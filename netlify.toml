@@ -1,3 +1,21 @@
 [build]
   command = "npm run build"
   publish = "dist"
+
+# Supabase publishable/anon values — they ship inside the client bundle by design, so they are
+# public, not secrets. Row Level Security is what actually guards the data.
+[build.environment]
+  VITE_SUPABASE_URL = "https://uumbvunbgcbkzoenupay.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_UVLFeDFDrxvAeVesqdEeHw_pdQRrzLb"
+
+# SPA fallback. Functions with an explicit `path` config (api/myinstants) route before this.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
