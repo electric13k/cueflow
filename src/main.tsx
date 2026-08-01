@@ -6,6 +6,7 @@ import "./styles.css";
 import Home from "./pages/Home";
 import Studio from "./pages/Studio";
 import Audience from "./pages/Audience";
+import CookieConsent from "./components/CookieConsent";
 
 // Bridge HeroUI's href-based components to react-router for client-side navigation.
 function Providers({ children }: { children: ReactNode }) {
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/audience" element={<Audience />} />
           <Route path="*" element={<Home />} />
         </Routes>
+        <CookieConsent />
       </Providers>
     </BrowserRouter>
   </StrictMode>

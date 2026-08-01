@@ -8,7 +8,13 @@ export class AudioEngine {
 }
 export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return new File([encodeWav(reversed)], `${name}-reversed.wav`, { type: "audio/wav" }); }
 // --- Buffer editing (waveform region trim, stereo/mono, per-channel gain) ---
-export async function decodeAudioUrl(url: string) { const res = await fetch(url); if (!res.ok) throw new Error("Could not load this audio"); const bytes = await res.arrayBuffer(); const ctx = new AudioContext(); const decoded = await ctx.decodeAudioData(bytes); await ctx.close(); return decoded; }
+const decodeCache = new Map<string, AudioBuffer>(); // ponytail: unbounded, fine for a session's handful of tracks
+export async function decodeAudioUrl(url: string) {
+  const hit = decodeCache.get(url); if (hit) return hit;
+  const res = await fetch(url); if (!res.ok) throw new Error("Could not load this audio");
+  const bytes = await res.arrayBuffer(); const ctx = new AudioContext(); const decoded = await ctx.decodeAudioData(bytes); await ctx.close();
+  decodeCache.set(url, decoded); return decoded;
+}
 export function sliceBuffer(src: AudioBuffer, from: number, to: number) {
   const start = Math.max(0, Math.floor(from * src.sampleRate)), end = Math.min(src.length, Math.floor(to * src.sampleRate));
   const length = Math.max(1, end - start);
