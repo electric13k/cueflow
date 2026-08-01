@@ -25,8 +25,12 @@ export default async (req: Request) => {
       seen.add(path);
       items.push({ name: m[2].trim(), url: `https://www.myinstants.com${path}` });
     }
-    // Myinstants may serve a bot-block page to datacenter IPs; ?debug=1 shows what we actually got.
+    // Myinstants sits behind Cloudflare, which serves an interstitial challenge to datacenter IPs
+    // instead of search results. Say so plainly rather than returning a silent empty list.
     if (params.get("debug")) return Response.json({ items, htmlLength: html.length, head: html.slice(0, 600) });
+    if (!items.length && /challenges\.cloudflare\.com|Just a moment/.test(html)) {
+      return Response.json({ error: "Myinstants is blocking this server (Cloudflare bot check). Paste a direct sound URL instead.", items: [] }, { status: 503 });
+    }
     return Response.json({ items }, { headers: { "cache-control": "public, max-age=300" } });
   } catch (e: any) {
     return Response.json({ error: String(e?.message ?? e) }, { status: 500 });
