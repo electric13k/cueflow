@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "@heroui/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronUp, ExternalLink, FastForward, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, ExternalLink, FastForward, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import Nav from "../components/Nav";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
@@ -26,6 +26,8 @@ export default function Studio() {
   const [tracks, setTracks] = useState<Track[]>(() => local.get("tracks", []));
   const [sequences, setSequences] = useState<Sequence[]>(() => local.get("sequences", []));
   const [selectedId, setSelectedId] = useState<string>(session.selectedId || local.get<Track[]>("tracks", [])[0]?.id || "");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]); // multi-select for editor + add-to-sequence
+  const [loop, setLoop] = useState(false);
   const [sequenceId, setSequenceId] = useState<string>(session.sequenceId);
   const [cueIndex, setCueIndex] = useState(session.cueIndex);
   const [tab, setTab] = useState(session.tab);
@@ -38,6 +40,7 @@ export default function Studio() {
 
   const selected = tracks.find(t => t.id === selectedId) ?? tracks[0];
   const selectedSequence = sequences.find(s => s.id === sequenceId);
+  useEffect(() => { audio.current.loop = loop; }, [loop]);
 
   useEffect(() => { void persist(tracks, sequences); }, [tracks, sequences]);
   useEffect(() => { local.set("session", { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
@@ -66,6 +69,9 @@ export default function Studio() {
     try { await engine.current.play(audio.current, fx); setPlaying(true); } catch { setPlaying(false); }
   };
   const toggle = () => { if (playing) { audio.current.pause(); setPlaying(false); } else void play(); };
+  // Soundboard: click a card to play it now (and make it the active/editor track).
+  const playTrack = (track: Track) => { if (track.id === selectedId && playing) { audio.current.pause(); setPlaying(false); return; } setSelectedId(track.id); void play(track, track.effects); };
+  const toggleSelect = (id: string) => setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
   const jump = (s: number) => { audio.current.currentTime = Math.max(0, Math.min(audio.current.duration || 0, audio.current.currentTime + s)); };
   const seek = (v: number) => { audio.current.currentTime = v; setTime(v); };
   const playCue = (i: number) => { if (!selectedSequence) return; const item = selectedSequence.items[i]; if (!item) return; const track = tracks.find(t => t.id === item.trackId); setCueIndex(i); if (track) void play(track, item.effects); };
@@ -99,7 +105,12 @@ export default function Studio() {
 
   const addSequence = () => { const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() }; setSequences(o => [...o, seq]); setSequenceId(seq.id); setCueIndex(0); };
   const deleteSequence = (id: string) => { setSequences(o => o.filter(s => s.id !== id)); if (sequenceId === id) setSequenceId(sequences.find(s => s.id !== id)?.id ?? ""); };
-  const addItem = () => { if (!selected || !sequenceId) return; setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: [...s.items, { id: crypto.randomUUID(), trackId: selected.id, label: selected.title, effects: cloneEffects(selected.effects) }] })); };
+  const addItem = () => {
+    if (!sequenceId) return;
+    const chosen = (selectedIds.length ? selectedIds.map(id => tracks.find(t => t.id === id)) : [selected]).filter(Boolean) as Track[];
+    if (!chosen.length) return;
+    setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: [...s.items, ...chosen.map(t => ({ id: crypto.randomUUID(), trackId: t.id, label: t.title, effects: cloneEffects(t.effects) }))] }));
+  };
   const deleteItem = (itemId: string) => setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: s.items.filter(i => i.id !== itemId) }));
   const moveItem = (i: number, dir: -1 | 1) => setSequences(o => o.map(s => { if (s.id !== sequenceId) return s; const j = i + dir; if (j < 0 || j >= s.items.length) return s; const items = [...s.items]; [items[i], items[j]] = [items[j], items[i]]; return { ...s, items }; }));
 
@@ -122,7 +133,7 @@ export default function Studio() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="mt-6">
           <Tabs aria-label="Sections" selectedKey={tab} onSelectionChange={k => setTab(String(k))} color="primary" variant="solid" radius="lg" classNames={{ tabList: "bg-content1/60 backdrop-blur" }}>
             <Tab key="library" title={<span className="flex items-center gap-2"><Volume2 size={16} />Library</span>}>
-              <Library tracks={tracks} selectedId={selected?.id ?? ""} onSelect={setSelectedId} onAdd={addFiles} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importSound={importSound} onAddToSequence={addItem} hasSequence={!!sequenceId} />
+              <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importSound={importSound} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
             <Tab key="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
               <Editor track={selected} busy={busy} update={updateEffects} bakeReverse={bakeReverse} onRename={() => selected && openRename("track", selected.id, selected.title)} />
@@ -134,7 +145,7 @@ export default function Studio() {
         </motion.div>
       </div>
 
-      <AnimatePresence>{selected && <Player key="player" track={selected} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+      <AnimatePresence>{selected && <Player key="player" track={selected} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -147,13 +158,14 @@ export default function Studio() {
   );
 }
 
-function Library({ tracks, selectedId, onSelect, onAdd, onDelete, onRename, importSound, onAddToSequence, hasSequence }: any) {
+function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleSelect, onAdd, onDelete, onRename, importSound, onAddToSequence, hasSequence }: any) {
+  const count = selectedIds.length;
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Cloud library</p><h2 className="text-xl font-bold">Your soundboard</h2></div>
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Soundboard</p><h2 className="text-xl font-bold">Click a sound to play</h2></div>
         <div className="flex gap-2">
-          <Tooltip content={hasSequence ? "" : "Create a sequence first"} isDisabled={hasSequence}><span><Button variant="bordered" startContent={<Plus size={16} />} isDisabled={!hasSequence} onPress={onAddToSequence}>Add to sequence</Button></span></Tooltip>
+          <Tooltip content={hasSequence ? "" : "Create a sequence first"} isDisabled={hasSequence}><span><Button variant="bordered" startContent={<Plus size={16} />} isDisabled={!hasSequence} onPress={onAddToSequence}>Add {count > 1 ? `${count} ` : ""}to sequence</Button></span></Tooltip>
           <Button as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept="audio/*" multiple onChange={onAdd} /></Button>
         </div>
       </div>
@@ -163,24 +175,28 @@ function Library({ tracks, selectedId, onSelect, onAdd, onDelete, onRename, impo
         </motion.div>
       ) : (
         <motion.div layout className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <AnimatePresence>{tracks.map((t: Track, i: number) => (
+          <AnimatePresence>{tracks.map((t: Track, i: number) => {
+            const isPlaying = playingId === t.id, isChecked = selectedIds.includes(t.id);
+            return (
             <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={{ y: -3 }}>
-              <Card isPressable onPress={() => onSelect(t.id)} className={`w-full border ${selectedId === t.id ? "border-primary bg-primary/10" : "border-default-100 bg-content1/60"} ${t.pending ? "opacity-70" : ""}`}>
+              <Card isPressable onPress={() => onPlay(t)} className={`w-full border ${isPlaying ? "border-primary bg-primary/15" : selectedId === t.id ? "border-primary/60 bg-primary/5" : "border-default-100 bg-content1/60"} ${t.pending ? "opacity-70" : ""}`}>
                 <CardBody className="gap-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="flex items-center gap-2 font-semibold capitalize leading-tight">{t.pending && <Spinner size="sm" />}{t.title}</p>
+                  <div className="flex items-start gap-2">
+                    <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${isPlaying ? "bg-primary text-primary-foreground" : "bg-default-100 text-foreground"}`}>{t.pending ? <Spinner size="sm" /> : isPlaying ? <Pause fill="currentColor" size={15} /> : <Play fill="currentColor" size={15} />}</span>
+                    <p className="min-w-0 flex-1 truncate pt-1.5 font-semibold capitalize leading-tight">{t.title}</p>
                     <div className="flex shrink-0 gap-1">
+                      <Tooltip content={isChecked ? "Deselect" : "Select"}><Button isIconOnly size="sm" variant={isChecked ? "solid" : "light"} color={isChecked ? "primary" : "default"} onPress={() => onToggleSelect(t.id)}><Check size={14} /></Button></Tooltip>
                       <Button isIconOnly size="sm" variant="light" onPress={() => onRename(t.id)}><Pencil size={14} /></Button>
                       <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => onDelete(t.id)}><Trash2 size={14} /></Button>
                     </div>
                   </div>
                   {t.error
                     ? <p className="flex items-center gap-1 text-xs text-warning"><TriangleAlert size={12} /> local only — cloud save failed</p>
-                    : <p className="text-xs text-default-500">{t.effects.speed}x • {Math.round(t.effects.volume * 100)}% vol{t.effects.reverb ? " • reverb" : ""}</p>}
+                    : <p className="pl-10 text-xs text-default-500">{t.effects.speed}x • {Math.round(t.effects.volume * 100)}% vol{t.effects.reverb ? " • reverb" : ""}</p>}
                 </CardBody>
               </Card>
             </motion.div>
-          ))}</AnimatePresence>
+          );})}</AnimatePresence>
         </motion.div>
       )}
       <MyInstantsPanel importSound={importSound} />
@@ -303,7 +319,7 @@ function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effect
   );
 }
 
-function Player({ track, playing, toggle, time, duration, seek, jump, effects, update }: any) {
+function Player({ track, playing, toggle, time, duration, seek, jump, loop, setLoop, effects, update }: any) {
   const [open, setOpen] = useState(false);
   return (
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
@@ -313,6 +329,7 @@ function Player({ track, playing, toggle, time, duration, seek, jump, effects, u
         <Tooltip content="Back 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
         <Button isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-primary/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
         <Tooltip content="Forward 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(5)}><FastForward size={18} /></Button></Tooltip>
+        <Tooltip content={loop ? "Looping" : "Loop"}><Button isIconOnly variant={loop ? "solid" : "flat"} color={loop ? "primary" : "default"} radius="full" onPress={() => setLoop((l: boolean) => !l)}><Repeat size={18} /></Button></Tooltip>
         <Tooltip content="Live effects"><Button isIconOnly variant={open ? "solid" : "flat"} color={open ? "primary" : "default"} radius="full" onPress={() => setOpen(o => !o)}><SlidersHorizontal size={18} /></Button></Tooltip>
       </div>
       <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => seek(Array.isArray(v) ? v[0] : v)} />
