@@ -1,13 +1,15 @@
 # CueFlow
 
-A React/Tailwind/WebGL stage-audio player with a non-destructive Web Audio editor, keyboard-driven manual sequences, audience-only presenter display, local persistence, and optional Supabase cloud storage.
+A React / Tailwind / HeroUI / WebGL stage-audio cue player: cloud sound library, a non-destructive Web Audio editor (speed, volume, gain, reverb, fade, distortion, reverse), keyboard-driven manual sequences, live playback effects, and a blackout audience display for presenter mode.
 
 ## Run
 
-`npm install && npm run dev`
+```
+npm install && npm run dev
+```
 
-The supplied MP3s are preloaded, and **Build Clue-less sequence** produces the 18 cues extracted from `Clue-Less Script.pdf`. Uploads work immediately in-browser; configure the two variables in `.env.example`, enable Anonymous Sign-Ins in Supabase Auth, and apply `supabase/migrations/0001_cueflow.sql` for private cloud Storage.
+Copy `.env.example` to `.env` and set the two Supabase variables for cloud storage. Uploads (local files or a Myinstants URL) are saved to the public Supabase `audio` bucket; sound and sequence metadata persist in the browser. Without Supabase vars the app still runs — uploads live in-browser only.
 
 ## Presenter mode
 
-Open **audience display** in a separate window and move that window to the mirrored/projected screen. It is a pure-black window with no controls, cue text, or app chrome — the audience sees nothing while you drive cues from the primary display. The browser cannot pick the OS mirror target for you, so you position the window once.
+Click **Audience display** to open a pure-black window with no controls or chrome, then drag it onto the mirrored/projected screen — the audience sees nothing while you drive cues from the primary display. Sequences never autoplay: advance with the ← → arrow keys or click a cue. The browser can't pick the OS mirror target for you, so position the window once.
