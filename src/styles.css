@@ -1,4 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@layer base { body { @apply m-0 min-h-screen bg-background text-foreground font-sans antialiased; } }
+
+@layer base {
+  body {
+    @apply m-0 min-h-screen bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(60rem 40rem at 78% -10%, rgba(34, 211, 238, .10), transparent 60%),
+      radial-gradient(50rem 40rem at 10% 110%, rgba(167, 139, 250, .10), transparent 60%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3 { @apply font-display; }
+}
+
+@layer components {
+  /* Liquid glass: translucent, blurred, inner top highlight + soft outer shadow. */
+  .glass {
+    @apply rounded-3xl border border-white/10 bg-white/[.045] shadow-glass backdrop-blur-2xl;
+  }
+  .glass-hover { @apply transition-colors hover:border-primary/40 hover:bg-white/[.07]; }
+  .glass-soft { @apply rounded-2xl border border-white/10 bg-white/[.03] backdrop-blur-xl; }
+}
+
+/* Slim, on-brand scrollbar */
+* { scrollbar-width: thin; scrollbar-color: rgba(34,211,238,.35) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(34,211,238,.3); border-radius: 9999px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,.5); }

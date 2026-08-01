@@ -43,7 +43,7 @@ export default function Home() {
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((f, i) => (
               <motion.div key={f.title} {...fade(i * .05)}>
-                <Card className="h-full border border-default-100 bg-content1/60"><CardBody className="gap-3 p-6">
+                <Card className="glass glass-hover h-full bg-transparent"><CardBody className="gap-3 p-6">
                   <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/15 text-primary"><f.icon size={22} /></div>
                   <h3 className="text-lg font-bold">{f.title}</h3>
                   <p className="text-sm text-default-500">{f.body}</p>

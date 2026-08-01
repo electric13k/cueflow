@@ -2,6 +2,12 @@ import { createClient } from "@supabase/supabase-js";
 import type { Sequence, SequenceItem, Track } from "../types";
 const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const supabase = url && key ? createClient(url, key) : null;
+
+// Auth: email + password. Cloud save/hydrate already gate on getUser(), so signing in activates them.
+export async function signUp(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signUp({ email, password }); if (error) throw error; }
+export async function signIn(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error; }
+export async function signOut() { await supabase?.auth.signOut(); }
+export function onAuth(cb: (email: string | null) => void) { if (!supabase) { cb(null); return () => {}; } supabase.auth.getUser().then(({ data }) => cb(data.user?.email ?? null)); const { data } = supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.email ?? null)); return () => data.subscription.unsubscribe(); }
 export const local = { get<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(`cueflow:${key}`) || "") as T; } catch { return fallback; } }, set(key: string, value: unknown) { localStorage.setItem(`cueflow:${key}`, JSON.stringify(value)); } };
 // Session-free upload: anon key writes to the public/ prefix (RLS policy allows it), bucket is public-read.
 export async function uploadTrack(file: File) { if (!supabase) return URL.createObjectURL(file); const path = `public/${crypto.randomUUID()}-${file.name}`; const { error } = await supabase.storage.from("audio").upload(path, file, { contentType: file.type || "audio/mpeg", upsert: false }); if (error) throw error; return supabase.storage.from("audio").getPublicUrl(path).data.publicUrl; }

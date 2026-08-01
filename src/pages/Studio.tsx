@@ -1,11 +1,12 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "@heroui/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronUp, ExternalLink, FastForward, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, ExternalLink, FastForward, Keyboard, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import Nav from "../components/Nav";
+import WaveformEditor from "../components/WaveformEditor";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
-import { hydrateCloud, local, persist, uploadTrack } from "../lib/store";
+import { hydrateCloud, local, onAuth, persist, uploadTrack } from "../lib/store";
 import { cloneEffects, defaultEffects, Effects, Sequence, SequenceItem, Track } from "../types";
 
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
@@ -18,6 +19,19 @@ const controls: Ctl[] = [
 ];
 type Session = { selectedId: string; sequenceId: string; cueIndex: number; tab: string };
 const patch = (arr: Track[], id: string, p: Partial<Track>) => arr.map(t => t.id === id ? { ...t, ...p } : t);
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+// Configurable keybinds: arrows drive cues, other keys nudge live effects.
+type Action = "nextCue" | "prevCue" | "playPause" | "volUp" | "volDown" | "speedUp" | "speedDown" | "reverbUp" | "reverbDown";
+const keyActions: { id: Action; label: string; def: string }[] = [
+  { id: "nextCue", label: "Next cue", def: "ArrowRight" }, { id: "prevCue", label: "Previous cue", def: "ArrowLeft" },
+  { id: "playPause", label: "Play / pause", def: " " },
+  { id: "volUp", label: "Volume +", def: "ArrowUp" }, { id: "volDown", label: "Volume −", def: "ArrowDown" },
+  { id: "speedUp", label: "Speed +", def: "]" }, { id: "speedDown", label: "Speed −", def: "[" },
+  { id: "reverbUp", label: "Reverb +", def: "r" }, { id: "reverbDown", label: "Reverb −", def: "e" },
+];
+const defaultBinds = Object.fromEntries(keyActions.map(a => [a.id, a.def])) as Record<Action, string>;
+const keyLabel = (k: string) => k === " " ? "Space" : ({ ArrowRight: "→", ArrowLeft: "←", ArrowUp: "↑", ArrowDown: "↓" } as Record<string, string>)[k] ?? (k.length === 1 ? k.toUpperCase() : k);
 
 export default function Studio() {
   const audio = useRef<HTMLAudioElement>(new Audio());
@@ -28,6 +42,9 @@ export default function Studio() {
   const [selectedId, setSelectedId] = useState<string>(session.selectedId || local.get<Track[]>("tracks", [])[0]?.id || "");
   const [selectedIds, setSelectedIds] = useState<string[]>([]); // multi-select for editor + add-to-sequence
   const [loop, setLoop] = useState(false);
+  const [loopSeq, setLoopSeq] = useState(false);
+  const [binds, setBinds] = useState<Record<Action, string>>(() => local.get("keybinds", defaultBinds));
+  const keybindsModal = useDisclosure();
   const [sequenceId, setSequenceId] = useState<string>(session.sequenceId);
   const [cueIndex, setCueIndex] = useState(session.cueIndex);
   const [tab, setTab] = useState(session.tab);
@@ -44,7 +61,12 @@ export default function Studio() {
 
   useEffect(() => { void persist(tracks, sequences); }, [tracks, sequences]);
   useEffect(() => { local.set("session", { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
-  useEffect(() => { void hydrateCloud().then(cloud => { if (!cloud) return; setTracks(o => [...o, ...cloud.tracks.filter(t => !o.some(e => e.id === t.id))]); setSequences(o => [...o, ...cloud.sequences.filter(s => !o.some(e => e.id === s.id))]); }); }, []);
+  useEffect(() => { local.set("keybinds", binds); }, [binds]);
+  const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
+  const mergeCloud = () => hydrateCloud().then(cloud => { if (!cloud) return; setTracks(o => [...o, ...cloud.tracks.filter(t => !o.some(e => e.id === t.id))]); setSequences(o => [...o, ...cloud.sequences.filter(s => !o.some(e => e.id === s.id))]); });
+  useEffect(() => { void mergeCloud(); }, []);
+  // On sign-in: pull the account's saved data and push whatever is currently local up to it.
+  useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences)); }), []);
   useEffect(() => {
     const a = audio.current; a.crossOrigin = "anonymous";
     const tick = () => { setTime(a.currentTime); const fade = selected?.effects.fadeOut ?? 0; if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, selected!.effects.volume * (a.duration - a.currentTime) / fade); };
@@ -55,9 +77,22 @@ export default function Studio() {
   }, [selected]);
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
-      if (!selectedSequence || ["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) return;
-      if (e.key === "ArrowRight") { e.preventDefault(); playCue(Math.min(cueIndex + 1, selectedSequence.items.length - 1)); }
-      if (e.key === "ArrowLeft") { e.preventDefault(); playCue(Math.max(cueIndex - 1, 0)); }
+      const el = e.target as HTMLElement; if (["INPUT", "TEXTAREA"].includes(el.tagName) || el.isContentEditable) return;
+      const action = (Object.keys(binds) as Action[]).find(a => binds[a] === e.key); if (!action) return;
+      if ((action === "nextCue" || action === "prevCue") && !selectedSequence) return;
+      if (["volUp", "volDown", "speedUp", "speedDown", "reverbUp", "reverbDown"].includes(action) && !selected) return;
+      e.preventDefault();
+      switch (action) {
+        case "nextCue": return advance(1);
+        case "prevCue": return advance(-1);
+        case "playPause": return toggle();
+        case "volUp": return nudge("volume", .05, 0, 1);
+        case "volDown": return nudge("volume", -.05, 0, 1);
+        case "speedUp": return nudge("speed", .05, .5, 2);
+        case "speedDown": return nudge("speed", -.05, .5, 2);
+        case "reverbUp": return nudge("reverb", .05, 0, 1);
+        case "reverbDown": return nudge("reverb", -.05, 0, 1);
+      }
     };
     window.addEventListener("keydown", keys); return () => window.removeEventListener("keydown", keys);
   });
@@ -75,6 +110,9 @@ export default function Studio() {
   const jump = (s: number) => { audio.current.currentTime = Math.max(0, Math.min(audio.current.duration || 0, audio.current.currentTime + s)); };
   const seek = (v: number) => { audio.current.currentTime = v; setTime(v); };
   const playCue = (i: number) => { if (!selectedSequence) return; const item = selectedSequence.items[i]; if (!item) return; const track = tracks.find(t => t.id === item.trackId); setCueIndex(i); if (track) void play(track, item.effects); };
+  const advance = (dir: 1 | -1) => { if (!selectedSequence) return; const n = selectedSequence.items.length; if (!n) return; const i = loopSeq ? (cueIndex + dir + n) % n : clamp(cueIndex + dir, 0, n - 1); playCue(i); };
+  const nudge = (key: keyof Effects, delta: number, min: number, max: number) => { if (!selected) return; updateEffects({ ...selected.effects, [key]: clamp(Number(selected.effects[key]) + delta, min, max) }); };
+  const startSequence = (audience: boolean) => { if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); playCue(0); };
 
   // Optimistic: the track appears instantly with a local object URL, then swaps to the cloud URL once uploaded.
   const addFiles = (e: ChangeEvent<HTMLInputElement>) => {
@@ -101,6 +139,8 @@ export default function Studio() {
     try { const file = await makeReversedFile(selected.url, selected.title); const url = await uploadTrack(file); setTracks(o => [{ id: crypto.randomUUID(), title: `${selected.title} (reversed)`, url, effects: { ...selected.effects, reverse: false }, createdAt: new Date().toISOString() }, ...o]); }
     catch (err) { alert(`Reverse failed: ${(err as Error).message}`); } finally { setBusy(false); }
   };
+  // Save an edited/clipped buffer from the waveform editor as a new cloud-backed track.
+  const addProcessedFile = async (file: File, title: string) => { const url = await uploadTrack(file); setTracks(o => [{ id: crypto.randomUUID(), title, url, effects: defaultEffects(), createdAt: new Date().toISOString() }, ...o]); };
   const deleteTrack = (id: string) => { setTracks(o => o.filter(t => t.id !== id)); setSequences(o => o.map(s => ({ ...s, items: s.items.filter(i => i.trackId !== id) }))); if (selectedId === id) setSelectedId(tracks.find(t => t.id !== id)?.id ?? ""); };
 
   const addSequence = () => { const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() }; setSequences(o => [...o, seq]); setSequenceId(seq.id); setCueIndex(0); };
@@ -125,21 +165,22 @@ export default function Studio() {
       <div className="mx-auto max-w-7xl px-4 py-6 pb-44 sm:px-6 lg:px-8">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-[11px] font-semibold uppercase tracking-[.3em] text-primary">Studio</p><h1 className="text-2xl font-black tracking-tight sm:text-3xl">Cue board</h1></div>
-          <Tooltip content="Opens a black window — drag it to the mirrored display" placement="bottom">
-            <Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}>Audience display</Button>
-          </Tooltip>
+          <div className="flex gap-2">
+            <Tooltip content="Set the keys for cues and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}>Keybinds</Button></Tooltip>
+            <Tooltip content="Opens a black window — drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}>Audience display</Button></Tooltip>
+          </div>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="mt-6">
-          <Tabs aria-label="Sections" selectedKey={tab} onSelectionChange={k => setTab(String(k))} color="primary" variant="solid" radius="lg" classNames={{ tabList: "bg-content1/60 backdrop-blur" }}>
+          <Tabs aria-label="Sections" selectedKey={tab} onSelectionChange={k => setTab(String(k))} color="primary" variant="solid" radius="lg" classNames={{ tabList: "glass-soft" }}>
             <Tab key="library" title={<span className="flex items-center gap-2"><Volume2 size={16} />Library</span>}>
               <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importSound={importSound} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
             <Tab key="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
-              <Editor track={selected} busy={busy} update={updateEffects} bakeReverse={bakeReverse} onRename={() => selected && openRename("track", selected.id, selected.title)} />
+              <Editor track={selected} busy={busy} update={updateEffects} bakeReverse={bakeReverse} onSave={addProcessedFile} onRename={() => selected && openRename("track", selected.id, selected.title)} />
             </Tab>
             <Tab key="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
-              <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} playCue={playCue} cueIndex={cueIndex} />
+              <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} />
             </Tab>
           </Tabs>
         </motion.div>
@@ -154,6 +195,8 @@ export default function Studio() {
           <ModalFooter><Button variant="light" onPress={onClose}>Cancel</Button><Button color="primary" onPress={() => { commitRename(); onClose(); }}>Save</Button></ModalFooter>
         </>)}</ModalContent>
       </Modal>
+
+      <KeybindsModal disc={keybindsModal} binds={binds} setBinds={setBinds} />
     </div>
   );
 }
@@ -217,7 +260,7 @@ function MyInstantsPanel({ importSound }: { importSound: (title: string, url: st
   };
   const importUrl = () => { const u = url.trim(); if (!u) return; const title = u.split("/").filter(Boolean).pop()?.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ") || "Sound"; importSound(title, u); setUrl(""); };
   return (
-    <div className="space-y-3 rounded-2xl border border-default-100 bg-content1/40 p-4">
+    <div className="glass-soft space-y-3 p-4">
       <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-primary" /> Myinstants sync</p>
       <div className="flex flex-wrap gap-2">
         <Input className="flex-1 min-w-56" size="sm" value={q} onValueChange={setQ} placeholder="Search Myinstants (e.g. airhorn, vine boom)" onKeyDown={(e: any) => e.key === "Enter" && search()} />
@@ -242,14 +285,15 @@ function MyInstantsPanel({ importSound }: { importSound: (title: string, url: st
   );
 }
 
-function Editor({ track, busy, update, bakeReverse, onRename }: any) {
+function Editor({ track, busy, update, bakeReverse, onSave, onRename }: any) {
   if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-default-500">Select a sound in the Library to edit it.</div>;
   return (
     <div className="mt-5 space-y-6">
       <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Non-destructive editor</p><h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button></h2></div>
-      <p className="max-w-2xl text-sm text-default-500">Edits save with this sound and apply live in playback and sequences. Reverse renders a new cloud-backed WAV.</p>
+      <p className="max-w-2xl text-sm text-default-500">Effects save with this sound and apply live in playback and sequences. The waveform tools render new cloud-backed WAVs — clip a region, mix to mono, or balance the left/right channels.</p>
+      <WaveformEditor track={track} onSave={onSave} />
       <EffectGrid effects={track.effects} update={update} />
-      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-default-100 bg-content1/40 p-4">
+      <div className="glass-soft flex flex-wrap items-center gap-4 p-4">
         <Switch isSelected={track.effects.reverse} onValueChange={v => update({ ...track.effects, reverse: v })}>Mark for reverse render</Switch>
         {track.effects.reverse && <Button color="primary" variant="flat" startContent={busy ? <Spinner size="sm" color="current" /> : <RotateCcw size={16} />} isDisabled={busy} onPress={bakeReverse}>Render & save reversed</Button>}
       </div>
@@ -257,7 +301,7 @@ function Editor({ track, busy, update, bakeReverse, onRename }: any) {
   );
 }
 
-function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, addItem, deleteItem, moveItem, playCue, cueIndex }: any) {
+function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, playCue, cueIndex, loopSeq, setLoopSeq, startSequence }: any) {
   const seq = sequences.find((s: Sequence) => s.id === sequenceId);
   return (
     <div className="mt-5 space-y-6">
@@ -280,7 +324,16 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
         <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-default-500">Create a sequence, then add sounds from the Library. It never autoplays — drive it with the ← → arrow keys or click a cue.</div>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-default-500"><span>Adds the selected sound{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</span><Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack} onPress={addItem}>Add cue</Button></div>
+          <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
+            <Button size="sm" color="primary" startContent={<Play size={14} fill="currentColor" />} isDisabled={!seq.items.length} onPress={() => startSequence(false)}>Start</Button>
+            <Button size="sm" color="secondary" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(true)}>Start in audience mode</Button>
+            <Switch size="sm" isSelected={loopSeq} onValueChange={setLoopSeq}>Loop sequence</Switch>
+            <span className="ml-auto text-xs text-default-500">← → to step through cues</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-default-500">
+            <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected sounds</b>.</> : <>Adds the selected sound{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
+            <Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
+          </div>
           {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-default-500">Empty sequence. Add the selected sound above.</p> : (
             <ol className="space-y-2">
               <AnimatePresence>{seq.items.map((item: SequenceItem, i: number) => (
@@ -323,7 +376,7 @@ function Player({ track, playing, toggle, time, duration, seek, jump, loop, setL
   const [open, setOpen] = useState(false);
   return (
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
-      className="fixed bottom-4 left-1/2 z-20 w-[min(96vw,1080px)] -translate-x-1/2 rounded-3xl border border-default-100 bg-content1/80 p-3 shadow-2xl backdrop-blur-xl sm:p-4">
+      className="glass fixed bottom-4 left-1/2 z-20 w-[min(96vw,1080px)] -translate-x-1/2 p-3 sm:p-4">
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold capitalize">{track.title}</p><p className="text-xs text-default-500">{format(time)} / {format(duration)}</p></div>
         <Tooltip content="Back 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
@@ -345,5 +398,37 @@ function Player({ track, playing, toggle, time, duration, seek, jump, loop, setL
         </motion.div>
       )}</AnimatePresence>
     </motion.section>
+  );
+}
+
+function KeybindRow({ label, value, onSet }: { label: string; value: string; onSet: (k: string) => void }) {
+  const [listening, setListening] = useState(false);
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2">
+      <span className="text-sm">{label}</span>
+      <button
+        className={`min-w-24 rounded-lg border px-3 py-1.5 font-mono text-sm ${listening ? "border-primary bg-primary/15 text-primary" : "border-white/15 bg-white/5"}`}
+        onClick={() => setListening(true)} onBlur={() => setListening(false)}
+        onKeyDown={e => { if (!listening) return; e.preventDefault(); if (e.key === "Escape") return setListening(false); onSet(e.key); setListening(false); }}
+      >{listening ? "Press a key…" : keyLabel(value)}</button>
+    </div>
+  );
+}
+
+function KeybindsModal({ disc, binds, setBinds }: { disc: ReturnType<typeof useDisclosure>; binds: Record<Action, string>; setBinds: (u: (b: Record<Action, string>) => Record<Action, string>) => void }) {
+  return (
+    <Modal isOpen={disc.isOpen} onOpenChange={disc.onOpenChange} placement="center" backdrop="blur" scrollBehavior="inside">
+      <ModalContent>{onClose => (<>
+        <ModalHeader className="flex items-center gap-2"><Keyboard size={18} className="text-primary" />Keybinds</ModalHeader>
+        <ModalBody className="gap-2">
+          <p className="text-xs text-default-500">Click a key box, then press a key to bind it. Cue keys work in the Sequences tab; effect keys nudge the currently playing sound.</p>
+          {keyActions.map(a => <KeybindRow key={a.id} label={a.label} value={binds[a.id]} onSet={k => setBinds(b => ({ ...b, [a.id]: k }))} />)}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="light" onPress={() => setBinds(() => defaultBinds)}>Reset defaults</Button>
+          <Button color="primary" onPress={onClose}>Done</Button>
+        </ModalFooter>
+      </>)}</ModalContent>
+    </Modal>
   );
 }
