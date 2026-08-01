@@ -1,5 +1,5 @@
 import { type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Slider, Spinner, Switch } from "@heroui/react";
+import { Button, Slider, Spinner, Switch } from "../ui";
 import { Crop, Pause, Play, Save, Scissors, Volume2, VolumeX } from "lucide-react";
 import { bufferToWavFile, decodeAudioUrl, processBuffer, sliceBuffer } from "../lib/audio";
 
@@ -73,7 +73,7 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
 
   const setC = (i: number, p: Partial<Chan>) => setChan(cs => cs.map((c, j) => (j === i ? { ...c, ...p } : c)));
 
-  if (loading) return <div className="glass-soft flex items-center gap-3 p-6 text-default-500"><Spinner size="sm" /> Loading waveform…</div>;
+  if (loading) return <div className="glass-soft flex items-center gap-3 p-6 text-muted"><Spinner size="sm" /> Loading waveform…</div>;
   if (err) return <div className="glass-soft p-6 text-sm text-warning">Couldn’t load audio for editing: {err}</div>;
   if (!buffer) return null;
 
@@ -81,7 +81,7 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
     <div className="glass-soft space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold">Waveform — drag to select a region</p>
-        <p className="text-xs text-default-500">{buffer.numberOfChannels === 2 ? "Stereo" : buffer.numberOfChannels === 1 ? "Mono" : `${buffer.numberOfChannels}ch`} • {fmt(buffer.duration)}{sel && <> • selection {fmt(sel.start)}–{fmt(sel.end)} ({fmt(sel.end - sel.start)})</>}</p>
+        <p className="text-xs text-muted">{buffer.numberOfChannels === 2 ? "Stereo" : buffer.numberOfChannels === 1 ? "Mono" : `${buffer.numberOfChannels}ch`} • {fmt(buffer.duration)}{sel && <> • selection {fmt(sel.start)}–{fmt(sel.end)} ({fmt(sel.end - sel.start)})</>}</p>
       </div>
       <canvas ref={canvas} onPointerDown={down} onPointerMove={move} onPointerUp={up} className="h-40 w-full cursor-crosshair touch-none rounded-xl border border-white/10 bg-black/30" />
       <div className="flex flex-wrap items-center gap-2">
@@ -104,7 +104,7 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
         <Button color="primary" isLoading={saving} startContent={sel ? <Crop size={16} /> : <Save size={16} />} onPress={save}>
           {sel ? "Save selection as new sound" : "Save edited copy"}
         </Button>
-        <span className="text-xs text-default-500">Renders a new cloud-backed WAV; the original is untouched.</span>
+        <span className="text-xs text-muted">Renders a new cloud-backed WAV; the original is untouched.</span>
       </div>
     </div>
   );

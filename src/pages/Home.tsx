@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Button, Card, CardBody } from "@heroui/react";
+import { Button, Card, CardBody } from "../ui";
 import { motion } from "framer-motion";
 import { ArrowRight, Cloud, Download, Keyboard, ListMusic, Monitor, Music, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
 import Backdrop from "../components/Backdrop";
@@ -23,17 +23,17 @@ export default function Home() {
       <Nav />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <section className="grid place-items-center py-20 text-center sm:py-28">
-          <motion.div initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .5 }} className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[.28em] text-primary">
+          <motion.div initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .5 }} className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[.28em] text-accent">
             <Sparkles size={13} /> Live audio cue system
           </motion.div>
           <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .05 }} className="mt-6 max-w-4xl text-5xl font-black leading-[1.03] tracking-tight sm:text-7xl">
-            Run your sound like a <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">slideshow</span>.
+            Run your sound like a <span className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">slideshow</span>.
           </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .12 }} className="mt-6 max-w-2xl text-lg text-default-500">
+          <motion.p initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .12 }} className="mt-6 max-w-2xl text-lg text-muted">
             CueFlow is a browser soundboard for theatre, presentations and streams: a waveform editor, arrow-key cue sequences, and a blackout presenter display — no downloads, no autoplay surprises.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .19 }} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-primary/30">Open the Studio</Button>
+            <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>
             <Button as="a" href="#features" size="lg" variant="bordered">See features</Button>
           </motion.div>
         </section>
@@ -44,9 +44,9 @@ export default function Home() {
             {features.map((f, i) => (
               <motion.div key={f.title} {...fade(i * .05)}>
                 <Card className="glass glass-hover h-full bg-transparent"><CardBody className="gap-3 p-6">
-                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/15 text-primary"><f.icon size={22} /></div>
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-accent/15 text-accent"><f.icon size={22} /></div>
                   <h3 className="text-lg font-bold">{f.title}</h3>
-                  <p className="text-sm text-default-500">{f.body}</p>
+                  <p className="text-sm text-muted">{f.body}</p>
                 </CardBody></Card>
               </motion.div>
             ))}
@@ -55,13 +55,13 @@ export default function Home() {
 
         <section className="py-16">
           <motion.div {...fade()}>
-            <Card className="glass overflow-hidden border-primary/20 bg-gradient-to-br from-primary/15 to-secondary/10">
+            <Card className="glass overflow-hidden border-accent/20 bg-gradient-to-br from-accent/15 to-secondary/10">
               <CardBody className="grid items-center gap-6 p-8 sm:grid-cols-[1fr_auto] sm:p-12">
                 <div>
                   <h2 className="text-3xl font-black tracking-tight">Ready to build your first show?</h2>
-                  <p className="mt-3 max-w-xl text-default-500">Upload a few sounds, drop them into a sequence, and drive it with your arrow keys. Sign in and it all saves to your account.</p>
+                  <p className="mt-3 max-w-xl text-muted">Upload a few sounds, drop them into a sequence, and drive it with your arrow keys. Sign in and it all saves to your account.</p>
                 </div>
-                <Button href="/studio" color="primary" size="lg" endContent={<Music size={18} />} className="font-bold shadow-lg shadow-primary/30">Launch Studio</Button>
+                <Button href="/studio" color="primary" size="lg" endContent={<Music size={18} />} className="font-bold shadow-lg shadow-accent/30">Launch Studio</Button>
               </CardBody>
             </Card>
           </motion.div>
@@ -69,9 +69,9 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-white/10 py-8">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-default-500 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
           <span className="flex items-center gap-2"><Download size={14} /> CueFlow — React · HeroUI · Supabase · WebGL</span>
-          <Link to="/studio" className="font-semibold text-primary">Open Studio →</Link>
+          <Link to="/studio" className="font-semibold text-accent">Open Studio →</Link>
         </div>
       </footer>
     </div>

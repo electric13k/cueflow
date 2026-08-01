@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "@heroui/react";
+import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, ChevronUp, ExternalLink, FastForward, Keyboard, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
@@ -164,7 +164,7 @@ export default function Studio() {
       <Nav />
       <div className="mx-auto max-w-7xl px-4 py-6 pb-44 sm:px-6 lg:px-8">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[.3em] text-primary">Studio</p><h1 className="text-2xl font-black tracking-tight sm:text-3xl">Cue board</h1></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Studio</p><h1 className="text-2xl font-black tracking-tight sm:text-3xl">Cue board</h1></div>
           <div className="flex gap-2">
             <Tooltip content="Set the keys for cues and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}>Keybinds</Button></Tooltip>
             <Tooltip content="Opens a black window — drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}>Audience display</Button></Tooltip>
@@ -172,14 +172,14 @@ export default function Studio() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="mt-6">
-          <Tabs aria-label="Sections" selectedKey={tab} onSelectionChange={k => setTab(String(k))} color="primary" variant="solid" radius="lg" classNames={{ tabList: "glass-soft" }}>
-            <Tab key="library" title={<span className="flex items-center gap-2"><Volume2 size={16} />Library</span>}>
+          <Tabs selectedKey={tab} onSelectionChange={setTab} classNames={{ tabList: "glass-soft" }}>
+            <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Volume2 size={16} />Library</span>}>
               <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importSound={importSound} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
-            <Tab key="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
+            <Tab key="editor" id="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
               <Editor track={selected} busy={busy} update={updateEffects} bakeReverse={bakeReverse} onSave={addProcessedFile} onRename={() => selected && openRename("track", selected.id, selected.title)} />
             </Tab>
-            <Tab key="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
+            <Tab key="sequence" id="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
               <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} />
             </Tab>
           </Tabs>
@@ -206,7 +206,7 @@ function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleS
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Soundboard</p><h2 className="text-xl font-bold">Click a sound to play</h2></div>
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Soundboard</p><h2 className="text-xl font-bold">Click a sound to play</h2></div>
         <div className="flex gap-2">
           <Tooltip content={hasSequence ? "" : "Create a sequence first"} isDisabled={hasSequence}><span><Button variant="bordered" startContent={<Plus size={16} />} isDisabled={!hasSequence} onPress={onAddToSequence}>Add {count > 1 ? `${count} ` : ""}to sequence</Button></span></Tooltip>
           <Button as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept="audio/*" multiple onChange={onAdd} /></Button>
@@ -214,7 +214,7 @@ function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleS
       </div>
       {tracks.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center rounded-2xl border border-dashed border-default-200 py-16 text-center">
-          <Music size={40} className="text-default-400" /><p className="mt-3 font-semibold">No sounds yet</p><p className="text-sm text-default-500">Upload files or search Myinstants below.</p>
+          <Music size={40} className="text-muted" /><p className="mt-3 font-semibold">No sounds yet</p><p className="text-sm text-muted">Upload files or search Myinstants below.</p>
         </motion.div>
       ) : (
         <motion.div layout className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -222,10 +222,10 @@ function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleS
             const isPlaying = playingId === t.id, isChecked = selectedIds.includes(t.id);
             return (
             <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={{ y: -3 }}>
-              <Card isPressable onPress={() => onPlay(t)} className={`w-full border ${isPlaying ? "border-primary bg-primary/15" : selectedId === t.id ? "border-primary/60 bg-primary/5" : "border-default-100 bg-content1/60"} ${t.pending ? "opacity-70" : ""}`}>
+              <Card isPressable onPress={() => onPlay(t)} className={`w-full border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
                 <CardBody className="gap-2">
                   <div className="flex items-start gap-2">
-                    <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${isPlaying ? "bg-primary text-primary-foreground" : "bg-default-100 text-foreground"}`}>{t.pending ? <Spinner size="sm" /> : isPlaying ? <Pause fill="currentColor" size={15} /> : <Play fill="currentColor" size={15} />}</span>
+                    <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${isPlaying ? "bg-accent text-accent-foreground" : "bg-surface-secondary text-foreground"}`}>{t.pending ? <Spinner size="sm" /> : isPlaying ? <Pause fill="currentColor" size={15} /> : <Play fill="currentColor" size={15} />}</span>
                     <p className="min-w-0 flex-1 truncate pt-1.5 font-semibold capitalize leading-tight">{t.title}</p>
                     <div className="flex shrink-0 gap-1">
                       <Tooltip content={isChecked ? "Deselect" : "Select"}><Button isIconOnly size="sm" variant={isChecked ? "solid" : "light"} color={isChecked ? "primary" : "default"} onPress={() => onToggleSelect(t.id)}><Check size={14} /></Button></Tooltip>
@@ -235,7 +235,7 @@ function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleS
                   </div>
                   {t.error
                     ? <p className="flex items-center gap-1 text-xs text-warning"><TriangleAlert size={12} /> local only — cloud save failed</p>
-                    : <p className="pl-10 text-xs text-default-500">{t.effects.speed}x • {Math.round(t.effects.volume * 100)}% vol{t.effects.reverb ? " • reverb" : ""}</p>}
+                    : <p className="pl-10 text-xs text-muted">{t.effects.speed}x • {Math.round(t.effects.volume * 100)}% vol{t.effects.reverb ? " • reverb" : ""}</p>}
                 </CardBody>
               </Card>
             </motion.div>
@@ -261,23 +261,23 @@ function MyInstantsPanel({ importSound }: { importSound: (title: string, url: st
   const importUrl = () => { const u = url.trim(); if (!u) return; const title = u.split("/").filter(Boolean).pop()?.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ") || "Sound"; importSound(title, u); setUrl(""); };
   return (
     <div className="glass-soft space-y-3 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-primary" /> Myinstants sync</p>
+      <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Myinstants sync</p>
       <div className="flex flex-wrap gap-2">
         <Input className="flex-1 min-w-56" size="sm" value={q} onValueChange={setQ} placeholder="Search Myinstants (e.g. airhorn, vine boom)" onKeyDown={(e: any) => e.key === "Enter" && search()} />
         <Button size="sm" color="primary" variant="flat" isLoading={loading} onPress={search}>Search</Button>
         <Button size="sm" variant="light" as="a" href="https://www.myinstants.com" target="_blank" endContent={<ExternalLink size={14} />}>Open</Button>
       </div>
-      {note && <p className="text-xs text-default-500">{note}</p>}
+      {note && <p className="text-xs text-muted">{note}</p>}
       {results.length > 0 && (
         <motion.div layout className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
           {results.map(r => (
-            <button key={r.url} onClick={() => importSound(r.name, r.url)} className="flex items-center justify-between gap-2 rounded-xl border border-default-100 bg-content2/60 px-3 py-2 text-left text-sm hover:border-primary hover:bg-primary/10">
-              <span className="truncate">{r.name}</span><Plus size={15} className="shrink-0 text-primary" />
+            <button key={r.url} onClick={() => importSound(r.name, r.url)} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-content2/60 px-3 py-2 text-left text-sm hover:border-accent hover:bg-accent/10">
+              <span className="truncate">{r.name}</span><Plus size={15} className="shrink-0 text-accent" />
             </button>
           ))}
         </motion.div>
       )}
-      <div className="flex flex-wrap gap-2 border-t border-default-100 pt-3">
+      <div className="flex flex-wrap gap-2 border-t border-border pt-3">
         <Input className="flex-1 min-w-56" size="sm" value={url} onValueChange={setUrl} placeholder="…or paste a direct sound URL" onKeyDown={(e: any) => e.key === "Enter" && importUrl()} />
         <Button size="sm" variant="bordered" onPress={importUrl}>Import URL</Button>
       </div>
@@ -286,11 +286,11 @@ function MyInstantsPanel({ importSound }: { importSound: (title: string, url: st
 }
 
 function Editor({ track, busy, update, bakeReverse, onSave, onRename }: any) {
-  if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-default-500">Select a sound in the Library to edit it.</div>;
+  if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Select a sound in the Library to edit it.</div>;
   return (
     <div className="mt-5 space-y-6">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Non-destructive editor</p><h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button></h2></div>
-      <p className="max-w-2xl text-sm text-default-500">Effects save with this sound and apply live in playback and sequences. The waveform tools render new cloud-backed WAVs — clip a region, mix to mono, or balance the left/right channels.</p>
+      <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Non-destructive editor</p><h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button></h2></div>
+      <p className="max-w-2xl text-sm text-muted">Effects save with this sound and apply live in playback and sequences. The waveform tools render new cloud-backed WAVs — clip a region, mix to mono, or balance the left/right channels.</p>
       <WaveformEditor track={track} onSave={onSave} />
       <EffectGrid effects={track.effects} update={update} />
       <div className="glass-soft flex flex-wrap items-center gap-4 p-4">
@@ -306,13 +306,13 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">Manual cue deck</p><h2 className="text-xl font-bold">Sequences</h2></div>
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Manual cue deck</p><h2 className="text-xl font-bold">Sequences</h2></div>
         <Button color="primary" startContent={<Plus size={16} />} onPress={addSequence}>New sequence</Button>
       </div>
       {sequences.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {sequences.map((s: Sequence) => (
-            <div key={s.id} className={`flex items-center gap-1 rounded-full border px-1 pl-3 ${s.id === sequenceId ? "border-primary bg-primary/15" : "border-default-100 bg-content1/50"}`}>
+            <div key={s.id} className={`flex items-center gap-1 rounded-full border px-1 pl-3 ${s.id === sequenceId ? "border-accent bg-accent/15" : "border-border bg-surface/50"}`}>
               <button className="py-1.5 text-sm font-semibold" onClick={() => selectSequence(s.id)}>{s.name}</button>
               <Button isIconOnly size="sm" variant="light" onPress={() => renameSequence(s.id)}><Pencil size={13} /></Button>
               <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteSequence(s.id)}><Trash2 size={13} /></Button>
@@ -321,28 +321,28 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
         </div>
       )}
       {!seq ? (
-        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-default-500">Create a sequence, then add sounds from the Library. It never autoplays — drive it with the ← → arrow keys or click a cue.</div>
+        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Create a sequence, then add sounds from the Library. It never autoplays — drive it with the ← → arrow keys or click a cue.</div>
       ) : (
         <div className="space-y-3">
           <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
             <Button size="sm" color="primary" startContent={<Play size={14} fill="currentColor" />} isDisabled={!seq.items.length} onPress={() => startSequence(false)}>Start</Button>
             <Button size="sm" color="secondary" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(true)}>Start in audience mode</Button>
             <Switch size="sm" isSelected={loopSeq} onValueChange={setLoopSeq}>Loop sequence</Switch>
-            <span className="ml-auto text-xs text-default-500">← → to step through cues</span>
+            <span className="ml-auto text-xs text-muted">← → to step through cues</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-default-500">
+          <div className="flex items-center gap-2 text-sm text-muted">
             <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected sounds</b>.</> : <>Adds the selected sound{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
             <Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
           </div>
-          {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-default-500">Empty sequence. Add the selected sound above.</p> : (
+          {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-muted">Empty sequence. Add the selected sound above.</p> : (
             <ol className="space-y-2">
               <AnimatePresence>{seq.items.map((item: SequenceItem, i: number) => (
                 <motion.li key={item.id} layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
-                  <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${i === cueIndex ? "border-primary bg-primary/10" : "border-default-100 bg-content1/50"}`}>
+                  <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
                     <button className="flex flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
-                      <span className="font-mono text-sm text-primary">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="font-mono text-sm text-accent">{String(i + 1).padStart(2, "0")}</span>
                       <span className="font-medium capitalize">{item.label}</span>
-                      <span className="ml-auto text-xs text-default-500">{tracks.find((t: Track) => t.id === item.trackId)?.title ?? "missing"}</span>
+                      <span className="ml-auto text-xs text-muted">{tracks.find((t: Track) => t.id === item.trackId)?.title ?? "missing"}</span>
                     </button>
                     <div className="flex shrink-0">
                       <Button isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button>
@@ -378,9 +378,9 @@ function Player({ track, playing, toggle, time, duration, seek, jump, loop, setL
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
       className="glass fixed bottom-4 left-1/2 z-20 w-[min(96vw,1080px)] -translate-x-1/2 p-3 sm:p-4">
       <div className="flex items-center gap-3 sm:gap-4">
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold capitalize">{track.title}</p><p className="text-xs text-default-500">{format(time)} / {format(duration)}</p></div>
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold capitalize">{track.title}</p><p className="text-xs text-muted">{format(time)} / {format(duration)}</p></div>
         <Tooltip content="Back 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
-        <Button isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-primary/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
+        <Button isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-accent/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
         <Tooltip content="Forward 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(5)}><FastForward size={18} /></Button></Tooltip>
         <Tooltip content={loop ? "Looping" : "Loop"}><Button isIconOnly variant={loop ? "solid" : "flat"} color={loop ? "primary" : "default"} radius="full" onPress={() => setLoop((l: boolean) => !l)}><Repeat size={18} /></Button></Tooltip>
         <Tooltip content="Live effects"><Button isIconOnly variant={open ? "solid" : "flat"} color={open ? "primary" : "default"} radius="full" onPress={() => setOpen(o => !o)}><SlidersHorizontal size={18} /></Button></Tooltip>
@@ -388,7 +388,7 @@ function Player({ track, playing, toggle, time, duration, seek, jump, loop, setL
       <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => seek(Array.isArray(v) ? v[0] : v)} />
       <AnimatePresence>{open && (
         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-          <div className="mt-3 grid gap-x-6 gap-y-3 border-t border-default-100 pt-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-3 grid gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
             {controls.slice(0, 4).map(c => (
               <Slider key={c.key} size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
                 value={Number(effects[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
@@ -407,7 +407,7 @@ function KeybindRow({ label, value, onSet }: { label: string; value: string; onS
     <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2">
       <span className="text-sm">{label}</span>
       <button
-        className={`min-w-24 rounded-lg border px-3 py-1.5 font-mono text-sm ${listening ? "border-primary bg-primary/15 text-primary" : "border-white/15 bg-white/5"}`}
+        className={`min-w-24 rounded-lg border px-3 py-1.5 font-mono text-sm ${listening ? "border-accent bg-accent/15 text-accent" : "border-white/15 bg-white/5"}`}
         onClick={() => setListening(true)} onBlur={() => setListening(false)}
         onKeyDown={e => { if (!listening) return; e.preventDefault(); if (e.key === "Escape") return setListening(false); onSet(e.key); setListening(false); }}
       >{listening ? "Press a key…" : keyLabel(value)}</button>
@@ -419,9 +419,9 @@ function KeybindsModal({ disc, binds, setBinds }: { disc: ReturnType<typeof useD
   return (
     <Modal isOpen={disc.isOpen} onOpenChange={disc.onOpenChange} placement="center" backdrop="blur" scrollBehavior="inside">
       <ModalContent>{onClose => (<>
-        <ModalHeader className="flex items-center gap-2"><Keyboard size={18} className="text-primary" />Keybinds</ModalHeader>
+        <ModalHeader className="flex items-center gap-2"><Keyboard size={18} className="text-accent" />Keybinds</ModalHeader>
         <ModalBody className="gap-2">
-          <p className="text-xs text-default-500">Click a key box, then press a key to bind it. Cue keys work in the Sequences tab; effect keys nudge the currently playing sound.</p>
+          <p className="text-xs text-muted">Click a key box, then press a key to bind it. Cue keys work in the Sequences tab; effect keys nudge the currently playing sound.</p>
           {keyActions.map(a => <KeybindRow key={a.id} label={a.label} value={binds[a.id]} onSet={k => setBinds(b => ({ ...b, [a.id]: k }))} />)}
         </ModalBody>
         <ModalFooter>

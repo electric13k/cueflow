@@ -12,3 +12,5 @@ vite.config.d.ts
 
 # tokenade — legacy per-project embedding model cache (now global)
 .fastembed_cache/
+
+.netlify

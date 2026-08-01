@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button } from "@heroui/react";
+import { Button } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { Cookie } from "lucide-react";
 import { CONSENT_COOKIE, getCookie, setCookie } from "../lib/cookies";
@@ -20,8 +20,8 @@ export default function CookieConsent() {
           className="glass fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-3xl flex-col items-start gap-3 p-4 sm:flex-row sm:items-center"
           role="dialog" aria-label="Cookie consent"
         >
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/15 text-primary"><Cookie size={18} /></div>
-          <p className="flex-1 text-sm text-default-500">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent/15 text-accent"><Cookie size={18} /></div>
+          <p className="flex-1 text-sm text-muted">
             CueFlow uses cookies and local storage to keep your sounds, sequences and preferences on this device, and to keep you signed in. No ads, no third-party tracking.
           </p>
           <div className="flex shrink-0 gap-2">

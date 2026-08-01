@@ -1,6 +1,36 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* HeroUI v3 ships its own Tailwind v4 entry (it @imports tailwindcss itself). */
+@import "@heroui/styles";
+
+/* Automatic source detection roots at the file that imports Tailwind — that lives in
+   node_modules here, so point it at our sources explicitly. */
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
+
+@theme {
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", Inter, sans-serif;
+  --shadow-glass: 0 8px 32px -8px rgba(2, 6, 23, .6), inset 0 1px 0 rgba(255, 255, 255, .06);
+  --color-secondary: #a78bfa;
+  --animate-float: float 6s ease-in-out infinite;
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+}
+
+/* Brand palette. HeroUI v3 calls the brand colour `accent`; overriding the token retints
+   every component at once. Same layer + selector as HeroUI's own dark theme, declared after
+   it, so these win. */
+@layer theme {
+  .dark,
+  [data-theme="dark"] {
+    --accent: #22d3ee;
+    --accent-foreground: #04121a;
+    --accent-hover: #67e8f9;
+    --background: #050914;
+    --focus: #22d3ee;
+  }
+}
 
 @layer base {
   body {
@@ -18,12 +48,12 @@
   .glass {
     @apply rounded-3xl border border-white/10 bg-white/[.045] shadow-glass backdrop-blur-2xl;
   }
-  .glass-hover { @apply transition-colors hover:border-primary/40 hover:bg-white/[.07]; }
+  .glass-hover { @apply transition-colors hover:border-accent/40 hover:bg-white/[.07]; }
   .glass-soft { @apply rounded-2xl border border-white/10 bg-white/[.03] backdrop-blur-xl; }
 }
 
 /* Slim, on-brand scrollbar */
-* { scrollbar-width: thin; scrollbar-color: rgba(34,211,238,.35) transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgba(34, 211, 238, .35) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: rgba(34,211,238,.3); border-radius: 9999px; }
-*::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,.5); }
+*::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, .3); border-radius: 9999px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(34, 211, 238, .5); }

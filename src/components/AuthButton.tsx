@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "@heroui/react";
+import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "../ui";
 import { LogIn, LogOut, User } from "lucide-react";
 import { onAuth, signIn, signOut, signUp } from "../lib/store";
 
@@ -33,13 +33,13 @@ export default function AuthButton() {
       <Button size="sm" color="primary" variant="flat" startContent={<LogIn size={15} />} onPress={modal.onOpen}>Sign in</Button>
       <Modal isOpen={modal.isOpen} onOpenChange={modal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
-          <ModalHeader className="flex items-center gap-2"><User size={18} className="text-primary" />{mode === "in" ? "Sign in" : "Create account"}</ModalHeader>
+          <ModalHeader className="flex items-center gap-2"><User size={18} className="text-accent" />{mode === "in" ? "Sign in" : "Create account"}</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-default-500">Saves your sounds and sequences to your account so they follow you across devices.</p>
+            <p className="text-sm text-muted">Saves your sounds and sequences to your account so they follow you across devices.</p>
             <Input type="email" label="Email" autoComplete="email" value={form.email} onValueChange={v => setForm(f => ({ ...f, email: v }))} />
             <Input type="password" label="Password" autoComplete={mode === "in" ? "current-password" : "new-password"} value={form.password} onValueChange={v => setForm(f => ({ ...f, password: v }))} onKeyDown={e => e.key === "Enter" && submit()} />
             {note && <p className="text-xs text-warning">{note}</p>}
-            <button className="self-start text-xs text-primary" onClick={() => { setMode(m => m === "in" ? "up" : "in"); setNote(""); }}>
+            <button className="self-start text-xs text-accent" onClick={() => { setMode(m => m === "in" ? "up" : "in"); setNote(""); }}>
               {mode === "in" ? "No account? Create one" : "Have an account? Sign in"}
             </button>
           </ModalBody>
