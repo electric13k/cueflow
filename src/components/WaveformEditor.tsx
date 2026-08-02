@@ -14,7 +14,12 @@ const fmt = (s: number) => `${s.toFixed(2)}s`;
 // having a clipboard rather than an in-place trim.
 let clipboard: AudioBuffer | null = null;
 
-export default function WaveformEditor({ track, onSave }: { track: { id: string; title: string; url: string }; onSave: (file: File, title: string) => Promise<void> }) {
+export default function WaveformEditor({ track, onSave, onPreview }: {
+  track: { id: string; title: string; url: string };
+  onSave: (file: File, title: string) => Promise<void>;
+  /** Hands the unsaved working buffer to the main player as a blob URL ("" once it matches the original). */
+  onPreview?: (url: string) => void;
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null); // the working copy — edits land here
   const [history, setHistory] = useState<AudioBuffer[]>([]);
@@ -27,6 +32,7 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
   const [playing, setPlaying] = useState(false);
   const [hasClip, setHasClip] = useState(!!clipboard);
   const preview = useRef<{ ctx: AudioContext; src: AudioBufferSourceNode } | null>(null);
+  const previewUrl = useRef(""); // blob URL currently handed to the main player
   const drag = useRef<{ from: number; channel: number | null } | null>(null);
 
   useEffect(() => {
@@ -99,8 +105,8 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
   const scopeTo = (channel: number | null) => setSel(s => (s ? { ...s, channel } : s));
 
   // --- edits -------------------------------------------------------------
-  const apply = (next: AudioBuffer) => { setHistory(h => [...h.slice(-19), buffer!]); setBuffer(next); };
-  const undo = () => setHistory(h => { if (!h.length) return h; setBuffer(h[h.length - 1]); setSel(null); return h.slice(0, -1); });
+  const apply = (next: AudioBuffer) => { stop(); setHistory(h => [...h.slice(-19), buffer!]); setBuffer(next); };
+  const undo = () => setHistory(h => { if (!h.length) return h; stop(); setBuffer(h[h.length - 1]); setSel(null); return h.slice(0, -1); });
 
   const region = () => (sel ? sliceBuffer(buffer!, sel.start, sel.end) : buffer!);
   const copy = () => {
@@ -115,14 +121,34 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
 
   const gains = () => chan.map(c => (c.mute ? 0 : c.gain));
   const buildOutput = () => processBuffer(buffer!, { gains: gains(), mono });
+  const dirty = history.length > 0 || mono || chan.some(c => c.mute || c.gain !== 1);
+
+  // Hand the working buffer to the main transport as a WAV blob, so the player at the bottom plays
+  // the edit instead of the original file — no save needed. Debounced: a gain drag re-encodes.
+  useEffect(() => {
+    if (!onPreview || !buffer) return;
+    if (!dirty) { onPreview(""); return; }
+    const t = setTimeout(() => {
+      const url = URL.createObjectURL(bufferToWavFile(buildOutput(), track.title));
+      if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+      previewUrl.current = url; onPreview(url);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [buffer, chan, mono, dirty]);
+  // Drop the blob and put the original back the moment the editor goes away.
+  useEffect(() => () => {
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    previewUrl.current = ""; onPreview?.("");
+  }, []);
 
   const stop = () => { try { preview.current?.src.stop(); } catch { /* already ended */ } void preview.current?.ctx.close(); preview.current = null; setPlaying(false); };
-  const previewOut = async () => {
+  // scoped = audition just the selection; otherwise the whole edited clip.
+  const previewOut = async (scoped: boolean) => {
     if (playing) return stop();
-    // Preview honours the selection without committing it, so you can audition before cutting.
-    let out = sel ? sliceBuffer(buffer!, sel.start, sel.end) : buffer!;
-    if (sel?.channel != null) out = pickChannels(out, [sel.channel]);
-    out = processBuffer(out, { gains: sel?.channel == null ? gains() : [gains()[sel.channel]], mono });
+    const region = scoped && sel;
+    let out = region ? sliceBuffer(buffer!, sel.start, sel.end) : buffer!;
+    if (region && sel.channel != null) out = pickChannels(out, [sel.channel]);
+    out = processBuffer(out, { gains: region && sel.channel != null ? [gains()[sel.channel]] : gains(), mono });
     const ctx = new AudioContext(), src = ctx.createBufferSource();
     src.buffer = out; src.connect(ctx.destination); src.onended = () => { if (preview.current?.src === src) stop(); };
     preview.current = { ctx, src }; src.start(); setPlaying(true);
@@ -169,9 +195,16 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" color="primary" variant="flat" startContent={playing ? <Pause size={15} /> : <Play size={15} />} onPress={previewOut}>
-          {playing ? "Stop" : sel ? `Play ${sel.channel == null ? "selection" : labels[sel.channel]}` : "Play"}
-        </Button>
+        <Tooltip content={dirty ? "Plays your unsaved edit — the bar at the bottom plays it too" : "Play this sound"}>
+          <Button size="sm" color="primary" variant="flat" startContent={playing ? <Pause size={15} /> : <Play size={15} />} onPress={() => previewOut(false)}>
+            {playing ? "Stop" : dirty ? "Play edit" : "Play"}
+          </Button>
+        </Tooltip>
+        {sel && !playing && (
+          <Button size="sm" variant="bordered" startContent={<Play size={14} />} onPress={() => previewOut(true)}>
+            Play {sel.channel == null ? "selection" : labels[sel.channel]}
+          </Button>
+        )}
         <Tooltip content="Copy the selection to the clipboard — it survives switching sounds">
           <Button size="sm" variant="bordered" isDisabled={!sel} startContent={<Copy size={14} />} onPress={copy}>Copy</Button>
         </Tooltip>
@@ -209,7 +242,9 @@ export default function WaveformEditor({ track, onSave }: { track: { id: string;
 
       <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
         <Button color="primary" isLoading={saving} startContent={history.length ? <Crop size={16} /> : <Save size={16} />} onPress={save}>Save as new sound</Button>
-        <span className="text-xs text-muted">Renders a new cloud-backed WAV; the original is untouched.</span>
+        <span className="text-xs text-muted">
+          {dirty ? "The player below is already on your unsaved edit. Saving renders a new cloud-backed WAV; the original is untouched." : "Renders a new cloud-backed WAV; the original is untouched."}
+        </span>
       </div>
     </div>
   );

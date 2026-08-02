@@ -56,6 +56,8 @@ export default function Studio() {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [editUrl, setEditUrl] = useState(""); // unsaved editor buffer, as a blob URL — takes over playback for the selected track
+  const wasEditing = useRef(false);
   const renameModal = useDisclosure();
   const [draft, setDraft] = useState<{ kind: "track" | "sequence"; id: string; value: string }>({ kind: "track", id: "", value: "" });
 
@@ -106,9 +108,21 @@ export default function Studio() {
   });
 
   const updateEffects = (fx: Effects) => { if (!selected) return; setTracks(all => patch(all, selected.id, { effects: fx })); engine.current.apply(audio.current, fx); };
+  // A fresh edit invalidates whatever the element has loaded: swap the source and rewind rather than
+  // let the transport keep playing the pre-edit audio.
+  useEffect(() => {
+    if (!editUrl && !wasEditing.current) return;
+    wasEditing.current = !!editUrl;
+    audio.current.pause(); setPlaying(false);
+    audio.current.src = editUrl || selected?.url || "";
+    audio.current.currentTime = 0; setTime(0); setDuration(0);
+  }, [editUrl]);
+
   const play = async (track = selected, fx = selected?.effects) => {
     if (!track || !fx) return;
-    if (audio.current.src !== new URL(track.url, location.href).href) { audio.current.src = track.url; audio.current.currentTime = 0; setTime(0); setDuration(0); }
+    // The editor's unsaved buffer wins for its own track, so you hear the edit without saving first.
+    const src = editUrl && track.id === selected?.id ? editUrl : track.url;
+    if (audio.current.src !== new URL(src, location.href).href) { audio.current.src = src; audio.current.currentTime = 0; setTime(0); setDuration(0); }
     try { await engine.current.play(audio.current, fx); setPlaying(true); } catch { setPlaying(false); }
   };
   const toggle = () => { if (playing) { audio.current.pause(); setPlaying(false); } else void play(); };
@@ -197,7 +211,7 @@ export default function Studio() {
               <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importSound={importSound} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
             <Tab key="editor" id="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
-              <Editor track={selected} busy={busy} update={updateEffects} bakeReverse={bakeReverse} onSave={addProcessedFile} onRename={() => selected && openRename("track", selected.id, selected.title)} />
+              <Editor track={selected} busy={busy} update={updateEffects} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => selected && openRename("track", selected.id, selected.title)} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
               <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} />
@@ -206,7 +220,7 @@ export default function Studio() {
         </motion.div>
       </div>
 
-      <AnimatePresence>{selected && <Player key="player" track={selected} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+      <AnimatePresence>{selected && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -321,13 +335,13 @@ function MyInstantsPanel({ importSound }: { importSound: (title: string, url: st
   );
 }
 
-function Editor({ track, busy, update, bakeReverse, onSave, onRename }: any) {
+function Editor({ track, busy, update, bakeReverse, onSave, onPreview, onRename }: any) {
   if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Select a sound in the Library to edit it.</div>;
   return (
     <div className="mt-5 space-y-6">
       <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Non-destructive editor</p><h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button></h2></div>
       <p className="max-w-2xl text-sm text-muted">Effects save with this sound and apply live in playback and sequences. The waveform tools render new cloud-backed WAVs — clip a region, mix to mono, or balance the left/right channels.</p>
-      <WaveformEditor track={track} onSave={onSave} />
+      <WaveformEditor track={track} onSave={onSave} onPreview={onPreview} />
       <EffectGrid effects={track.effects} update={update} />
       <div className="glass-soft flex flex-wrap items-center gap-4 p-4">
         <Switch isSelected={track.effects.reverse} onValueChange={v => update({ ...track.effects, reverse: v })}>Mark for reverse render</Switch>
@@ -410,14 +424,20 @@ function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effect
 
 // Centred with inset + auto margins rather than -translate-x-1/2: framer-motion writes its own
 // inline `transform` for the entry animation, which silently wins over a Tailwind translate.
-function Player({ track, playing, toggle, time, duration, seek, jump, loop, setLoop, effects, update }: any) {
+function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, loop, setLoop, effects, update }: any) {
   const [open, setOpen] = useState(false);
   return (
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
       className="glass fixed inset-x-2 bottom-4 z-20 mx-auto max-w-[1080px] p-3 sm:inset-x-4 sm:p-4">
       {/* Phones get the title above the transport; there is no room for both on one line. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold capitalize">{track.title}</p><p className="text-xs text-muted">{format(time)} / {format(duration)}</p></div>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 truncate text-sm font-bold capitalize">
+            {track.title}
+            {unsaved && <span className="shrink-0 rounded-full border border-secondary/40 bg-secondary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary">Unsaved edit</span>}
+          </p>
+          <p className="text-xs text-muted">{format(time)} / {format(duration)}</p>
+        </div>
         <div className="flex items-center justify-center gap-2 sm:gap-4">
           <Tooltip content="Back 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
           <Button isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-accent/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
