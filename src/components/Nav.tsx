@@ -13,11 +13,12 @@ export default function Nav() {
           <div className="grid h-8 w-8 place-items-center rounded-xl bg-accent text-accent-foreground shadow-md shadow-accent/30"><Music size={17} /></div>
           <span className="text-lg font-black tracking-tight">CueFlow</span>
         </Link>
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
           <Button href="/" size="sm" {...link("/")}>Home</Button>
           <Button href="/studio" size="sm" {...link("/studio")}>Studio</Button>
           <AuthButton />
-          <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub"><Github size={17} /></Button>
+          {/* Repo link is a nicety — drop it before the nav starts wrapping on phones. */}
+          <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub" className="hidden sm:inline-flex"><Github size={17} /></Button>
         </div>
       </div>
     </nav>

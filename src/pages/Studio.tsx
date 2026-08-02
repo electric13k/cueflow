@@ -170,13 +170,15 @@ export default function Studio() {
     <div className="relative min-h-screen">
       <Backdrop />
       <Nav />
-      <div className="mx-auto max-w-7xl px-4 py-6 pb-44 sm:px-6 lg:px-8">
+      {/* Bottom padding clears the fixed player, which stacks taller on phones. */}
+      <div className="mx-auto max-w-7xl px-4 py-6 pb-60 sm:px-6 sm:pb-44 lg:px-8">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Studio</p><h1 className="text-2xl font-black tracking-tight sm:text-3xl">Cue board</h1></div>
-          <div className="flex gap-2">
-            <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}>Setup guide</Button></Tooltip>
-            <Tooltip content="Set the keys for cues and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}>Keybinds</Button></Tooltip>
-            <Tooltip content="Opens a black window — drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}>Audience display</Button></Tooltip>
+          {/* Labels collapse to icons on phones — three full-width buttons do not fit a 375px row. */}
+          <div className="flex flex-wrap gap-2">
+            <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>
+            <Tooltip content="Set the keys for cues and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
+            <Tooltip content="Opens a black window — drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}><span className="hidden sm:inline">Audience display</span></Button></Tooltip>
           </div>
         </motion.div>
 
@@ -387,13 +389,16 @@ function Player({ track, playing, toggle, time, duration, seek, jump, loop, setL
   return (
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
       className="glass fixed bottom-4 left-1/2 z-20 w-[min(96vw,1080px)] -translate-x-1/2 p-3 sm:p-4">
-      <div className="flex items-center gap-3 sm:gap-4">
+      {/* Phones get the title above the transport; there is no room for both on one line. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold capitalize">{track.title}</p><p className="text-xs text-muted">{format(time)} / {format(duration)}</p></div>
-        <Tooltip content="Back 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
-        <Button isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-accent/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
-        <Tooltip content="Forward 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(5)}><FastForward size={18} /></Button></Tooltip>
-        <Tooltip content={loop ? "Looping" : "Loop"}><Button isIconOnly variant={loop ? "solid" : "flat"} color={loop ? "primary" : "default"} radius="full" onPress={() => setLoop((l: boolean) => !l)}><Repeat size={18} /></Button></Tooltip>
-        <Tooltip content="Live effects"><Button isIconOnly variant={open ? "solid" : "flat"} color={open ? "primary" : "default"} radius="full" onPress={() => setOpen(o => !o)}><SlidersHorizontal size={18} /></Button></Tooltip>
+        <div className="flex items-center justify-center gap-2 sm:gap-4">
+          <Tooltip content="Back 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
+          <Button isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-accent/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
+          <Tooltip content="Forward 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(5)}><FastForward size={18} /></Button></Tooltip>
+          <Tooltip content={loop ? "Looping" : "Loop"}><Button isIconOnly variant={loop ? "solid" : "flat"} color={loop ? "primary" : "default"} radius="full" onPress={() => setLoop((l: boolean) => !l)}><Repeat size={18} /></Button></Tooltip>
+          <Tooltip content="Live effects"><Button isIconOnly variant={open ? "solid" : "flat"} color={open ? "primary" : "default"} radius="full" onPress={() => setOpen(o => !o)}><SlidersHorizontal size={18} /></Button></Tooltip>
+        </div>
       </div>
       <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => seek(Array.isArray(v) ? v[0] : v)} />
       <AnimatePresence>{open && (
