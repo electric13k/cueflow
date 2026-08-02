@@ -71,7 +71,11 @@ export default function Home() {
       <footer className="border-t border-white/10 py-8">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
           <span className="flex items-center gap-2"><Download size={14} /> CueFlow — React · HeroUI · Supabase · WebGL</span>
-          <Link to="/studio" className="font-semibold text-accent">Open Studio →</Link>
+          <span className="flex items-center gap-4">
+            <Link to="/legal#terms" className="hover:text-foreground">Terms</Link>
+            <Link to="/legal#privacy" className="hover:text-foreground">Privacy</Link>
+            <Link to="/studio" className="font-semibold text-accent">Open Studio →</Link>
+          </span>
         </div>
       </footer>
     </div>

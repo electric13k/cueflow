@@ -4,7 +4,7 @@
 // Switch.Content > Switch.Control > Switch.Thumb, …) and renamed the brand colour from `primary`
 // to `accent`. Rather than spray that composition across ~80 call sites, the app imports these
 // wrappers, which keep the old call shape and do the composition once.
-import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
+import { Children, createContext, isValidElement, use, useCallback, type ReactElement, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button as B, Card as C, Input as I, Modal as M, Slider as S, Spinner as Sp,
@@ -36,16 +36,15 @@ export function Button({
 }) {
   const navigate = useNavigate();
   const inner = <>{isLoading ? <Sp size="sm" /> : startContent}{children}{endContent}</>;
+  const styled = cn(buttonVariants({ variant: toVariant(color, variant), size, isIconOnly }) as string, radius === "full" && "rounded-full", className);
   const cls = cn(radius === "full" && "rounded-full", className);
   // External links stay real anchors so target/_blank and middle-click keep working.
   if (href && (/^https?:/.test(href) || target)) {
-    return (
-      <a {...rest} href={href} target={target} rel={target === "_blank" ? "noreferrer" : undefined}
-        className={cn(buttonVariants({ variant: toVariant(color, variant), size, isIconOnly }) as string, cls)}>
-        {inner}
-      </a>
-    );
+    return <a {...rest} href={href} target={target} rel={target === "_blank" ? "noreferrer" : undefined} className={styled}>{inner}</a>;
   }
+  // `as="label"` wraps a hidden file input — it has to stay a real <label> or the click never
+  // reaches the input. A RAC Button would swallow it.
+  if (_as === "label") return <label className={cn(styled, "cursor-pointer")}>{inner}</label>;
   const press = href
     // Hash links scroll in place; everything else is an in-app route.
     ? () => (href.startsWith("#") ? document.querySelector(href)?.scrollIntoView({ behavior: "smooth" }) : navigate(href))
@@ -150,15 +149,28 @@ export const useDisclosure = () => {
   return { isOpen: s.isOpen, onOpen: s.open, onClose: s.close, onOpenChange: s.setOpen };
 };
 
+// RAC's own `close` (the Dialog render prop, Escape, backdrop click) does not reach a Modal that
+// is controlled from outside HeroUI, so closing is driven off our own onOpenChange instead and
+// handed down by context.
+const CloseCtx = createContext<() => void>(() => {});
+
 export function Modal({ isOpen, onOpenChange, children }: { isOpen?: boolean; onOpenChange?: (v: boolean) => void; children?: ReactNode; placement?: string; backdrop?: string; scrollBehavior?: string }) {
-  return <M isOpen={isOpen} onOpenChange={onOpenChange}>{children}</M>;
+  const close = useCallback(() => onOpenChange?.(false), [onOpenChange]);
+  // Unmount the contents ourselves instead of leaving it to RAC's exit animation: RAC waits for
+  // `animationend` on the backdrop, and a modal that closes while the tab is not painting (or the
+  // animation is otherwise never ticked) stays on screen forever.
+  return <CloseCtx value={close}><M isOpen={isOpen} onOpenChange={onOpenChange}>{isOpen ? children : null}</M></CloseCtx>;
 }
 
 export function ModalContent({ children }: { children: ReactNode | ((close: () => void) => ReactNode) }) {
+  const close = use(CloseCtx);
   return (
-    <M.Backdrop>
+    <M.Backdrop onClick={close}>
       <M.Container placement="center">
-        <M.Dialog>{({ close }: { close: () => void }) => (typeof children === "function" ? children(close) : children)}</M.Dialog>
+        {/* Stop backdrop dismissal from firing when the click lands inside the dialog. */}
+        <M.Dialog onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+          {typeof children === "function" ? children(close) : children}
+        </M.Dialog>
       </M.Container>
     </M.Backdrop>
   );

@@ -1,12 +1,14 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronUp, ExternalLink, FastForward, Keyboard, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, CircleHelp, ExternalLink, FastForward, Keyboard, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import Nav from "../components/Nav";
+import Onboarding from "../components/Onboarding";
 import WaveformEditor from "../components/WaveformEditor";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
 import { hydrateCloud, local, onAuth, persist, uploadTrack } from "../lib/store";
+import { toastOnce } from "../lib/toast";
 import { cloneEffects, defaultEffects, Effects, Sequence, SequenceItem, Track } from "../types";
 
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
@@ -45,6 +47,8 @@ export default function Studio() {
   const [loopSeq, setLoopSeq] = useState(false);
   const [binds, setBinds] = useState<Record<Action, string>>(() => local.get("keybinds", defaultBinds));
   const keybindsModal = useDisclosure();
+  const guideModal = useDisclosure();
+  const [signedIn, setSignedIn] = useState(false);
   const [sequenceId, setSequenceId] = useState<string>(session.sequenceId);
   const [cueIndex, setCueIndex] = useState(session.cueIndex);
   const [tab, setTab] = useState(session.tab);
@@ -66,7 +70,11 @@ export default function Studio() {
   const mergeCloud = () => hydrateCloud().then(cloud => { if (!cloud) return; setTracks(o => [...o, ...cloud.tracks.filter(t => !o.some(e => e.id === t.id))]); setSequences(o => [...o, ...cloud.sequences.filter(s => !o.some(e => e.id === s.id))]); });
   useEffect(() => { void mergeCloud(); }, []);
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
-  useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences)); }), []);
+  useEffect(() => onAuth(email => { setSignedIn(!!email); if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences)); }), []);
+  // Once there is something worth losing, mention syncing — once ever, not every visit.
+  useEffect(() => {
+    if (!signedIn && tracks.length) toastOnce("sync-nudge", "Sign in to sync your progress", "Your sounds and sequences live in this browser only. Signing in saves them to your account so they follow you across devices.");
+  }, [tracks.length, signedIn]);
   useEffect(() => {
     const a = audio.current; a.crossOrigin = "anonymous";
     const tick = () => { setTime(a.currentTime); const fade = selected?.effects.fadeOut ?? 0; if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, selected!.effects.volume * (a.duration - a.currentTime) / fade); };
@@ -166,6 +174,7 @@ export default function Studio() {
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Studio</p><h1 className="text-2xl font-black tracking-tight sm:text-3xl">Cue board</h1></div>
           <div className="flex gap-2">
+            <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}>Setup guide</Button></Tooltip>
             <Tooltip content="Set the keys for cues and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}>Keybinds</Button></Tooltip>
             <Tooltip content="Opens a black window — drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}>Audience display</Button></Tooltip>
           </div>
@@ -196,6 +205,7 @@ export default function Studio() {
         </>)}</ModalContent>
       </Modal>
 
+      <Onboarding control={guideModal} />
       <KeybindsModal disc={keybindsModal} binds={binds} setBinds={setBinds} />
     </div>
   );

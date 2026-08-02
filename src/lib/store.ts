@@ -4,7 +4,9 @@ const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABA
 export const supabase = url && key ? createClient(url, key) : null;
 
 // Auth: email + password. Cloud save/hydrate already gate on getUser(), so signing in activates them.
-export async function signUp(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signUp({ email, password }); if (error) throw error; }
+export async function signUp(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}/studio` } }); if (error) throw error; }
+// NOTE: emailRedirectTo only works if the URL is allow-listed in Supabase → Authentication → URL
+// Configuration. Otherwise Supabase falls back to Site URL, which defaults to http://localhost:3000.
 export async function signIn(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error; }
 export async function signOut() { await supabase?.auth.signOut(); }
 export function onAuth(cb: (email: string | null) => void) { if (!supabase) { cb(null); return () => {}; } supabase.auth.getUser().then(({ data }) => cb(data.user?.email ?? null)); const { data } = supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.email ?? null)); return () => data.subscription.unsubscribe(); }

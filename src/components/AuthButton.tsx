@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "../ui";
 import { LogIn, LogOut, User } from "lucide-react";
 import { onAuth, signIn, signOut, signUp } from "../lib/store";
+import { toast } from "../lib/toast";
 
 // Sign-in lives in the nav so the whole app shares one session. On sign-in, Studio's listener hydrates cloud data.
 export default function AuthButton() {
@@ -17,8 +18,13 @@ export default function AuthButton() {
   const submit = async () => {
     setBusy(true); setNote("");
     try {
-      if (mode === "up") { await signUp(form.email, form.password); setNote("Account created — you're signed in. (Check your inbox if confirmation is required.)"); }
-      else await signIn(form.email, form.password);
+      if (mode === "up") {
+        await signUp(form.email, form.password);
+        toast("Check your email", `We sent a confirmation link to ${form.email}. Click it to finish setting up your account — you can keep working here in the meantime.`, "success");
+      } else {
+        await signIn(form.email, form.password);
+        toast("Signed in", "Your sounds and sequences now sync to this account.", "success");
+      }
       modal.onClose();
     } catch (e) { setNote((e as Error).message); } finally { setBusy(false); }
   };
@@ -42,6 +48,13 @@ export default function AuthButton() {
             <button className="self-start text-xs text-accent" onClick={() => { setMode(m => m === "in" ? "up" : "in"); setNote(""); }}>
               {mode === "in" ? "No account? Create one" : "Have an account? Sign in"}
             </button>
+            {mode === "up" && (
+              <p className="text-xs text-muted">
+                By creating an account you agree to the{" "}
+                <a href="/legal#terms" className="text-accent underline-offset-2 hover:underline">Terms</a> and{" "}
+                <a href="/legal#privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>.
+              </p>
+            )}
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={onClose}>Cancel</Button>
