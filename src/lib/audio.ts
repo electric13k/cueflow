@@ -69,7 +69,7 @@ export function insertBuffer(src: AudioBuffer, at: number, clip: AudioBuffer) {
   return out;
 }
 
-/** clip summed on top of src at `at` seconds — the two play together. Extends src if needed. */
+/** clip summed on top of src at `at` seconds, the two play together. Extends src if needed. */
 export function mixBuffer(src: AudioBuffer, at: number, clip: AudioBuffer) {
   const a = frames(src, at);
   const out = make(src.numberOfChannels, Math.max(src.length, a + clip.length), src.sampleRate);
@@ -95,7 +95,7 @@ export function silenceRange(src: AudioBuffer, from: number, to: number, channel
   return out;
 }
 
-/** A copy of just the given channels, in order — e.g. [1] lifts the right channel out as mono. */
+/** A copy of just the given channels, in order, e.g. [1] lifts the right channel out as mono. */
 export function pickChannels(src: AudioBuffer, channels: number[]) {
   const out = make(channels.length, src.length, src.sampleRate);
   channels.forEach((c, i) => out.getChannelData(i).set(src.getChannelData(c % src.numberOfChannels)));

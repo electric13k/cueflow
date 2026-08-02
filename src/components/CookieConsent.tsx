@@ -8,9 +8,10 @@ import { CONSENT_COOKIE, getCookie, setCookie } from "../lib/cookies";
 // functional, so it always works; this records the user's acknowledgement and hides once chosen.
 export default function CookieConsent() {
   const [show, setShow] = useState(false);
-  // Never surface on the projected audience window — it must stay pure black.
+  // Never surface on the projected audience window, it must stay pure black.
   useEffect(() => { setShow(location.pathname !== "/audience" && !getCookie(CONSENT_COOKIE)); }, []);
-  const choose = (v: "accepted" | "declined") => { setCookie(CONSENT_COOKIE, v); setShow(false); };
+  // The sign-in nudge queues behind this one and waits for the event rather than a reload.
+  const choose = (v: "accepted" | "declined") => { setCookie(CONSENT_COOKIE, v); setShow(false); window.dispatchEvent(new Event("cueflow:consent")); };
   return (
     <AnimatePresence>
       {show && (

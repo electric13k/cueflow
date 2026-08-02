@@ -38,16 +38,16 @@ export default function Legal() {
           </Section>
 
           <Section title="Your account">
-            An account is optional — CueFlow works without one. If you create one, keep your password to yourself; you are responsible for what happens under your account. You can sign out at any time, and you can ask for your account and its data to be deleted (see Privacy below).
+            An account is optional, CueFlow works without one. If you create one, keep your password to yourself; you are responsible for what happens under your account. You can sign out at any time, and you can ask for your account and its data to be deleted (see Privacy below).
           </Section>
 
           <Section title="The audio you upload">
             <p>You keep all rights to the audio you upload. By uploading, you confirm you have the right to use that audio, and you grant CueFlow only the permission needed to store it and play it back to you.</p>
-            <p><b>Do not upload anything you are not licensed to use, anything illegal, or anything you would mind a stranger hearing</b> — see the storage note in the Privacy Policy for why that last part matters.</p>
+            <p><b>Do not upload anything you are not licensed to use, anything illegal, or anything you would mind a stranger hearing</b>, see the storage note in the Privacy Policy for why that last part matters.</p>
           </Section>
 
           <Section title="Third-party sounds">
-            The Myinstants import fetches audio from myinstants.com. Those sounds belong to their respective owners and are subject to Myinstants' own terms — clearing rights for anything you perform publicly is on you.
+            The Myinstants import fetches audio from myinstants.com. Those sounds belong to their respective owners and are subject to Myinstants' own terms, clearing rights for anything you perform publicly is on you.
           </Section>
 
           <Section title="No warranty">
@@ -72,7 +72,7 @@ export default function Legal() {
 
           <Section title="What is stored on the server">
             <p>Accounts and cue data are held by <b>Supabase</b> (our hosting and database provider). If you sign in, we store your email address, your track and sequence metadata, and nothing else about you. Passwords are handled by Supabase Auth and are never visible to CueFlow.</p>
-            <p><b>Uploaded audio files are stored in a public storage bucket.</b> Their URLs are long and random and are not listed anywhere, but they are not access-controlled — anyone holding a file's URL can play it. Treat uploads as unlisted, not private, and do not upload confidential recordings.</p>
+            <p><b>Uploaded audio files are stored in a public storage bucket.</b> Their URLs are long and random and are not listed anywhere, but they are not access-controlled, anyone holding a file's URL can play it. Treat uploads as unlisted, not private, and do not upload confidential recordings.</p>
           </Section>
 
           <Section title="Requests to Myinstants">
@@ -92,7 +92,7 @@ export default function Legal() {
           </Section>
 
           <Section title="Contact">
-            Questions, or a deletion request — send them straight from here, no email client needed.
+            Questions, or a deletion request, send them straight from here, no email client needed.
             <ContactForm />
           </Section>
         </div>

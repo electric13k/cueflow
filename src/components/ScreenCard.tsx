@@ -13,7 +13,7 @@ export default function ScreenCard({ shot, alt, title, body, points, fit = "cove
     <motion.div {...fade(delay)} style={{ perspective: "1400px" }}>
       <button
         onClick={() => setFlipped(f => !f)}
-        aria-label={`${title} — flip for details`}
+        aria-label={`${title}, flip for details`}
         aria-pressed={flipped}
         className="group relative block h-[24rem] w-full text-left transition-transform duration-500 ease-out"
         style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "none" }}

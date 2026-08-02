@@ -19,7 +19,7 @@ const screens: Screen[] = [
     shot: "/shots/editor.png", title: "Waveform editor",
     alt: "The CueFlow waveform editor showing a rendered waveform and channel controls",
     body: "Drag across the waveform to pick a region, then reshape it.",
-    points: ["Shift-drag to grab one channel", "Cut, copy, paste, merge, silence", "Saves a new sound — original untouched"],
+    points: ["Shift-drag to grab one channel", "Cut, copy, paste, merge, silence", "Play edit, selection or original", "Saves a new sound, original untouched"],
   },
   {
     shot: "/shots/sequences.png", title: "Cue sequences",
@@ -38,19 +38,19 @@ const screens: Screen[] = [
 const steps = [
   {
     icon: Upload, title: "Get sounds in",
-    body: "Hit Upload in the Library tab to add files from your computer. To pull one off the web, paste a direct link to the audio file in the import box — on Myinstants that means right-clicking the sound and copying the audio address, not the page URL. Imports keep their own name.",
+    body: "Hit Upload in the Library tab to add files from your computer. To pull one off the web, paste a direct link to the audio file in the import box, on Myinstants that means right-clicking the sound and copying the audio address, not the page URL. Imports keep their own name.",
   },
   {
     icon: SlidersHorizontal, title: "Shape a sound",
-    body: "Pick a sound, open Editor, and drag across the waveform to select a region. Shift-drag to grab a single channel — each lane is labelled Left or Right. From there: cut, copy, paste, merge two sounds together, silence a stretch, mix to mono, or balance the channels. Undo is one click, and saving always writes a new sound rather than overwriting the original.",
+    body: "Pick a sound, open Editor, and drag across the waveform to select a region. Shift-drag to grab a single channel, each lane is labelled Left or Right. From there: cut, copy, paste, merge two sounds together, silence a stretch, mix to mono, or balance the channels. Undo is one click, and saving always writes a new sound rather than overwriting the original.",
   },
   {
     icon: ListMusic, title: "Build a cue deck",
-    body: "In Sequences, make a sequence and add cues to it — like slides in a deck. Nothing ever autoplays: you step through cues with the arrow keys, one press per cue. Turn on Loop sequence to wrap back to the start.",
+    body: "In Sequences, make a sequence and add cues to it, like slides in a deck. Nothing ever autoplays: you step through cues with the arrow keys, one press per cue. Turn on Loop sequence to wrap back to the start.",
   },
   {
     icon: Monitor, title: "Run the show",
-    body: "Audience display opens a pure-black window — drag it onto the projector or mirrored screen so the room sees nothing while you drive the board. You can start a sequence straight into audience mode from the Sequences tab.",
+    body: "Audience display opens a pure-black window, drag it onto the projector or mirrored screen so the room sees nothing while you drive the board. Arm a sequence straight into audience mode from the Sequences tab; the arrow keys still drive cues while that black window has focus. Arming loads the deck without firing anything, so cue 1 waits for your first arrow press.",
   },
   {
     icon: Keyboard, title: "Make the keys yours",
@@ -71,7 +71,7 @@ export default function Tutorial() {
         <motion.p {...fade()} className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Tutorial</motion.p>
         <motion.h1 {...fade(.05)} className="mt-2 max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">Running a show, start to finish.</motion.h1>
         <motion.p {...fade(.1)} className="mt-4 max-w-2xl text-lg text-muted">
-          Six steps from an empty library to a cue deck you can drive with your arrow keys. The same guide opens on your first visit to the Studio — the Setup guide button brings it back any time.
+          Six steps from an empty library to a cue deck you can drive with your arrow keys. The same guide opens on your first visit to the Studio, the Setup guide button brings it back any time.
         </motion.p>
 
         <section className="py-12">

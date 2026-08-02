@@ -32,7 +32,8 @@ export function Button({
   color?: V2Color; variant?: V2Variant; radius?: "full" | "lg" | "md" | "sm"; startContent?: ReactNode;
   endContent?: ReactNode; isLoading?: boolean; href?: string; target?: string; children?: ReactNode;
   className?: string; size?: "sm" | "md" | "lg"; isIconOnly?: boolean; isDisabled?: boolean;
-  title?: string; as?: string; "aria-label"?: string; onPress?: () => void; type?: "button" | "submit";
+  // The press event carries the modifier keys, which the library uses for shift-click range select.
+  title?: string; as?: string; "aria-label"?: string; onPress?: (e: { shiftKey?: boolean }) => void; type?: "button" | "submit";
 }) {
   const navigate = useNavigate();
   const inner = <>{isLoading ? <Sp size="sm" /> : startContent}{children}{endContent}</>;
@@ -42,7 +43,7 @@ export function Button({
   if (href && (/^https?:/.test(href) || target)) {
     return <a {...rest} href={href} target={target} rel={target === "_blank" ? "noreferrer" : undefined} className={styled}>{inner}</a>;
   }
-  // `as="label"` wraps a hidden file input — it has to stay a real <label> or the click never
+  // `as="label"` wraps a hidden file input, it has to stay a real <label> or the click never
   // reaches the input. A RAC Button would swallow it.
   if (_as === "label") return <label className={cn(styled, "cursor-pointer")}>{inner}</label>;
   const press = href
@@ -101,7 +102,7 @@ export function Slider({ label, getValue, value, className, ...rest }: {
   minValue?: number; maxValue?: number; step?: number; isDisabled?: boolean; size?: "sm" | "md" | "lg";
   color?: string; onChange?: (v: number) => void; "aria-label"?: string;
 }) {
-  // v2's `size`/`color` are gone in v3 — the theme drives both now.
+  // v2's `size`/`color` are gone in v3, the theme drives both now.
   const { size: _size, color: _color, ...sliderProps } = rest as Record<string, unknown>;
   return (
     <S {...sliderProps} value={value} className={cn("w-full", className)}>

@@ -8,9 +8,11 @@ import Audience from "./pages/Audience";
 import Legal from "./pages/Legal";
 import Tutorial from "./pages/Tutorial";
 import CookieConsent from "./components/CookieConsent";
+import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
+import { applyTheme, getTheme } from "./lib/theme";
 
-document.documentElement.classList.add("dark");
+applyTheme(getTheme());
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
@@ -24,6 +26,7 @@ createRoot(document.getElementById("root")!).render(
       </Routes>
       <Toaster />
       <CookieConsent />
+      <SignInPrompt />
     </BrowserRouter>
   </StrictMode>
 );

@@ -14,13 +14,19 @@ export default function AuthButton() {
   const [note, setNote] = useState("");
 
   useEffect(() => onAuth(setEmail), []);
+  // The sign-in banner asks for the modal rather than owning a second copy of it.
+  useEffect(() => {
+    const open = () => modal.onOpen();
+    window.addEventListener("cueflow:signin", open);
+    return () => window.removeEventListener("cueflow:signin", open);
+  }, [modal]);
 
   const submit = async () => {
     setBusy(true); setNote("");
     try {
       if (mode === "up") {
         await signUp(form.email, form.password);
-        toast("Check your email", `We sent a confirmation link to ${form.email}. Click it to finish setting up your account — you can keep working here in the meantime.`, "success");
+        toast("Check your email", `We sent a confirmation link to ${form.email}. Click it to finish setting up your account, you can keep working here in the meantime.`, "success");
       } else {
         await signIn(form.email, form.password);
         toast("Signed in", "Your sounds and sequences now sync to this account.", "success");

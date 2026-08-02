@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getTheme } from "../lib/theme";
 
 // Real animated WebGL shader: a slow flowing noise field in the cyan palette, behind every page.
 const VERT = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
@@ -17,7 +18,7 @@ void main(){
   vec3 cyan = vec3(0.13, 0.83, 0.93);
   vec3 violet = vec3(0.65, 0.55, 0.98);
   vec3 col = base + cyan * smoothstep(0.35, 0.95, n) * 0.30;
-  // The canvas is opaque, so the page's corner gradients would never show through — the cyan and
+  // The canvas is opaque, so the page's corner gradients would never show through, the cyan and
   // violet washes are painted here instead.
   col += cyan * 0.16 * smoothstep(1.05, 0.0, length(uv - vec2(0.82, 1.06)));
   col += violet * 0.15 * smoothstep(1.0, 0.0, length(uv - vec2(0.08, -0.06)));
@@ -31,8 +32,15 @@ function compile(gl: WebGLRenderingContext, type: number, src: string) {
 }
 
 export default function Backdrop() {
+  const [theme, setTheme] = useState(getTheme);
+  useEffect(() => {
+    const sync = () => setTheme(getTheme());
+    window.addEventListener("cueflow:theme", sync);
+    return () => window.removeEventListener("cueflow:theme", sync);
+  }, []);
   useEffect(() => {
     const canvas = document.getElementById("bg") as HTMLCanvasElement | null;
+    if (theme === "light") return; // the shader paints an opaque dark field; light mode uses the body gradient
     const gl = canvas?.getContext("webgl", { antialias: false, depth: false });
     if (!canvas || !gl) return;
     const prog = gl.createProgram()!;
@@ -50,6 +58,7 @@ export default function Backdrop() {
     const render = () => { gl.uniform2f(uRes, canvas.width, canvas.height); gl.uniform1f(uTime, (performance.now() - t0) / 1000); gl.drawArrays(gl.TRIANGLES, 0, 3); raf = requestAnimationFrame(render); };
     render();
     return () => { cancelAnimationFrame(raf); removeEventListener("resize", resize); };
-  }, []);
+  }, [theme]);
+  if (theme === "light") return null;
   return <canvas id="bg" aria-hidden className="fixed inset-0 -z-10 h-full w-full" />;
 }

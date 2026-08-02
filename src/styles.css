@@ -1,7 +1,7 @@
 /* HeroUI v3 ships its own Tailwind v4 entry (it @imports tailwindcss itself). */
 @import "@heroui/styles";
 
-/* Automatic source detection roots at the file that imports Tailwind — that lives in
+/* Automatic source detection roots at the file that imports Tailwind, that lives in
    node_modules here, so point it at our sources explicitly. */
 @source "../index.html";
 @source "./**/*.{ts,tsx}";
@@ -22,6 +22,13 @@
    every component at once. Same layer + selector as HeroUI's own dark theme, declared after
    it, so these win. */
 @layer theme {
+  /* Light mode needs a deeper cyan: #22d3ee on white fails contrast for text and icons. */
+  :root:not(.dark) {
+    --accent: #0e7490;
+    --accent-foreground: #ecfeff;
+    --accent-hover: #0891b2;
+    --focus: #0e7490;
+  }
   .dark,
   [data-theme="dark"] {
     --accent: #22d3ee;
@@ -33,6 +40,18 @@
 }
 
 @layer base {
+  /* Glass is tinted with light on a dark page and with ink on a light one, so both themes drive the
+     same utilities off these two tokens. */
+  :root {
+    --glass-tint: 15, 23, 42;
+    --glass-face: rgba(255, 255, 255, .72);
+    --glass-face-hover: rgba(255, 255, 255, .92);
+  }
+  .dark {
+    --glass-tint: 255, 255, 255;
+    --glass-face: rgba(255, 255, 255, .045);
+    --glass-face-hover: rgba(255, 255, 255, .07);
+  }
   body {
     @apply m-0 min-h-screen bg-background text-foreground font-sans antialiased;
     background-image:
@@ -41,19 +60,49 @@
     background-attachment: fixed;
   }
   h1, h2, h3 { @apply font-display; }
+
+  /* Anything you can act on says so under the cursor, and lifts a little when you get there. */
+  button:not(:disabled), a[href], label[for], [role="button"], summary { cursor: pointer; }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    button:not(:disabled), a[href], [role="button"] { transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease; }
+    button:not(:disabled):hover, a[href]:hover, [role="button"]:hover { transform: translateY(-1px); }
+    button:not(:disabled):active, [role="button"]:active { transform: translateY(0) scale(.98); }
+  }
 }
 
 @layer components {
   /* Liquid glass: translucent, blurred, inner top highlight + soft outer shadow. */
   .glass {
-    @apply rounded-3xl border border-white/10 bg-white/[.045] shadow-glass backdrop-blur-2xl;
+    @apply rounded-3xl border shadow-glass backdrop-blur-2xl;
+    background: var(--glass-face);
+    border-color: rgba(var(--glass-tint), .12);
   }
-  .glass-hover { @apply transition-colors hover:border-accent/40 hover:bg-white/[.07]; }
-  .glass-soft { @apply rounded-2xl border border-white/10 bg-white/[.03] backdrop-blur-xl; }
+  .glass-hover { @apply transition-colors hover:border-accent/40; }
+  .glass-hover:hover { background: var(--glass-face-hover); }
+  .glass-soft {
+    @apply rounded-2xl border backdrop-blur-xl;
+    background: rgba(var(--glass-tint), .035);
+    border-color: rgba(var(--glass-tint), .12);
+  }
+
+  /* ponytail: the app writes border-white/10 and friends inline in ~20 places. Retinting those
+     utilities in light mode is a far smaller diff than theming every call site, and it keeps the
+     dark build byte-identical. Drop this if the classes ever move behind a token. */
+  :root:not(.dark) {
+    .border-white\/10 { border-color: rgba(15, 23, 42, .12); }
+    .border-white\/15 { border-color: rgba(15, 23, 42, .16); }
+    .border-white\/25 { border-color: rgba(15, 23, 42, .26); }
+    .bg-white\/\[\.03\], .bg-white\/5 { background-color: rgba(15, 23, 42, .035); }
+    .bg-white\/\[\.045\] { background-color: rgba(255, 255, 255, .72); }
+    .bg-white\/\[\.07\] { background-color: rgba(255, 255, 255, .92); }
+    .bg-white\/10 { background-color: rgba(15, 23, 42, .08); }
+    .bg-white\/15 { background-color: rgba(15, 23, 42, .12); }
+    .bg-white\/25 { background-color: rgba(15, 23, 42, .2); }
+  }
 
   /* HeroUI v3 paints the slider thumb the same accent colour as the fill, so it disappears the
      moment it sits on filled track. Give it a light face and a ring. */
-  .slider__track { background: rgba(255, 255, 255, .1); }
+  .slider__track { background: rgba(var(--glass-tint), .14); }
   .slider__thumb {
     background: #f8fafc;
     border: 2px solid var(--accent);

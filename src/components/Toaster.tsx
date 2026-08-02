@@ -15,7 +15,7 @@ export default function Toaster() {
     setTimeout(() => drop(t.id), 7000);
   }), []);
 
-  // Never surface on the projected audience window — it must stay pure black.
+  // Never surface on the projected audience window, it must stay pure black.
   if (location.pathname === "/audience") return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-[60] flex flex-col items-center gap-2 px-3">

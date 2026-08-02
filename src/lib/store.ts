@@ -32,7 +32,7 @@ export async function deleteTrackEverywhere(id: string, url: string) {
   if (!user) return;
   await supabase.from("sequence_items").delete().eq("track_id", id);
   await supabase.from("tracks").delete().eq("id", id).eq("user_id", user.id);
-  // The audio itself lives in a public bucket — leaving it behind would keep it playable by URL.
+  // The audio itself lives in a public bucket, leaving it behind would keep it playable by URL.
   const path = storagePath(url);
   if (path) await supabase.storage.from("audio").remove([decodeURIComponent(path)]);
 }

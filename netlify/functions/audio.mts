@@ -1,6 +1,6 @@
 import type { Config } from "@netlify/functions";
 
-// Server-side audio fetcher. Browsers cannot fetch most remote audio directly — the host sends no
+// Server-side audio fetcher. Browsers cannot fetch most remote audio directly, the host sends no
 // CORS headers, so the request fails and, worse, an <audio crossOrigin="anonymous"> element refuses
 // to load it at all. Fetching here and re-uploading to our own storage sidesteps both.
 //

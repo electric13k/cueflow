@@ -15,7 +15,7 @@ export function onToast(listener: (t: Toast) => void) {
   return () => void listeners.delete(listener);
 }
 
-// Fires a toast at most once per browser, keyed by name — for nudges that must not nag.
+// Fires a toast at most once per browser, keyed by name, for nudges that must not nag.
 export function toastOnce(key: string, title: string, body?: string, tone: Toast["tone"] = "info") {
   const k = `cueflow:toast:${key}`;
   if (localStorage.getItem(k)) return;

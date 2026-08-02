@@ -31,7 +31,7 @@ export default async (req: Request) => {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      text: `New CueFlow message — ${topic}`,
+      text: `New CueFlow message, ${topic}`,
       blocks: [
         { type: "header", text: { type: "plain_text", text: `CueFlow · ${topic}` } },
         { type: "section", text: { type: "mrkdwn", text: message.slice(0, LIMITS.message) } },

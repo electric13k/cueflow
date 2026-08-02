@@ -10,7 +10,7 @@ const features = [
   { icon: SlidersHorizontal, title: "Waveform editor", body: "Clip a region, mix to mono, balance left/right channels, plus speed, reverb, fades, distortion and reverse." },
   { icon: ListMusic, title: "Manual cue sequences", body: "Build slideshow-style decks that never autoplay. Loop them, or launch straight into audience mode." },
   { icon: Keyboard, title: "Configurable keybinds", body: "Drive a show like a presenter: arrow keys step through cues, custom keys nudge reverb, volume and speed." },
-  { icon: Monitor, title: "Blackout presenter mode", body: "A pure-black audience window for the mirrored screen — the room sees nothing while you run the board." },
+  { icon: Monitor, title: "Blackout presenter mode", body: "A pure-black audience window for the mirrored screen, the room sees nothing while you run the board." },
   { icon: Zap, title: "Live effects in playback", body: "Tune reverb, speed, volume and fades on the fly, not just in the editor." },
 ];
 
@@ -30,7 +30,7 @@ export default function Home() {
             Run your sound like a <span className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">slideshow</span>.
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .12 }} className="mt-6 max-w-2xl text-lg text-muted">
-            CueFlow is a browser soundboard for theatre, presentations and streams: a waveform editor, arrow-key cue sequences, and a blackout presenter display — no downloads, no autoplay surprises.
+            CueFlow is a browser soundboard for theatre, presentations and streams: a waveform editor, arrow-key cue sequences, and a blackout presenter display, no downloads, no autoplay surprises.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .19 }} className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>
@@ -71,7 +71,7 @@ export default function Home() {
 
       <footer className="border-t border-white/10 py-8">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
-          <span className="flex items-center gap-2"><Download size={14} /> CueFlow — React · HeroUI · Supabase · WebGL</span>
+          <span className="flex items-center gap-2"><Download size={14} /> CueFlow</span>
           <span className="flex items-center gap-4">
             <Link to="/tutorial" className="hover:text-foreground">Tutorial</Link>
             <Link to="/legal#terms" className="hover:text-foreground">Terms</Link>

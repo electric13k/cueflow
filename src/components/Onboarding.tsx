@@ -16,11 +16,11 @@ const steps: Step[] = [
   },
   {
     icon: ListMusic, title: "3. Build a cue deck",
-    body: <>In <b>Sequences</b>, make a sequence and add cues to it — like slides in a deck. Nothing ever autoplays: you step through cues with the arrow keys, one press per cue. Turn on <b>Loop sequence</b> to wrap back to the start.</>,
+    body: <>In <b>Sequences</b>, make a sequence and add cues to it, like slides in a deck. Nothing ever autoplays: you step through cues with the arrow keys, one press per cue. Turn on <b>Loop sequence</b> to wrap back to the start.</>,
   },
   {
     icon: Monitor, title: "4. Run the show",
-    body: <><b>Audience display</b> opens a pure-black window — drag it onto the projector or mirrored screen so the room sees nothing while you drive the board. Start a sequence straight into audience mode from the Sequences tab.</>,
+    body: <><b>Audience display</b> opens a pure-black window, drag it onto the projector or mirrored screen so the room sees nothing while you drive the board. Arm a sequence straight into audience mode from the Sequences tab, and the arrow keys keep working while that black window has focus.</>,
   },
   {
     icon: Keyboard, title: "5. Make the keys yours",
