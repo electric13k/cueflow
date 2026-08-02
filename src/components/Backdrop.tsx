@@ -15,8 +15,13 @@ void main(){
   float n = fbm(p * 3.0 + vec2(t, t*0.6) + fbm(p*2.0 - t) * 0.6);
   vec3 base = vec3(0.015, 0.03, 0.06);
   vec3 cyan = vec3(0.13, 0.83, 0.93);
+  vec3 violet = vec3(0.65, 0.55, 0.98);
   vec3 col = base + cyan * smoothstep(0.35, 0.95, n) * 0.30;
-  col += cyan * 0.10 * smoothstep(0.9, 0.0, length(uv - vec2(0.5, 0.0)));
+  // The canvas is opaque, so the page's corner gradients would never show through — the cyan and
+  // violet washes are painted here instead.
+  col += cyan * 0.16 * smoothstep(1.05, 0.0, length(uv - vec2(0.82, 1.06)));
+  col += violet * 0.15 * smoothstep(1.0, 0.0, length(uv - vec2(0.08, -0.06)));
+  col += cyan * 0.08 * smoothstep(0.9, 0.0, length(uv - vec2(0.5, 0.0)));
   col *= 1.0 - 0.28 * length(uv - 0.5);
   gl_FragColor = vec4(col, 1.0);
 }`;

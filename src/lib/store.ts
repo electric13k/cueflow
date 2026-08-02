@@ -14,6 +14,37 @@ export const local = { get<T>(key: string, fallback: T): T { try { return JSON.p
 // Session-free upload: anon key writes to the public/ prefix (RLS policy allows it), bucket is public-read.
 export async function uploadTrack(file: File) { if (!supabase) return URL.createObjectURL(file); const path = `public/${crypto.randomUUID()}-${file.name}`; const { error } = await supabase.storage.from("audio").upload(path, file, { contentType: file.type || "audio/mpeg", upsert: false }); if (error) throw error; return supabase.storage.from("audio").getPublicUrl(path).data.publicUrl; }
 const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+
+// Tombstones. Deleting locally is not enough: every re-hydrate would pull the row back from the
+// cloud. The remote delete below handles the signed-in case; this covers the rest (signed out,
+// offline, request failed) so a deleted sound never returns.
+const tombstones = () => new Set(local.get<string[]>("deleted", []));
+export const isDeleted = (id: string) => tombstones().has(id);
+function tombstone(id: string) { const t = tombstones(); t.add(id); local.set("deleted", [...t].slice(-500)); }
+
+/** Storage path out of a public object URL: …/object/public/audio/public/<file> -> public/<file> */
+const storagePath = (publicUrl: string) => publicUrl.split("/object/public/audio/")[1] ?? null;
+
+export async function deleteTrackEverywhere(id: string, url: string) {
+  tombstone(id);
+  if (!supabase || !isUuid(id)) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("sequence_items").delete().eq("track_id", id);
+  await supabase.from("tracks").delete().eq("id", id).eq("user_id", user.id);
+  // The audio itself lives in a public bucket — leaving it behind would keep it playable by URL.
+  const path = storagePath(url);
+  if (path) await supabase.storage.from("audio").remove([decodeURIComponent(path)]);
+}
+
+export async function deleteSequenceEverywhere(id: string) {
+  tombstone(id);
+  if (!supabase || !isUuid(id)) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("sequence_items").delete().eq("sequence_id", id);
+  await supabase.from("sequences").delete().eq("id", id).eq("user_id", user.id);
+}
 export async function persist(tracks: Track[], sequences: Sequence[]) { local.set("tracks", tracks); local.set("sequences", sequences); if (!supabase) return; const { data: { user } } = await supabase.auth.getUser(); if (!user) return; const cloudTracks = tracks.filter(track => isUuid(track.id)); await supabase.from("tracks").upsert(cloudTracks.map(track => ({ id: track.id, user_id: user.id, title: track.title, source_url: track.url, effects: track.effects }))); const cloudSequences = sequences.filter(sequence => isUuid(sequence.id) && sequence.items.every(item => isUuid(item.trackId))); await supabase.from("sequences").upsert(cloudSequences.map(sequence => ({ id: sequence.id, user_id: user.id, name: sequence.name }))); for (const sequence of cloudSequences) { await supabase.from("sequence_items").delete().eq("sequence_id", sequence.id); if (sequence.items.length) await supabase.from("sequence_items").insert(sequence.items.map((item, position) => ({ id: item.id, sequence_id: sequence.id, track_id: item.trackId, position, label: item.label, effects: item.effects }))); }
 }
 export async function hydrateCloud() { if (!supabase) return null; const { data: { user } } = await supabase.auth.getUser(); if (!user) return null; const { data: tracks } = await supabase.from("tracks").select("id,title,source_url,effects,created_at").eq("user_id", user.id); const { data: sequences } = await supabase.from("sequences").select("id,name,created_at").eq("user_id", user.id); if (!tracks || !sequences) return null; const ids = sequences.map(sequence => sequence.id); const { data: items } = ids.length ? await supabase.from("sequence_items").select("id,sequence_id,track_id,label,effects,position").in("sequence_id", ids).order("position") : { data: [] }; return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, createdAt: row.created_at } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, items: (items ?? []).filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects } as SequenceItem)) } as Sequence)) };

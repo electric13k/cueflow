@@ -50,6 +50,16 @@
   }
   .glass-hover { @apply transition-colors hover:border-accent/40 hover:bg-white/[.07]; }
   .glass-soft { @apply rounded-2xl border border-white/10 bg-white/[.03] backdrop-blur-xl; }
+
+  /* HeroUI v3 paints the slider thumb the same accent colour as the fill, so it disappears the
+     moment it sits on filled track. Give it a light face and a ring. */
+  .slider__track { background: rgba(255, 255, 255, .1); }
+  .slider__thumb {
+    background: #f8fafc;
+    border: 2px solid var(--accent);
+    box-shadow: 0 2px 10px rgba(2, 6, 23, .65);
+  }
+  .slider__thumb[data-dragging], .slider__thumb[data-focus-visible] { background: #fff; transform: scale(1.06); }
 }
 
 /* Slim, on-brand scrollbar */

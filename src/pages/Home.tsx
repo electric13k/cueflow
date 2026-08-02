@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Card, CardBody } from "../ui";
 import { motion } from "framer-motion";
-import { ArrowRight, Cloud, Download, Keyboard, ListMusic, Monitor, Music, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Check, Cloud, Download, Keyboard, ListMusic, Monitor, Music, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import Nav from "../components/Nav";
 
@@ -15,6 +16,74 @@ const features = [
 ];
 
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-80px" }, transition: { duration: .5, delay: d } });
+
+type Screen = { shot: string; alt: string; title: string; body: string; points: string[]; fit?: "cover" | "contain" };
+const screens: Screen[] = [
+  {
+    shot: "/shots/soundboard.png", title: "Soundboard",
+    alt: "The CueFlow soundboard: a grid of sound cards above the transport bar",
+    body: "Click a card and it plays. That's the whole interaction.",
+    points: ["Scrub, speed and loop in the bar", "Multi-select with the checkmarks", "Nothing plays until you say so"],
+  },
+  {
+    shot: "/shots/editor.png", title: "Waveform editor",
+    alt: "The CueFlow waveform editor showing a rendered waveform and channel controls",
+    body: "Drag across the waveform to pick a region, then reshape it.",
+    points: ["Shift-drag to grab one channel", "Cut, copy, paste, merge, silence", "Saves a new sound — original untouched"],
+  },
+  {
+    shot: "/shots/sequences.png", title: "Cue sequences",
+    alt: "The CueFlow sequences tab showing a cue deck",
+    body: "A deck of cues you step through like slides.",
+    points: ["Arrow keys move one cue at a time", "Loop the deck, or start it blacked out", "Every key is rebindable"],
+  },
+  {
+    shot: "/shots/phone.png", title: "On your phone", fit: "contain",
+    alt: "CueFlow running on a phone",
+    body: "The same board, sized for one thumb.",
+    points: ["No install, no app store", "Sign in and it follows you", "Runs from the back of the room"],
+  },
+];
+
+/** Flip card: the screenshot on the front, what it does on the back. */
+function ScreenCard({ shot, alt, title, body, points, fit = "cover", delay }: Screen & { delay: number }) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <motion.div {...fade(delay)} style={{ perspective: "1400px" }}>
+      <button
+        onClick={() => setFlipped(f => !f)}
+        aria-label={`${title} — flip for details`}
+        aria-pressed={flipped}
+        className="group relative block h-[24rem] w-full text-left [transform-style:preserve-3d] transition-transform duration-500 ease-out"
+        style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "none" }}
+      >
+        <span className="glass glass-hover absolute inset-0 flex flex-col overflow-hidden p-2 [backface-visibility:hidden]" style={{ backfaceVisibility: "hidden" }}>
+          <img src={shot} alt={alt} loading="lazy" className={`min-h-0 flex-1 rounded-2xl bg-black/30 object-top ${fit === "contain" ? "object-contain" : "object-cover"}`} />
+          <span className="flex items-center justify-between px-2 py-2 text-sm font-bold">
+            {title}
+            <span className="text-xs font-medium text-muted">Flip →</span>
+          </span>
+        </span>
+        <span
+          className="glass absolute inset-0 flex flex-col justify-center gap-3 border-accent/25 bg-gradient-to-br from-accent/15 to-secondary/10 p-6 [backface-visibility:hidden]"
+          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+        >
+          <h3 className="text-xl font-black tracking-tight">{title}</h3>
+          <p className="text-sm text-muted">{body}</p>
+          <ul className="mt-1 space-y-2">
+            {points.map(p => (
+              <li key={p} className="flex gap-2 text-sm">
+                <Check size={15} className="mt-0.5 shrink-0 text-accent" />
+                <span>{p}</span>
+              </li>
+            ))}
+          </ul>
+          <span className="mt-2 text-xs text-muted">← Flip back</span>
+        </span>
+      </button>
+    </motion.div>
+  );
+}
 
 export default function Home() {
   return (
@@ -55,23 +124,9 @@ export default function Home() {
 
         <section id="screens" className="scroll-mt-20 py-10">
           <motion.h2 {...fade()} className="text-center text-3xl font-black tracking-tight sm:text-4xl">A look at the board</motion.h2>
-          <div className="mt-12 grid gap-4 lg:grid-cols-[2fr_1fr]">
-            <motion.figure {...fade()} className="glass overflow-hidden p-2">
-              <img src="/shots/soundboard.png" alt="The CueFlow soundboard: a grid of sound cards above the transport bar" className="w-full rounded-2xl" loading="lazy" width={2880} height={1800} />
-              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">Soundboard.</b> Click a card, it plays. Progress, speed and loop live in the bar.</figcaption>
-            </motion.figure>
-            <motion.figure {...fade(.05)} className="glass overflow-hidden p-2">
-              <img src="/shots/phone.png" alt="CueFlow running on a phone" className="mx-auto w-full max-w-[280px] rounded-2xl" loading="lazy" width={780} height={1688} />
-              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">On your phone.</b> The same board, one thumb.</figcaption>
-            </motion.figure>
-            <motion.figure {...fade(.1)} className="glass overflow-hidden p-2 lg:col-span-2">
-              <img src="/shots/editor.png" alt="The CueFlow waveform editor showing a rendered waveform and channel controls" className="w-full rounded-2xl" loading="lazy" width={2880} height={1800} />
-              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">Editor.</b> Drag across the waveform to pick a region, then trim, mix to mono or balance the channels.</figcaption>
-            </motion.figure>
-            <motion.figure {...fade(.15)} className="glass overflow-hidden p-2 lg:col-span-2">
-              <img src="/shots/sequences.png" alt="The CueFlow sequences tab showing a cue deck" className="w-full rounded-2xl" loading="lazy" width={2880} height={1800} />
-              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">Sequences.</b> A cue deck you step through with the arrow keys — nothing fires on its own.</figcaption>
-            </motion.figure>
+          <p className="mt-3 text-center text-sm text-muted">Tap a card to flip it over.</p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2">
+            {screens.map((s, i) => <ScreenCard key={s.title} {...s} delay={i * .05} />)}
           </div>
         </section>
 

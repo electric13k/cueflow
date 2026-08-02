@@ -7,8 +7,8 @@ import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
 import WaveformEditor from "../components/WaveformEditor";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
-import { hydrateCloud, local, onAuth, persist, uploadTrack } from "../lib/store";
-import { toastOnce } from "../lib/toast";
+import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, onAuth, persist, uploadTrack } from "../lib/store";
+import { toast, toastOnce } from "../lib/toast";
 import { cloneEffects, defaultEffects, Effects, Sequence, SequenceItem, Track } from "../types";
 
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
@@ -67,7 +67,7 @@ export default function Studio() {
   useEffect(() => { local.set("session", { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
   useEffect(() => { local.set("keybinds", binds); }, [binds]);
   const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
-  const mergeCloud = () => hydrateCloud().then(cloud => { if (!cloud) return; setTracks(o => [...o, ...cloud.tracks.filter(t => !o.some(e => e.id === t.id))]); setSequences(o => [...o, ...cloud.sequences.filter(s => !o.some(e => e.id === s.id))]); });
+  const mergeCloud = () => hydrateCloud().then(cloud => { if (!cloud) return; setTracks(o => [...o, ...cloud.tracks.filter(t => !isDeleted(t.id) && !o.some(e => e.id === t.id))]); setSequences(o => [...o, ...cloud.sequences.filter(s => !isDeleted(s.id) && !o.some(e => e.id === s.id))]); });
   useEffect(() => { void mergeCloud(); }, []);
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
   useEffect(() => onAuth(email => { setSignedIn(!!email); if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences)); }), []);
@@ -136,13 +136,20 @@ export default function Studio() {
   const importSound = (title: string, src: string) => {
     const id = crypto.randomUUID();
     setTracks(o => [{ id, title, url: src, effects: defaultEffects(), createdAt: new Date().toISOString(), pending: true }, ...o]); setSelectedId(id);
-    // Myinstants needs the CORS proxy; anywhere else, fetch straight from the browser.
-    const source = /myinstants\.com\//.test(src) ? `/api/myinstants?url=${encodeURIComponent(src)}` : src;
-    fetch(source)
-      .then(r => r.ok ? r.blob() : Promise.reject(new Error("fetch")))
+    // Always via the proxy: fetching a remote sound straight from the page trips CORS on nearly
+    // every host, and an <audio crossOrigin="anonymous"> element then refuses to load it at all.
+    fetch(`/api/audio?url=${encodeURIComponent(src)}`)
+      .then(async r => {
+        if (r.ok) return r.blob();
+        const { error } = await r.json().catch(() => ({ error: "" }));
+        throw new Error(error || `Import failed (${r.status}).`);
+      })
       .then(blob => uploadTrack(new File([blob], `${title}.mp3`, { type: blob.type || "audio/mpeg" })))
       .then(url => setTracks(o => patch(o, id, { url, pending: false })))
-      .catch(() => setTracks(o => patch(o, id, { pending: false }))); // keep the direct URL as a fallback
+      .catch((e: Error) => {
+        setTracks(o => o.filter(t => t.id !== id)); // a card that can never play is worse than none
+        toast("Couldn't import that sound", e.message, "warn");
+      });
   };
   const bakeReverse = async () => {
     if (!selected) return; setBusy(true);
@@ -151,10 +158,10 @@ export default function Studio() {
   };
   // Save an edited/clipped buffer from the waveform editor as a new cloud-backed track.
   const addProcessedFile = async (file: File, title: string) => { const url = await uploadTrack(file); setTracks(o => [{ id: crypto.randomUUID(), title, url, effects: defaultEffects(), createdAt: new Date().toISOString() }, ...o]); };
-  const deleteTrack = (id: string) => { setTracks(o => o.filter(t => t.id !== id)); setSequences(o => o.map(s => ({ ...s, items: s.items.filter(i => i.trackId !== id) }))); if (selectedId === id) setSelectedId(tracks.find(t => t.id !== id)?.id ?? ""); };
+  const deleteTrack = (id: string) => { const gone = tracks.find(t => t.id === id); void deleteTrackEverywhere(id, gone?.url ?? ""); setTracks(o => o.filter(t => t.id !== id)); setSequences(o => o.map(s => ({ ...s, items: s.items.filter(i => i.trackId !== id) }))); if (selectedId === id) setSelectedId(tracks.find(t => t.id !== id)?.id ?? ""); };
 
   const addSequence = () => { const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() }; setSequences(o => [...o, seq]); setSequenceId(seq.id); setCueIndex(0); };
-  const deleteSequence = (id: string) => { setSequences(o => o.filter(s => s.id !== id)); if (sequenceId === id) setSequenceId(sequences.find(s => s.id !== id)?.id ?? ""); };
+  const deleteSequence = (id: string) => { void deleteSequenceEverywhere(id); setSequences(o => o.filter(s => s.id !== id)); if (sequenceId === id) setSequenceId(sequences.find(s => s.id !== id)?.id ?? ""); };
   const addItem = () => {
     if (!sequenceId) return;
     const chosen = (selectedIds.length ? selectedIds.map(id => tracks.find(t => t.id === id)) : [selected]).filter(Boolean) as Track[];
