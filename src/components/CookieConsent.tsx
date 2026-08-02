@@ -23,9 +23,9 @@ export default function CookieConsent() {
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent/15 text-accent"><Cookie size={18} /></div>
           <p className="flex-1 text-sm text-muted">
             CueFlow uses cookies and local storage to keep your sounds, sequences and preferences on this device, and to keep you signed in. No ads, no third-party tracking.{" "}
-            <a href="/legal#privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>
+            <a href="/legal#privacy" target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>
             {" · "}
-            <a href="/legal#terms" className="text-accent underline-offset-2 hover:underline">Terms</a>
+            <a href="/legal#terms" target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Terms</a>
           </p>
           <div className="flex shrink-0 gap-2">
             <Button size="sm" variant="light" onPress={() => choose("declined")}>Decline</Button>

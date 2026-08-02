@@ -53,6 +53,28 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="screens" className="scroll-mt-20 py-10">
+          <motion.h2 {...fade()} className="text-center text-3xl font-black tracking-tight sm:text-4xl">A look at the board</motion.h2>
+          <div className="mt-12 grid gap-4 lg:grid-cols-[2fr_1fr]">
+            <motion.figure {...fade()} className="glass overflow-hidden p-2">
+              <img src="/shots/soundboard.png" alt="The CueFlow soundboard: a grid of sound cards above the transport bar" className="w-full rounded-2xl" loading="lazy" width={2880} height={1800} />
+              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">Soundboard.</b> Click a card, it plays. Progress, speed and loop live in the bar.</figcaption>
+            </motion.figure>
+            <motion.figure {...fade(.05)} className="glass overflow-hidden p-2">
+              <img src="/shots/phone.png" alt="CueFlow running on a phone" className="mx-auto w-full max-w-[280px] rounded-2xl" loading="lazy" width={780} height={1688} />
+              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">On your phone.</b> The same board, one thumb.</figcaption>
+            </motion.figure>
+            <motion.figure {...fade(.1)} className="glass overflow-hidden p-2 lg:col-span-2">
+              <img src="/shots/editor.png" alt="The CueFlow waveform editor showing a rendered waveform and channel controls" className="w-full rounded-2xl" loading="lazy" width={2880} height={1800} />
+              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">Editor.</b> Drag across the waveform to pick a region, then trim, mix to mono or balance the channels.</figcaption>
+            </motion.figure>
+            <motion.figure {...fade(.15)} className="glass overflow-hidden p-2 lg:col-span-2">
+              <img src="/shots/sequences.png" alt="The CueFlow sequences tab showing a cue deck" className="w-full rounded-2xl" loading="lazy" width={2880} height={1800} />
+              <figcaption className="px-3 py-2 text-sm text-muted"><b className="text-foreground">Sequences.</b> A cue deck you step through with the arrow keys — nothing fires on its own.</figcaption>
+            </motion.figure>
+          </div>
+        </section>
+
         <section className="py-16">
           <motion.div {...fade()}>
             <Card className="glass overflow-hidden border-accent/20 bg-gradient-to-br from-accent/15 to-secondary/10">

@@ -36,6 +36,72 @@ export function processBuffer(src: AudioBuffer, opts: { gains?: number[]; mono?:
 }
 export const bufferToWavFile = (buffer: AudioBuffer, name: string) => new File([encodeWav(buffer)], `${name}.wav`, { type: "audio/wav" });
 
+// --- Clip surgery (cut / paste / merge / silence) ---
+const frames = (buf: AudioBuffer, seconds: number) => Math.max(0, Math.min(buf.length, Math.round(seconds * buf.sampleRate)));
+const make = (channels: number, length: number, sampleRate: number) => new AudioBuffer({ length: Math.max(1, length), numberOfChannels: channels, sampleRate });
+
+/** Reads channel c of src, wrapping around when src has fewer channels (mono clip into stereo). */
+const chan = (src: AudioBuffer, c: number) => src.getChannelData(c % src.numberOfChannels);
+
+/** src with [from, to) deleted. */
+export function removeRange(src: AudioBuffer, from: number, to: number) {
+  const a = frames(src, from), b = frames(src, to);
+  if (b <= a) return src;
+  const out = make(src.numberOfChannels, src.length - (b - a), src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const d = src.getChannelData(c), o = out.getChannelData(c);
+    o.set(d.subarray(0, a), 0);
+    o.set(d.subarray(b), a);
+  }
+  return out;
+}
+
+/** clip spliced into src at `at` seconds, pushing the rest later. */
+export function insertBuffer(src: AudioBuffer, at: number, clip: AudioBuffer) {
+  const a = frames(src, at);
+  const out = make(src.numberOfChannels, src.length + clip.length, src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const d = src.getChannelData(c), o = out.getChannelData(c);
+    o.set(d.subarray(0, a), 0);
+    o.set(chan(clip, c), a);
+    o.set(d.subarray(a), a + clip.length);
+  }
+  return out;
+}
+
+/** clip summed on top of src at `at` seconds — the two play together. Extends src if needed. */
+export function mixBuffer(src: AudioBuffer, at: number, clip: AudioBuffer) {
+  const a = frames(src, at);
+  const out = make(src.numberOfChannels, Math.max(src.length, a + clip.length), src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const o = out.getChannelData(c), s = chan(clip, c);
+    o.set(src.getChannelData(c), 0);
+    // Halve both sides so a full-scale overlap cannot clip past 0 dBFS.
+    for (let i = 0; i < out.length; i++) o[i] *= .5;
+    for (let i = 0; i < clip.length; i++) o[a + i] += s[i] * .5;
+  }
+  return out;
+}
+
+/** Zeroes [from, to) on the given channels (all channels when `channels` is omitted). */
+export function silenceRange(src: AudioBuffer, from: number, to: number, channels?: number[]) {
+  const a = frames(src, from), b = frames(src, to);
+  const out = make(src.numberOfChannels, src.length, src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const o = out.getChannelData(c);
+    o.set(src.getChannelData(c));
+    if (!channels || channels.includes(c)) o.fill(0, a, b);
+  }
+  return out;
+}
+
+/** A copy of just the given channels, in order — e.g. [1] lifts the right channel out as mono. */
+export function pickChannels(src: AudioBuffer, channels: number[]) {
+  const out = make(channels.length, src.length, src.sampleRate);
+  channels.forEach((c, i) => out.getChannelData(i).set(src.getChannelData(c % src.numberOfChannels)));
+  return out;
+}
+
 function impulse(context: AudioContext) { const b = context.createBuffer(2, context.sampleRate * 2, context.sampleRate); for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2); } return b; }
 function curve(amount: number) { if (!amount) return null; const d = new Float32Array(44100), k = amount * 120; for (let i = 0; i < d.length; i++) { const x = i * 2 / d.length - 1; d[i] = (3 + k) * x * 20 * Math.PI / 180 / (Math.PI + k * Math.abs(x)); } return d; }
 function encodeWav(buffer: AudioBuffer) { const channels = buffer.numberOfChannels, frameCount = buffer.length, view = new DataView(new ArrayBuffer(44 + frameCount * channels * 2)); let offset = 0; const write = (value: string) => { for (let i = 0; i < value.length; i++) view.setUint8(offset++, value.charCodeAt(i)); }; write("RIFF"); view.setUint32(offset, 36 + frameCount * channels * 2, true); offset += 4; write("WAVEfmt "); view.setUint32(offset, 16, true); offset += 4; view.setUint16(offset, 1, true); offset += 2; view.setUint16(offset, channels, true); offset += 2; view.setUint32(offset, buffer.sampleRate, true); offset += 4; view.setUint32(offset, buffer.sampleRate * channels * 2, true); offset += 4; view.setUint16(offset, channels * 2, true); offset += 2; view.setUint16(offset, 16, true); offset += 2; write("data"); view.setUint32(offset, frameCount * channels * 2, true); offset += 4; for (let frame = 0; frame < frameCount; frame++) for (let channel = 0; channel < channels; channel++) { const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[frame])); view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true); offset += 2; } return view.buffer; }

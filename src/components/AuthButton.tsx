@@ -51,8 +51,8 @@ export default function AuthButton() {
             {mode === "up" && (
               <p className="text-xs text-muted">
                 By creating an account you agree to the{" "}
-                <a href="/legal#terms" className="text-accent underline-offset-2 hover:underline">Terms</a> and{" "}
-                <a href="/legal#privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>.
+                <a href="/legal#terms" target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Terms</a> and{" "}
+                <a href="/legal#privacy" target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>.
               </p>
             )}
           </ModalBody>

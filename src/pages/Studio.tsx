@@ -136,8 +136,10 @@ export default function Studio() {
   const importSound = (title: string, src: string) => {
     const id = crypto.randomUUID();
     setTracks(o => [{ id, title, url: src, effects: defaultEffects(), createdAt: new Date().toISOString(), pending: true }, ...o]); setSelectedId(id);
-    fetch(`/api/myinstants?url=${encodeURIComponent(src)}`)
-      .then(r => r.ok ? r.blob() : Promise.reject(new Error("proxy")))
+    // Myinstants needs the CORS proxy; anywhere else, fetch straight from the browser.
+    const source = /myinstants\.com\//.test(src) ? `/api/myinstants?url=${encodeURIComponent(src)}` : src;
+    fetch(source)
+      .then(r => r.ok ? r.blob() : Promise.reject(new Error("fetch")))
       .then(blob => uploadTrack(new File([blob], `${title}.mp3`, { type: blob.type || "audio/mpeg" })))
       .then(url => setTracks(o => patch(o, id, { url, pending: false })))
       .catch(() => setTracks(o => patch(o, id, { pending: false }))); // keep the direct URL as a fallback
@@ -259,40 +261,55 @@ function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleS
   );
 }
 
+// "airhorn-2.mp3" / "%20vine%20boom_45123" -> "Airhorn", "Vine Boom". Trailing numeric ids that
+// Myinstants and most CDNs append are noise, not part of the name.
+function titleFromUrl(raw: string) {
+  let slug = "";
+  try { slug = decodeURIComponent(new URL(raw, location.href).pathname.split("/").filter(Boolean).pop() ?? ""); }
+  catch { slug = decodeURIComponent(raw.split(/[?#]/)[0].split("/").filter(Boolean).pop() ?? ""); }
+  const words = slug
+    .replace(/\.[a-z0-9]{2,4}$/i, "")
+    .replace(/[-_+]+/g, " ")
+    .replace(/\s*\b\d{3,}\b\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!words) return "Sound";
+  return words.replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function MyInstantsPanel({ importSound }: { importSound: (title: string, url: string) => void }) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<{ name: string; url: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [note, setNote] = useState("");
   const [url, setUrl] = useState("");
-  const search = async () => {
-    const query = q.trim(); if (!query) return; setLoading(true); setNote("");
-    try { const r = await fetch(`/api/myinstants?q=${encodeURIComponent(query)}`); const d = await r.json(); setResults(d.items ?? []); if (!d.items?.length) setNote("No results."); }
-    catch { setNote("Search unavailable (the proxy runs on the deployed site)."); } finally { setLoading(false); }
+  const [note, setNote] = useState("");
+  // Myinstants sits behind Cloudflare, which blocks server-side search from datacenter IPs — so
+  // search hands off to their own site rather than pretending to work.
+  const search = () => {
+    const query = q.trim(); if (!query) return;
+    window.open(`https://www.myinstants.com/en/search/?name=${encodeURIComponent(query)}`, "_blank", "noopener,noreferrer");
   };
-  const importUrl = () => { const u = url.trim(); if (!u) return; const title = u.split("/").filter(Boolean).pop()?.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ") || "Sound"; importSound(title, u); setUrl(""); };
+  const importUrl = () => {
+    const u = url.trim(); if (!u) return;
+    if (/myinstants\.com\/(en\/)?instant\//.test(u)) {
+      setNote("That's the page, not the sound. On Myinstants, right-click the sound button → “Copy audio address”, or use its Download button, then paste that here.");
+      return;
+    }
+    setNote("");
+    importSound(titleFromUrl(u), u);
+    setUrl("");
+  };
   return (
     <div className="glass-soft space-y-3 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Myinstants sync</p>
+      <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Add from Myinstants</p>
       <div className="flex flex-wrap gap-2">
         <Input className="flex-1 min-w-56" size="sm" value={q} onValueChange={setQ} placeholder="Search Myinstants (e.g. airhorn, vine boom)" onKeyDown={(e: any) => e.key === "Enter" && search()} />
-        <Button size="sm" color="primary" variant="flat" isLoading={loading} onPress={search}>Search</Button>
-        <Button size="sm" variant="light" as="a" href="https://www.myinstants.com" target="_blank" endContent={<ExternalLink size={14} />}>Open</Button>
+        <Button size="sm" color="primary" variant="flat" endContent={<ExternalLink size={14} />} onPress={search}>Search</Button>
       </div>
-      {note && <p className="text-xs text-muted">{note}</p>}
-      {results.length > 0 && (
-        <motion.div layout className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
-          {results.map(r => (
-            <button key={r.url} onClick={() => importSound(r.name, r.url)} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-content2/60 px-3 py-2 text-left text-sm hover:border-accent hover:bg-accent/10">
-              <span className="truncate">{r.name}</span><Plus size={15} className="shrink-0 text-accent" />
-            </button>
-          ))}
-        </motion.div>
-      )}
+      <p className="text-xs text-muted">Search opens Myinstants in a new tab. Copy a sound's audio address there, paste it below, and it lands in your library under its own name.</p>
       <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-        <Input className="flex-1 min-w-56" size="sm" value={url} onValueChange={setUrl} placeholder="…or paste a direct sound URL" onKeyDown={(e: any) => e.key === "Enter" && importUrl()} />
+        <Input className="flex-1 min-w-56" size="sm" value={url} onValueChange={setUrl} placeholder="Paste a direct sound URL (.mp3, .wav, .ogg)" onKeyDown={(e: any) => e.key === "Enter" && importUrl()} />
         <Button size="sm" variant="bordered" onPress={importUrl}>Import URL</Button>
       </div>
+      {note && <p className="text-xs text-warning">{note}</p>}
     </div>
   );
 }
@@ -384,11 +401,13 @@ function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effect
   );
 }
 
+// Centred with inset + auto margins rather than -translate-x-1/2: framer-motion writes its own
+// inline `transform` for the entry animation, which silently wins over a Tailwind translate.
 function Player({ track, playing, toggle, time, duration, seek, jump, loop, setLoop, effects, update }: any) {
   const [open, setOpen] = useState(false);
   return (
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
-      className="glass fixed bottom-4 left-1/2 z-20 w-[min(96vw,1080px)] -translate-x-1/2 p-3 sm:p-4">
+      className="glass fixed inset-x-2 bottom-4 z-20 mx-auto max-w-[1080px] p-3 sm:inset-x-4 sm:p-4">
       {/* Phones get the title above the transport; there is no room for both on one line. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold capitalize">{track.title}</p><p className="text-xs text-muted">{format(time)} / {format(duration)}</p></div>

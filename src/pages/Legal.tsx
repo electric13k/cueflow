@@ -2,13 +2,14 @@ import { useEffect, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { FileText, ShieldCheck } from "lucide-react";
 import Backdrop from "../components/Backdrop";
+import ContactForm from "../components/ContactForm";
 import Nav from "../components/Nav";
 
 const UPDATED = "2 August 2026";
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section className="mt-7">
+    <section id={id} className="mt-7 scroll-mt-20">
       <h3 className="text-base font-bold">{title}</h3>
       <div className="mt-2 space-y-2 text-sm leading-relaxed text-muted">{children}</div>
     </section>
@@ -91,7 +92,8 @@ export default function Legal() {
           </Section>
 
           <Section title="Contact">
-            Questions, or a deletion request: <a className="text-accent" href="mailto:electric13k@gmail.com">electric13k@gmail.com</a>.
+            Questions, or a deletion request — send them straight from here, no email client needed.
+            <ContactForm />
           </Section>
         </div>
       </main>
