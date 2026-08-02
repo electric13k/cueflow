@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Card, CardBody } from "../ui";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, Cloud, Download, Keyboard, ListMusic, Monitor, Music, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Cloud, Download, Keyboard, ListMusic, Monitor, Music, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import Nav from "../components/Nav";
 
@@ -16,74 +15,6 @@ const features = [
 ];
 
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-80px" }, transition: { duration: .5, delay: d } });
-
-type Screen = { shot: string; alt: string; title: string; body: string; points: string[]; fit?: "cover" | "contain" };
-const screens: Screen[] = [
-  {
-    shot: "/shots/soundboard.png", title: "Soundboard",
-    alt: "The CueFlow soundboard: a grid of sound cards above the transport bar",
-    body: "Click a card and it plays. That's the whole interaction.",
-    points: ["Scrub, speed and loop in the bar", "Multi-select with the checkmarks", "Nothing plays until you say so"],
-  },
-  {
-    shot: "/shots/editor.png", title: "Waveform editor",
-    alt: "The CueFlow waveform editor showing a rendered waveform and channel controls",
-    body: "Drag across the waveform to pick a region, then reshape it.",
-    points: ["Shift-drag to grab one channel", "Cut, copy, paste, merge, silence", "Saves a new sound — original untouched"],
-  },
-  {
-    shot: "/shots/sequences.png", title: "Cue sequences",
-    alt: "The CueFlow sequences tab showing a cue deck",
-    body: "A deck of cues you step through like slides.",
-    points: ["Arrow keys move one cue at a time", "Loop the deck, or start it blacked out", "Every key is rebindable"],
-  },
-  {
-    shot: "/shots/phone.png", title: "On your phone", fit: "contain",
-    alt: "CueFlow running on a phone",
-    body: "The same board, sized for one thumb.",
-    points: ["No install, no app store", "Sign in and it follows you", "Runs from the back of the room"],
-  },
-];
-
-/** Flip card: the screenshot on the front, what it does on the back. */
-function ScreenCard({ shot, alt, title, body, points, fit = "cover", delay }: Screen & { delay: number }) {
-  const [flipped, setFlipped] = useState(false);
-  return (
-    <motion.div {...fade(delay)} style={{ perspective: "1400px" }}>
-      <button
-        onClick={() => setFlipped(f => !f)}
-        aria-label={`${title} — flip for details`}
-        aria-pressed={flipped}
-        className="group relative block h-[24rem] w-full text-left [transform-style:preserve-3d] transition-transform duration-500 ease-out"
-        style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "none" }}
-      >
-        <span className="glass glass-hover absolute inset-0 flex flex-col overflow-hidden p-2 [backface-visibility:hidden]" style={{ backfaceVisibility: "hidden" }}>
-          <img src={shot} alt={alt} loading="lazy" className={`min-h-0 flex-1 rounded-2xl bg-black/30 object-top ${fit === "contain" ? "object-contain" : "object-cover"}`} />
-          <span className="flex items-center justify-between px-2 py-2 text-sm font-bold">
-            {title}
-            <span className="text-xs font-medium text-muted">Flip →</span>
-          </span>
-        </span>
-        <span
-          className="glass absolute inset-0 flex flex-col justify-center gap-3 border-accent/25 bg-gradient-to-br from-accent/15 to-secondary/10 p-6 [backface-visibility:hidden]"
-          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-        >
-          <h3 className="text-xl font-black tracking-tight">{title}</h3>
-          <p className="text-sm text-muted">{body}</p>
-          <ul className="mt-1 space-y-2">
-            {points.map(p => (
-              <li key={p} className="flex gap-2 text-sm">
-                <Check size={15} className="mt-0.5 shrink-0 text-accent" />
-                <span>{p}</span>
-              </li>
-            ))}
-          </ul>
-          <span className="mt-2 text-xs text-muted">← Flip back</span>
-        </span>
-      </button>
-    </motion.div>
-  );
-}
 
 export default function Home() {
   return (
@@ -103,7 +34,7 @@ export default function Home() {
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .19 }} className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>
-            <Button as="a" href="#features" size="lg" variant="bordered">See features</Button>
+            <Button href="/tutorial" size="lg" variant="bordered">See how it works</Button>
           </motion.div>
         </section>
 
@@ -122,13 +53,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="screens" className="scroll-mt-20 py-10">
-          <motion.h2 {...fade()} className="text-center text-3xl font-black tracking-tight sm:text-4xl">A look at the board</motion.h2>
-          <p className="mt-3 text-center text-sm text-muted">Tap a card to flip it over.</p>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2">
-            {screens.map((s, i) => <ScreenCard key={s.title} {...s} delay={i * .05} />)}
-          </div>
-        </section>
 
         <section className="py-16">
           <motion.div {...fade()}>
@@ -149,6 +73,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
           <span className="flex items-center gap-2"><Download size={14} /> CueFlow — React · HeroUI · Supabase · WebGL</span>
           <span className="flex items-center gap-4">
+            <Link to="/tutorial" className="hover:text-foreground">Tutorial</Link>
             <Link to="/legal#terms" className="hover:text-foreground">Terms</Link>
             <Link to="/legal#privacy" className="hover:text-foreground">Privacy</Link>
             <Link to="/studio" className="font-semibold text-accent">Open Studio →</Link>

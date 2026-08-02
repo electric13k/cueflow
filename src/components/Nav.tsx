@@ -16,6 +16,7 @@ export default function Nav() {
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
           <Button href="/" size="sm" {...link("/")}>Home</Button>
           <Button href="/studio" size="sm" {...link("/studio")}>Studio</Button>
+          <Button href="/tutorial" size="sm" {...link("/tutorial")} className="hidden sm:inline-flex">Tutorial</Button>
           <AuthButton />
           {/* Repo link is a nicety — drop it before the nav starts wrapping on phones. */}
           <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub" className="hidden sm:inline-flex"><Github size={17} /></Button>

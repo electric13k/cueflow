@@ -6,6 +6,7 @@ import Home from "./pages/Home";
 import Studio from "./pages/Studio";
 import Audience from "./pages/Audience";
 import Legal from "./pages/Legal";
+import Tutorial from "./pages/Tutorial";
 import CookieConsent from "./components/CookieConsent";
 import Toaster from "./components/Toaster";
 
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/studio" element={<Studio />} />
         <Route path="/audience" element={<Audience />} />
         <Route path="/legal" element={<Legal />} />
+        <Route path="/tutorial" element={<Tutorial />} />
         <Route path="*" element={<Home />} />
       </Routes>
       <Toaster />
