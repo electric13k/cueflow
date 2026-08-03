@@ -45,7 +45,73 @@ export async function deleteSequenceEverywhere(id: string) {
   await supabase.from("sequence_items").delete().eq("sequence_id", id);
   await supabase.from("sequences").delete().eq("id", id).eq("user_id", user.id);
 }
-export async function persist(tracks: Track[], sequences: Sequence[]) { local.set("tracks", tracks); local.set("sequences", sequences); if (!supabase) return; const { data: { user } } = await supabase.auth.getUser(); if (!user) return; const cloudTracks = tracks.filter(track => isUuid(track.id)); await supabase.from("tracks").upsert(cloudTracks.map(track => ({ id: track.id, user_id: user.id, title: track.title, source_url: track.url, effects: track.effects, kind: track.kind ?? "audio", visual: track.visual ?? null }))); const cloudSequences = sequences.filter(sequence => isUuid(sequence.id) && sequence.items.every(item => isUuid(item.trackId))); await supabase.from("sequences").upsert(cloudSequences.map(sequence => ({ id: sequence.id, user_id: user.id, name: sequence.name }))); for (const sequence of cloudSequences) { await supabase.from("sequence_items").delete().eq("sequence_id", sequence.id); if (sequence.items.length) await supabase.from("sequence_items").insert(sequence.items.map((item, position) => ({ id: item.id, sequence_id: sequence.id, track_id: item.trackId, position, label: item.label, effects: item.effects, visual: item.visual ?? null }))); }
+/**
+ * What the last save actually did. Every call used to discard its error, so a rejected write looked
+ * exactly like a successful one: the reason no cue ever reached the cloud (sequence_items.track_id
+ * is a foreign key, so one cue pointing at a local-only sound failed the whole batch, silently).
+ */
+export type SyncState = { cloud: boolean; ok: boolean; reason?: string; skipped?: number };
+
+export async function persist(tracks: Track[], sequences: Sequence[]): Promise<SyncState> {
+  local.set("tracks", tracks);
+  local.set("sequences", sequences);
+  if (!supabase) return { cloud: false, ok: true, reason: "Cloud is not configured for this build." };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { cloud: false, ok: true, reason: "Sign in to save to your account." };
+
+  const cloudTracks = tracks.filter(track => isUuid(track.id));
+  const { error: trackError } = await supabase.from("tracks").upsert(cloudTracks.map(track => ({
+    id: track.id, user_id: user.id, title: track.title, source_url: track.url,
+    effects: track.effects, kind: track.kind ?? "audio", visual: track.visual ?? null,
+  })));
+  if (trackError) return { cloud: true, ok: false, reason: trackError.message };
+
+  const cloudSequences = sequences.filter(sequence => isUuid(sequence.id));
+  const { error: seqError } = await supabase.from("sequences").upsert(
+    cloudSequences.map(sequence => ({ id: sequence.id, user_id: user.id, name: sequence.name })),
+  );
+  if (seqError) return { cloud: true, ok: false, reason: seqError.message };
+
+  // A cue can only be stored once its sound is, so drop the ones whose track never made it rather
+  // than losing the whole sequence to a foreign-key error.
+  const saved = new Set(cloudTracks.map(track => track.id));
+  let skipped = 0;
+  for (const sequence of cloudSequences) {
+    const items = sequence.items.filter(item => saved.has(item.trackId));
+    skipped += sequence.items.length - items.length;
+    const { error } = await supabase.from("sequence_items").delete().eq("sequence_id", sequence.id);
+    if (error) return { cloud: true, ok: false, reason: error.message };
+    if (!items.length) continue;
+    const { error: itemError } = await supabase.from("sequence_items").insert(items.map((item, position) => ({
+      id: item.id, sequence_id: sequence.id, track_id: item.trackId, position,
+      label: item.label, effects: item.effects, visual: item.visual ?? null,
+    })));
+    if (itemError) return { cloud: true, ok: false, reason: itemError.message };
+  }
+  return { cloud: true, ok: true, skipped };
 }
+/**
+ * Folds a cloud copy into what this device already has. Sequences that exist on both sides get the
+ * union of their cues rather than being skipped, which is what made work done on a second device
+ * look like it never arrived.
+ */
+export function mergeInto(tracks: Track[], sequences: Sequence[], cloud: { tracks: Track[]; sequences: Sequence[] }) {
+  const merged = { tracks: [...tracks], sequences: [...sequences] };
+  for (const track of cloud.tracks) {
+    if (isDeleted(track.id) || merged.tracks.some(t => t.id === track.id)) continue;
+    merged.tracks.push(track);
+  }
+  for (const remote of cloud.sequences) {
+    if (isDeleted(remote.id)) continue;
+    const at = merged.sequences.findIndex(s => s.id === remote.id);
+    if (at < 0) { merged.sequences.push(remote); continue; }
+    const here = merged.sequences[at];
+    const have = new Set(here.items.map(item => item.id));
+    const extra = remote.items.filter(item => !have.has(item.id) && !isDeleted(item.id));
+    if (extra.length) merged.sequences[at] = { ...here, items: [...here.items, ...extra] };
+  }
+  return merged;
+}
+
 export async function hydrateCloud() { if (!supabase) return null; const { data: { user } } = await supabase.auth.getUser(); if (!user) return null; const { data: tracks } = await supabase.from("tracks").select("id,title,source_url,effects,kind,visual,created_at").eq("user_id", user.id); const { data: sequences } = await supabase.from("sequences").select("id,name,created_at").eq("user_id", user.id); if (!tracks || !sequences) return null; const ids = sequences.map(sequence => sequence.id); const { data: items } = ids.length ? await supabase.from("sequence_items").select("id,sequence_id,track_id,label,effects,visual,position").in("sequence_id", ids).order("position") : { data: [] }; return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, kind: row.kind ?? "audio", visual: row.visual ?? undefined, createdAt: row.created_at } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, items: (items ?? []).filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects, visual: item.visual ?? undefined } as SequenceItem)) } as Sequence)) };
 }

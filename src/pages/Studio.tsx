@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import MediaEditor, { blankSlide } from "../components/MediaEditor";
 import Nav from "../components/Nav";
@@ -11,10 +11,11 @@ import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
+import { moved, useDragList } from "../lib/dragList";
 import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, uniqueTitle, type Hit, type Source } from "../lib/media";
-import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, onAuth, persist, uploadTrack } from "../lib/store";
+import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack, type SyncState } from "../lib/store";
 import { toast } from "../lib/toast";
-import { cloneEffects, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual } from "../types";
+import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual } from "../types";
 
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
 type Ctl = { key: keyof Effects; label: string; min: number; max: number; step: number; unit?: string };
@@ -76,11 +77,38 @@ export default function Studio() {
   const selectedSequence = sequences.find(s => s.id === sequenceId);
   useEffect(() => { audio.current.loop = loop; }, [loop]);
 
-  useEffect(() => { void persist(tracks, sequences); }, [tracks, sequences]);
+  const [sync, setSync] = useState<SyncState>({ cloud: false, ok: true });
+  const syncHint = (s: SyncState) =>
+    !s.ok ? `Last save failed: ${s.reason}. Click to pull your account's copy.`
+      : !s.cloud ? s.reason ?? "Saved on this device only."
+        : s.skipped ? `Saved. ${s.skipped} cue${s.skipped > 1 ? "s" : ""} still point at sounds that are not in your account yet.`
+          : "Saved to your account. Click to pull anything a second device added.";
+  const lastSyncNote = useRef("");
+  // A failed save used to be indistinguishable from a good one. Report it once per distinct reason,
+  // so a broken sync is visible on the device it happens on instead of at the next show.
+  useEffect(() => {
+    void persist(tracks, sequences).then(state => {
+      setSync(state);
+      const note = state.ok ? "" : state.reason ?? "unknown error";
+      if (note && note !== lastSyncNote.current) toast("Couldn't save to your account", note, "warn");
+      lastSyncNote.current = note;
+    });
+  }, [tracks, sequences]);
   useEffect(() => { local.set("session", { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
   useEffect(() => { local.set("keybinds", binds); }, [binds]);
   const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
-  const mergeCloud = () => hydrateCloud().then(cloud => { if (!cloud) return; setTracks(o => [...o, ...cloud.tracks.filter(t => !isDeleted(t.id) && !o.some(e => e.id === t.id))]); setSequences(o => [...o, ...cloud.sequences.filter(s => !isDeleted(s.id) && !o.some(e => e.id === s.id))]); });
+  const mergeCloud = () => hydrateCloud().then(cloud => {
+    if (!cloud) return false;
+    const merged = mergeInto(data.current.tracks, data.current.sequences, cloud);
+    setTracks(merged.tracks); setSequences(merged.sequences);
+    return true;
+  });
+  /** Manual pull, for when a second device has work this one has not seen yet. */
+  const syncNow = () => mergeCloud().then(pulled => toast(
+    pulled ? "Synced" : "Nothing to sync",
+    pulled ? "Pulled everything saved to your account." : "Sign in to sync across devices.",
+    pulled ? "success" : "warn",
+  ));
   useEffect(() => { void mergeCloud(); }, []);
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
   useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences)); }), []);
@@ -314,6 +342,11 @@ export default function Studio() {
           <div className="flex flex-wrap gap-2">
             <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>
             <Tooltip content="Set the keys for cues, slides and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
+            <Tooltip content={syncHint(sync)} placement="bottom">
+              <Button variant="flat" color={sync.ok ? "default" : "danger"} startContent={<RefreshCw size={17} />} onPress={syncNow}>
+                <span className="hidden sm:inline">{sync.ok ? "Sync" : "Not synced"}</span>
+              </Button>
+            </Tooltip>
             {/* Sequences has its own "Arm in audience mode", so this would be a second door to the same room. */}
             {tab !== "sequence" && <Tooltip content="Opens the presenter window, drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}><span className="hidden sm:inline">Audience display</span></Button></Tooltip>}
           </div>
@@ -512,7 +545,7 @@ function Editor({ track, busy, update, updateVisual, bakeReverse, onSave, onPrev
       {heading}
       <p className="max-w-2xl text-sm text-muted">
         {kind === "embed"
-          ? "An embedded deck. Edit the slides in Google Slides or PowerPoint itself; the transition and caption below are what CueFlow adds when the cue fires."
+          ? "An embedded deck. Edit the slides in Google Slides or PowerPoint itself; the transition and caption below are what CueFloww adds when the cue fires."
           : "Framing, colour and timing ride with this asset and are applied when the cue fires, so the original file is never touched. Flatten to a new image if you want a copy with the look baked in."}
       </p>
       <MediaEditor track={track} onChange={updateVisual} onSave={onSave} />
@@ -535,7 +568,13 @@ function Editor({ track, busy, update, updateVisual, bakeReverse, onSave, onPrev
 
 function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage }: any) {
   const seq = sequences.find((s: Sequence) => s.id === sequenceId);
-  const [drag, setDrag] = useState(-1); // index being dragged; native DnD, no library needed
+  const cueDrag = useDragList(reorder);
+  // Rendered order is the drag preview while a drag is in flight, and the real order otherwise.
+  const order: SequenceItem[] = !seq ? [] : cueDrag.drag ? moved(seq.items, cueDrag.drag.from, cueDrag.drag.to) : seq.items;
+  const numbers = cueNumbers(order.map(item => {
+    const track = tracks.find((t: Track) => t.id === item.trackId);
+    return track ? kindOf(track) : "audio";
+  }));
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -572,21 +611,29 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                 <Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
               </div>
               {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (
-                <ol className="space-y-2">
-                  <AnimatePresence>{seq.items.map((item: SequenceItem, i: number) => {
+                <ol className="space-y-2" ref={cueDrag.list}>
+                  <AnimatePresence>{order.map((item: SequenceItem, i: number) => {
                     const track = tracks.find((t: Track) => t.id === item.trackId);
                     const kind: Kind = track ? kindOf(track) : "audio";
                     const Icon = kindIcon[kind];
+                    const held = cueDrag.drag?.to === i;
                     return (
-                    <motion.li key={item.id} layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
-                      draggable onDragStart={() => setDrag(i)} onDragEnd={() => setDrag(-1)}
-                      onDragOver={e => { e.preventDefault(); if (drag >= 0 && drag !== i) { reorder(drag, i); setDrag(i); } }}
-                      onDrop={e => e.preventDefault()}
-                    >
-                      <div className={`flex cursor-grab items-center gap-3 rounded-xl border px-3 py-2.5 active:cursor-grabbing ${drag === i ? "opacity-60" : ""} ${i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
-                        <GripVertical size={15} className="shrink-0 text-muted" aria-hidden />
+                    // Layout animation is off mid-drag: an animating row reports a moving rectangle,
+                    // and the drop target is computed from those rectangles.
+                    <motion.li key={item.id} layout={!cueDrag.dragging} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
+                      <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${held ? "border-accent bg-accent/15 shadow-lg" : i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
+                        {/* The grip is the drag surface, and it is finger-sized: -m-2 p-2 gives it a
+                            40px target without changing the row's layout. */}
+                        <span
+                          role="button" tabIndex={-1} aria-label={`Reorder ${item.label}`}
+                          className="-m-2 shrink-0 cursor-grab touch-none p-2 text-muted active:cursor-grabbing"
+                          onPointerDown={cueDrag.start(i)} onPointerMove={cueDrag.move}
+                          onPointerUp={cueDrag.end} onPointerCancel={cueDrag.end}
+                        >
+                          <GripVertical size={15} aria-hidden />
+                        </span>
                         <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
-                          <span className="font-mono text-sm text-accent">{String(i + 1).padStart(2, "0")}</span>
+                          <span className={`w-6 shrink-0 text-center font-mono text-sm font-bold ${kind === "audio" ? "text-accent" : "text-secondary"}`}>{numbers[i]}</span>
                           <Icon size={14} className="shrink-0 text-muted" aria-hidden />
                           <span className="truncate font-medium capitalize">{item.label}</span>
                           <span className="ml-auto hidden shrink-0 text-xs text-muted sm:inline">{track?.title ?? "missing"}</span>

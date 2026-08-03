@@ -38,4 +38,16 @@ export const defaultVisual = (): Visual => ({
   caption: "", trimIn: 0, trimOut: 0, muted: false, rate: 1, loop: false, transition: "fade",
 });
 export const kindOf = (track: Pick<Track, "kind">) => track.kind ?? "audio";
+
+/** a, b, … z, aa, ab … for the visual cues. */
+const letters = (n: number) => { let s = ""; for (n += 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(97 + (n - 1) % 26) + s; return s; };
+
+/**
+ * Sound cues count 1, 2, 3; anything that fills the screen counts a, b, c. Two runs of labels in one
+ * deck means "play 3" and "put up b" are unambiguous over comms, which one shared numbering is not.
+ */
+export function cueNumbers(kinds: Kind[]) {
+  let sound = 0, visual = 0;
+  return kinds.map(kind => (kind === "audio" ? String(++sound) : letters(visual++)));
+}
 export const isVisual = (track: Pick<Track, "kind">) => kindOf(track) !== "audio";

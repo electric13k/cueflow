@@ -19,10 +19,10 @@ export default function Home() {
           <Sparkles size={13} /> Live cue system
         </motion.div>
         <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .05 }} className="mt-6 max-w-4xl text-5xl font-black leading-[1.03] tracking-tight sm:text-7xl">
-          Run your show like a <span className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">slideshow</span>.
+          Nothing happens until <span className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">you press the key</span>.
         </motion.h1>
         <motion.p initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .12 }} className="mt-6 max-w-2xl text-lg text-muted">
-          CueFlow is a browser cue board for theatre, presentations and streams: sound, slides and video in one deck, a waveform and media editor, and a presenter display, no downloads, no autoplay surprises.
+          CueFloww is a cue board you run from a laptop. Your sound, slides and video go into one numbered list; each keypress fires the next thing on it, onto a second screen the audience sees. No desk, no install, and nothing plays on its own.
         </motion.p>
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .19 }} className="mt-9 flex flex-wrap items-center justify-center gap-3">
           <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>

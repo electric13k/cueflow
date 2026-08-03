@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Cookie } from "lucide-react";
 import { CONSENT_COOKIE, getCookie, setCookie } from "../lib/cookies";
 
-// Consent banner. CueFlow's storage (localStorage for your sounds/sequences, Supabase auth cookies) is
+// Consent banner. CueFloww's storage (localStorage for your sounds/sequences, Supabase auth cookies) is
 // functional, so it always works; this records the user's acknowledgement and hides once chosen.
 export default function CookieConsent() {
   const [show, setShow] = useState(false);
@@ -23,7 +23,7 @@ export default function CookieConsent() {
         >
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent/15 text-accent"><Cookie size={18} /></div>
           <p className="flex-1 text-sm text-muted">
-            CueFlow uses cookies and local storage to keep your sounds, sequences and preferences on this device, and to keep you signed in. No ads, no third-party tracking.{" "}
+            CueFloww uses cookies and local storage to keep your sounds, sequences and preferences on this device, and to keep you signed in. No ads, no third-party tracking.{" "}
             <a href={`${import.meta.env.BASE_URL}legal#privacy`} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>
             {" · "}
             <a href={`${import.meta.env.BASE_URL}legal#terms`} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Terms</a>

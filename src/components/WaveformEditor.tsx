@@ -2,11 +2,11 @@ import { type KeyboardEvent, type PointerEvent, type WheelEvent, useCallback, us
 import { Button, Slider, Spinner, Switch, Tooltip } from "../ui";
 import {
   ClipboardPaste, Copy, Crop, Layers, Maximize2, Pause, Play, Repeat, RotateCcw, Save, Scissors,
-  SignalHigh, TrendingDown, TrendingUp, Undo2, Redo2, Volume1, Volume2, VolumeX, Wand2, ZoomIn, ZoomOut,
+  SignalHigh, Split, TrendingDown, TrendingUp, Undo2, Redo2, Volume1, Volume2, VolumeX, Wand2, ZoomIn, ZoomOut,
 } from "lucide-react";
 import {
   bufferToWavFile, decodeAudioUrl, fadeRange, gainRange, insertBuffer, mixBuffer, normalizeRange,
-  peaks, pickChannels, processBuffer, removeRange, reverseRange, silenceRange, sliceBuffer,
+  peaks, pickChannels, processBuffer, removeRange, reverseRange, silenceRange, sliceBuffer, toStereo,
 } from "../lib/audio";
 
 type Chan = { gain: number; mute: boolean };
@@ -70,6 +70,13 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
     [buffer, chan],
   );
   const short = (i: number) => (labels[i] ?? "").slice(0, 1).toUpperCase() || String(i + 1);
+
+  // Converting to stereo changes the channel count, so the level strip has to follow it.
+  useEffect(() => {
+    if (!buffer) return;
+    setChan(cs => cs.length === buffer.numberOfChannels ? cs
+      : Array.from({ length: buffer.numberOfChannels }, (_, i) => cs[i] ?? { gain: 1, mute: false }));
+  }, [buffer]);
 
   // The canvas is fluid, so every time→pixel conversion needs its real width.
   useEffect(() => {
@@ -445,6 +452,11 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
         <Tooltip content={`Play the ${act} backwards`}>
           <Button size="sm" variant="bordered" startContent={<Repeat size={14} />} onPress={reverse}>Reverse</Button>
         </Tooltip>
+        {!stereo && (
+          <Tooltip content="Turns this mono clip into two channels, widened slightly. Affects the whole clip.">
+            <Button size="sm" variant="bordered" startContent={<Split size={14} />} onPress={() => apply(toStereo(buffer))}>To stereo</Button>
+          </Tooltip>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

@@ -21,7 +21,7 @@ export default function Contact() {
       </motion.div>
 
       <p className="mt-6 text-sm text-muted">
-        Data questions are covered in the <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</Link>, and what you agree to by using CueFlow is in the <Link to="/terms" className="text-accent underline-offset-2 hover:underline">Terms</Link>.
+        Data questions are covered in the <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</Link>, and what you agree to by using CueFloww is in the <Link to="/terms" className="text-accent underline-offset-2 hover:underline">Terms</Link>.
       </p>
     </Page>
   );

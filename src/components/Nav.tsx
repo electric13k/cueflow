@@ -15,7 +15,7 @@ export default function Nav() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-xl bg-accent text-accent-foreground shadow-md shadow-accent/30"><Music size={17} /></div>
-          <span className="text-lg font-black tracking-tight">CueFlow</span>
+          <span className="text-lg font-black tracking-tight">CueFloww</span>
         </Link>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
           <Button href="/" size="sm" {...link("/")}>Home</Button>

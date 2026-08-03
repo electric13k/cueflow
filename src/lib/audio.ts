@@ -163,6 +163,22 @@ export function peaks(src: AudioBuffer, channel: number, from: number, to: numbe
   return out;
 }
 
+/**
+ * A mono clip widened to two channels. `spread` 0 is a plain duplicate; above that the right channel
+ * is delayed by up to 14 ms, which the ear reads as width (the Haas effect) without inventing any
+ * material that was not there. Kept short on purpose: a longer delay would sound like an echo, and a
+ * phase-inverted trick would cancel itself the moment a venue sums the feed back to mono.
+ */
+export function toStereo(src: AudioBuffer, spread = 0.5) {
+  const out = make(2, src.length, src.sampleRate);
+  const d = src.getChannelData(0);
+  const delay = Math.round(Math.max(0, Math.min(1, spread)) * 0.014 * src.sampleRate);
+  const left = out.getChannelData(0), right = out.getChannelData(1);
+  left.set(d);
+  for (let i = 0; i < src.length; i++) right[i] = d[Math.max(0, i - delay)];
+  return out;
+}
+
 /** A copy of just the given channels, in order, e.g. [1] lifts the right channel out as mono. */
 export function pickChannels(src: AudioBuffer, channels: number[]) {
   const out = make(channels.length, src.length, src.sampleRate);
