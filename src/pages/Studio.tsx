@@ -8,6 +8,7 @@ import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
 import Stage from "../components/Stage";
 import WaveformEditor from "../components/WaveformEditor";
+import { fetchMedia } from "../lib/api";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
 import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, uniqueTitle, type Hit, type Source } from "../lib/media";
@@ -245,12 +246,7 @@ export default function Studio() {
     const kind = kindFromUrl(src);
     setTracks(o => [{ id, title, url: src, kind, ...(kind === "audio" ? {} : { visual: defaultVisual() }), effects: defaultEffects(), createdAt: new Date().toISOString(), pending: true }, ...o]);
     setSelectedId(id);
-    fetch(`/api/audio?url=${encodeURIComponent(src)}`)
-      .then(async r => {
-        if (r.ok) return r.blob();
-        const { error } = await r.json().catch(() => ({ error: "" }));
-        throw new Error(error || `Import failed (${r.status}).`);
-      })
+    fetchMedia(src)
       .then(blob => uploadTrack(new File([blob], `${title}.${src.split(/[?#]/)[0].split(".").pop() || "mp3"}`, { type: blob.type || "audio/mpeg" })))
       .then(url => setTracks(o => patch(o, id, { url, pending: false })))
       .catch((e: Error) => {
@@ -304,7 +300,7 @@ export default function Studio() {
 
   const openRename = (kind: "track" | "sequence", id: string, value: string) => { setDraft({ kind, id, value }); renameModal.onOpen(); };
   const commitRename = () => { const { kind, id, value } = draft; const v = value.trim(); if (!v) return; if (kind === "track") setTracks(o => patch(o, id, { title: v })); else setSequences(o => o.map(s => s.id === id ? { ...s, name: v } : s)); };
-  const openAudience = () => window.open(`${location.origin}/audience`, "cueflow-audience", "popup,width=1000,height=650");
+  const openAudience = () => window.open(`${location.origin}${import.meta.env.BASE_URL}audience`, "cueflow-audience", "popup,width=1000,height=650");
 
   return (
     <div className="relative min-h-screen">

@@ -95,6 +95,74 @@ export function silenceRange(src: AudioBuffer, from: number, to: number, channel
   return out;
 }
 
+/** Ramps [from, to) between silence and full, linearly. `dir` "in" rises, "out" falls. */
+export function fadeRange(src: AudioBuffer, from: number, to: number, dir: "in" | "out", channels?: number[]) {
+  const a = frames(src, from), b = frames(src, to), span = Math.max(1, b - a);
+  const out = make(src.numberOfChannels, src.length, src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const o = out.getChannelData(c); o.set(src.getChannelData(c));
+    if (channels && !channels.includes(c)) continue;
+    for (let i = a; i < b; i++) { const t = (i - a) / span; o[i] *= dir === "in" ? t : 1 - t; }
+  }
+  return out;
+}
+
+/** Scales [from, to) by `factor`, hard-limited so a boost cannot wrap past full scale. */
+export function gainRange(src: AudioBuffer, from: number, to: number, factor: number, channels?: number[]) {
+  const a = frames(src, from), b = frames(src, to);
+  const out = make(src.numberOfChannels, src.length, src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const o = out.getChannelData(c); o.set(src.getChannelData(c));
+    if (channels && !channels.includes(c)) continue;
+    for (let i = a; i < b; i++) o[i] = Math.max(-1, Math.min(1, o[i] * factor));
+  }
+  return out;
+}
+
+/** [from, to) played backwards, the rest untouched. */
+export function reverseRange(src: AudioBuffer, from: number, to: number, channels?: number[]) {
+  const a = frames(src, from), b = frames(src, to);
+  const out = make(src.numberOfChannels, src.length, src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const o = out.getChannelData(c); o.set(src.getChannelData(c));
+    if (channels && !channels.includes(c)) continue;
+    o.set(src.getChannelData(c).subarray(a, b).slice().reverse(), a);
+  }
+  return out;
+}
+
+/**
+ * Lifts [from, to) so its loudest sample sits at `peak`. One shared factor across every channel,
+ * otherwise normalising a stereo file would quietly re-pan it.
+ */
+export function normalizeRange(src: AudioBuffer, from: number, to: number, peak = 0.99, channels?: number[]) {
+  const a = frames(src, from), b = frames(src, to);
+  let loudest = 0;
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    if (channels && !channels.includes(c)) continue;
+    const d = src.getChannelData(c);
+    for (let i = a; i < b; i++) { const v = Math.abs(d[i]); if (v > loudest) loudest = v; }
+  }
+  if (!loudest) return src; // silence has nothing to normalise
+  return gainRange(src, from, to, peak / loudest, channels);
+}
+
+/**
+ * Column min/max pairs for drawing, over the window [from, to). Returned raw (no gain applied) so a
+ * gain drag can rescale the cached peaks instead of rescanning millions of samples per frame.
+ */
+export function peaks(src: AudioBuffer, channel: number, from: number, to: number, columns: number) {
+  const a = frames(src, from), b = frames(src, to), span = Math.max(1, b - a);
+  const d = src.getChannelData(channel), out = new Float32Array(columns * 2);
+  for (let x = 0; x < columns; x++) {
+    const s = a + Math.floor((x * span) / columns), e = Math.max(s + 1, a + Math.floor(((x + 1) * span) / columns));
+    let min = 0, max = 0;
+    for (let i = s; i < e && i < b; i++) { const v = d[i]; if (v < min) min = v; else if (v > max) max = v; }
+    out[x * 2] = min; out[x * 2 + 1] = max;
+  }
+  return out;
+}
+
 /** A copy of just the given channels, in order, e.g. [1] lifts the right channel out as mono. */
 export function pickChannels(src: AudioBuffer, channels: number[]) {
   const out = make(channels.length, src.length, src.sampleRate);

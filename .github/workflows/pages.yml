@@ -1,0 +1,51 @@
+name: GitHub Pages
+
+# GitHub Pages serves the app from /<repo>/ and cannot run the /api functions, so this build sets
+# BASE_PATH for every link and VITE_STATIC_HOST so the app knows to skip the import proxy and the
+# contact form rather than calling endpoints that are not there.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_STATIC_HOST: "1"
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      # Pages has no SPA rewrite of its own: it serves 404.html for unknown paths, so a copy of the
+      # app there is what makes /studio survive a refresh or a shared link.
+      - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,4 @@
+# Single-page app: every route is served by index.html and matched client-side. Cloudflare Pages
+# reads this file; Netlify reads the same rule from netlify.toml. Functions under /api are matched
+# before redirects on both, so this does not shadow them.
+/*    /index.html   200

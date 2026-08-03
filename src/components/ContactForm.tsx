@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CircleCheck, Send, User } from "lucide-react";
 import { Button, Input } from "../ui";
+import { PRIMARY_ORIGIN, hasApi } from "../lib/api";
 import { onAuth } from "../lib/store";
 
 const topics = ["General", "Bug report", "Feature idea", "Delete my account"] as const;
@@ -52,6 +53,17 @@ export default function ContactForm() {
           Send another
         </Button>
       </div>
+    </div>
+  );
+
+  // GitHub Pages has no server to post to, so say that up front instead of letting the button fail.
+  if (!hasApi) return (
+    <div className="glass-soft mt-4 p-5">
+      <p className="font-semibold">This build can't send messages.</p>
+      <p className="mt-1 text-sm text-muted">
+        It's hosted as static files, with no server behind it. The form works on{" "}
+        <a href={`${PRIMARY_ORIGIN}/contact`} className="text-accent underline-offset-2 hover:underline">{PRIMARY_ORIGIN.replace(/^https:\/\//, "")}</a>.
+      </p>
     </div>
   );
 

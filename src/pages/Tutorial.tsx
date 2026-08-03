@@ -8,25 +8,25 @@ const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacit
 
 const screens: Screen[] = [
   {
-    shot: "/shots/soundboard.png", title: "Library",
+    shot: `${import.meta.env.BASE_URL}shots/soundboard.png`, title: "Library",
     alt: "The CueFlow library: a grid of media cards above the transport bar",
     body: "Click a card and it fires. That's the whole interaction.",
     points: ["Sound, images, video and decks together", "Search your library or the free archives", "Multi-select with the checkmarks", "Nothing plays until you say so"],
   },
   {
-    shot: "/shots/editor.png", title: "Editors",
+    shot: `${import.meta.env.BASE_URL}shots/editor.png`, title: "Editors",
     alt: "The CueFlow waveform editor showing a rendered waveform and channel controls",
     body: "Drag across the waveform to pick a region, then reshape it. Images and video get their own panel.",
     points: ["Shift-drag to grab one channel", "Cut, copy, paste, merge, silence", "Framing, colour and captions for slides", "Trim video without re-encoding"],
   },
   {
-    shot: "/shots/sequences.png", title: "Cue sequences",
+    shot: `${import.meta.env.BASE_URL}shots/sequences.png`, title: "Cue sequences",
     alt: "The CueFlow sequences tab showing a cue deck",
     body: "A deck of cues you step through like slides.",
     points: ["Mix sound, slides and video in one deck", "Arrow keys move one cue at a time", "A and D move slides only", "Every key is rebindable"],
   },
   {
-    shot: "/shots/phone.png", title: "On your phone", fit: "contain",
+    shot: `${import.meta.env.BASE_URL}shots/phone.png`, title: "On your phone", fit: "contain",
     alt: "CueFlow running on a phone",
     body: "The same board, sized for one thumb.",
     points: ["No install, no app store", "Sign in and it follows you", "Runs from the back of the room"],

@@ -1,0 +1,5 @@
+# Cloudflare Pages. `npx wrangler pages deploy` reads this; the dashboard's Git integration reads
+# the build command and output directory from the project settings instead.
+name = "cueflow"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-01-01"

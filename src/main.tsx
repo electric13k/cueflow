@@ -24,7 +24,8 @@ function LegalRedirect() {
 applyTheme(getTheme());
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
+    {/* BASE_URL is "/" everywhere except GitHub Pages, which serves the app from /<repo>/. */}
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/features" element={<Features />} />
