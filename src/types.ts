@@ -1,4 +1,5 @@
-export type Effects = { speed: number; volume: number; gain: number; reverb: number; fadeIn: number; fadeOut: number; distortion: number; reverse: boolean };
+/** bass/mid/treble are in dB, 0 being flat. Older saved effects have none, so they read as 0. */
+export type Effects = { speed: number; volume: number; gain: number; reverb: number; fadeIn: number; fadeOut: number; distortion: number; reverse: boolean; bass?: number; mid?: number; treble?: number };
 
 /** What a library asset is. Legacy tracks have no `kind`, so anything undefined is audio. */
 export type Kind = "audio" | "image" | "video" | "embed";
@@ -30,7 +31,7 @@ export type Sequence = { id: string; name: string; items: SequenceItem[]; create
 /** What the audience window is showing right now. `n` bumps per cue so a repeat still animates. */
 export type Stage = { url: string; kind: Kind; visual: Visual; label: string; n: number } | null;
 
-export const defaultEffects = (): Effects => ({ speed: 1, volume: 0.9, gain: 1, reverb: 0, fadeIn: 0, fadeOut: 0, distortion: 0, reverse: false });
+export const defaultEffects = (): Effects => ({ speed: 1, volume: 0.9, gain: 1, reverb: 0, fadeIn: 0, fadeOut: 0, distortion: 0, reverse: false, bass: 0, mid: 0, treble: 0 });
 export const cloneEffects = (effects: Effects): Effects => ({ ...effects });
 export const defaultVisual = (): Visual => ({
   fit: "contain", zoom: 1, rotate: 0, flipH: false,

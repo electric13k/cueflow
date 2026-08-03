@@ -30,23 +30,36 @@ export function embedUrl(raw: string): string | null {
 }
 
 // --- Auto-naming ------------------------------------------------------------------------------
+/** decodeURIComponent throws on a lone "%", which a filename is perfectly entitled to contain. */
+const safeDecode = (s: string) => { try { return decodeURIComponent(s); } catch { return s; } };
+
 /**
  * "airhorn-2_final.mp3", "%20vine%20boom_45123", "IMG_2481.JPG" -> "Airhorn 2 Final", "Vine Boom",
  * "IMG 2481". Trailing numeric ids that CDNs append are noise; a real word is not.
+ *
+ * `source` matters. A filename is not a URL: "50% off.wav" and "act 1 #2.wav" are both legal on
+ * disk, and both come out mangled (or throw) if you run them through URL parsing -- "#2.wav" gets
+ * treated as a fragment and thrown away, leaving "Act 1". That was the name glitch.
  */
-export function prettyName(raw: string) {
-  let slug = raw;
-  try { slug = decodeURIComponent(new URL(raw, location.href).pathname.split("/").filter(Boolean).pop() ?? raw); }
-  catch { slug = decodeURIComponent(raw.split(/[?#]/)[0].split("/").filter(Boolean).pop() ?? raw); }
+export function prettyName(raw: string, source: "file" | "url" = "url") {
+  const slug = source === "file"
+    ? raw
+    : safeDecode(((): string => {
+      try { return new URL(raw, location.href).pathname.split("/").filter(Boolean).pop() ?? raw; }
+      catch { return raw.split(/[?#]/)[0].split("/").filter(Boolean).pop() ?? raw; }
+    })());
   const words = slug
     .replace(/\.[a-z0-9]{2,4}$/i, "")
     .replace(/[-_+]+/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")      // camelCase exports from editing apps
-    .replace(/\s*\b\d{4,}\b\s*$/, "")          // …_45123 style ids
     .replace(/\s+/g, " ")
     .trim();
-  if (!words) return "Untitled";
-  return words.replace(/\b\w/g, c => c.toUpperCase());
+  // Trailing CDN ids ("vine boom 45123") are noise, but "IMG 2481" is the only name that photo has.
+  // Bias towards keeping: only drop a long run of digits when real words survive it.
+  const trimmed = words.replace(/\s+\d{5,}$/, "");
+  const kept = trimmed.includes(" ") ? trimmed : words;
+  if (!kept) return "Untitled";
+  return kept.replace(/\b\w/g, c => c.toUpperCase());
 }
 
 /** "Airhorn" against an existing "Airhorn" -> "Airhorn 2". Keeps a library of imports readable. */
@@ -76,7 +89,7 @@ export async function downloadAsset(url: string, title: string) {
 }
 
 // --- Search providers -------------------------------------------------------------------------
-export type Source = "library" | "archive" | "commons" | "myinstants" | "url";
+export type Source = "library" | "archive" | "commons" | "openverse" | "myinstants" | "url";
 export type Hit = { id: string; title: string; by?: string; source: Source; url?: string; archiveId?: string };
 
 const j = async (url: string) => { const r = await fetch(url); if (!r.ok) throw new Error(`Search failed (${r.status})`); return r.json(); };
@@ -101,6 +114,26 @@ export async function searchCommons(q: string): Promise<Hit[]> {
   return Object.values(data.query?.pages ?? {})
     .filter(p => playable(p.imageinfo?.[0]?.mime))
     .map(p => ({ id: p.title, source: "commons" as const, title: p.title.replace(/^File:/, "").replace(/\.[^.]+$/, ""), url: p.imageinfo![0].url, by: "Wikimedia Commons" }));
+}
+
+/**
+ * Openverse, the Creative Commons search index: stock audio and images from Jamendo, Freesound,
+ * Flickr, Wikimedia and friends behind one open API. No key, CORS enabled, everything it returns is
+ * openly licensed. Audio and images are separate endpoints, so both are asked at once.
+ */
+export async function searchOpenverse(q: string): Promise<Hit[]> {
+  const one = async (kind: "audio" | "images") => {
+    const data = await j(`https://api.openverse.org/v1/${kind}/?q=${encodeURIComponent(q)}&page_size=8`) as {
+      results?: { id: string; title?: string; creator?: string; url?: string; license?: string }[];
+    };
+    return (data.results ?? []).filter(r => r.url).map(r => ({
+      id: `${kind}:${r.id}`, source: "openverse" as const, url: r.url,
+      title: r.title || "Untitled", by: [r.creator, r.license?.toUpperCase()].filter(Boolean).join(" · "),
+    }));
+  };
+  // One dead endpoint should not lose the other's results.
+  const both = await Promise.allSettled([one("audio"), one("images")]);
+  return both.flatMap(r => (r.status === "fulfilled" ? r.value : []));
 }
 
 /** Archive results name a collection, not a file, so the playable URL is resolved on import. */

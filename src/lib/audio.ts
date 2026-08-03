@@ -1,9 +1,32 @@
 import type { Effects } from "../types";
 
+/**
+ * Three-band tone control, the shelf/peak split every mixer and Audacity's own equaliser use: a low
+ * shelf under 250 Hz, a peak at 1 kHz for the range voices sit in, a high shelf over 4 kHz.
+ */
+const BANDS = [
+  { key: "bass" as const, type: "lowshelf" as BiquadFilterType, freq: 250 },
+  { key: "mid" as const, type: "peaking" as BiquadFilterType, freq: 1000 },
+  { key: "treble" as const, type: "highshelf" as BiquadFilterType, freq: 4000 },
+];
+
 export class AudioEngine {
-  private context?: AudioContext; private source?: MediaElementAudioSourceNode; private output?: GainNode; private wet?: GainNode; private distortion?: WaveShaperNode; private reverb?: ConvolverNode; private element?: HTMLAudioElement;
-  private connect(element: HTMLAudioElement) { if (this.element === element) return; this.element = element; this.context = new AudioContext(); this.source = this.context.createMediaElementSource(element); this.output = this.context.createGain(); this.wet = this.context.createGain(); this.distortion = this.context.createWaveShaper(); this.reverb = this.context.createConvolver(); this.source.connect(this.distortion); this.distortion.connect(this.output); this.distortion.connect(this.reverb); this.reverb.connect(this.wet); this.wet.connect(this.output); this.output.connect(this.context.destination); }
-  apply(element: HTMLAudioElement, fx: Effects) { this.connect(element); if (!this.context || !this.output || !this.wet || !this.distortion || !this.reverb) return; const now = this.context.currentTime; element.playbackRate = fx.speed; element.volume = fx.volume; this.output.gain.setTargetAtTime(fx.gain, now, .02); this.wet.gain.setTargetAtTime(fx.reverb, now, .02); this.distortion.curve = curve(fx.distortion); if (fx.reverb) this.reverb.buffer = impulse(this.context); }
+  private context?: AudioContext; private source?: MediaElementAudioSourceNode; private output?: GainNode; private wet?: GainNode; private distortion?: WaveShaperNode; private reverb?: ConvolverNode; private element?: HTMLAudioElement; private eq: BiquadFilterNode[] = [];
+  private connect(element: HTMLAudioElement) {
+    if (this.element === element) return;
+    this.element = element; this.context = new AudioContext();
+    this.source = this.context.createMediaElementSource(element);
+    this.output = this.context.createGain(); this.wet = this.context.createGain();
+    this.distortion = this.context.createWaveShaper(); this.reverb = this.context.createConvolver();
+    // source -> distortion -> bass -> mid -> treble -> output, with a reverb send off the tone stack.
+    this.eq = BANDS.map(band => { const node = this.context!.createBiquadFilter(); node.type = band.type; node.frequency.value = band.freq; node.Q.value = 1; return node; });
+    const toned = this.eq.reduce<AudioNode>((prev, node) => { prev.connect(node); return node; }, this.distortion);
+    this.source.connect(this.distortion);
+    toned.connect(this.output);
+    toned.connect(this.reverb); this.reverb.connect(this.wet); this.wet.connect(this.output);
+    this.output.connect(this.context.destination);
+  }
+  apply(element: HTMLAudioElement, fx: Effects) { this.connect(element); if (!this.context || !this.output || !this.wet || !this.distortion || !this.reverb) return; const now = this.context.currentTime; element.playbackRate = fx.speed; element.volume = fx.volume; this.output.gain.setTargetAtTime(fx.gain, now, .02); this.wet.gain.setTargetAtTime(fx.reverb, now, .02); this.distortion.curve = curve(fx.distortion); this.eq.forEach((node, i) => node.gain.setTargetAtTime(fx[BANDS[i].key] ?? 0, now, .02)); if (fx.reverb) this.reverb.buffer = impulse(this.context); }
   async play(element: HTMLAudioElement, fx: Effects) { this.apply(element, fx); if (this.context?.state === "suspended") await this.context.resume(); if (fx.fadeIn) { element.volume = 0; const started = performance.now(); const fade = () => { element.volume = Math.min(fx.volume, fx.volume * (performance.now() - started) / (fx.fadeIn * 1000)); if (element.volume < fx.volume) requestAnimationFrame(fade); }; fade(); } await element.play(); }
 }
 export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return new File([encodeWav(reversed)], `${name}-reversed.wav`, { type: "audio/wav" }); }

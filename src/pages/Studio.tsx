@@ -12,7 +12,7 @@ import { fetchMedia } from "../lib/api";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
 import { moved, useDragList } from "../lib/dragList";
-import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, uniqueTitle, type Hit, type Source } from "../lib/media";
+import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, searchOpenverse, uniqueTitle, type Hit, type Source } from "../lib/media";
 import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack, type SyncState } from "../lib/store";
 import { toast } from "../lib/toast";
 import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual } from "../types";
@@ -24,6 +24,10 @@ const controls: Ctl[] = [
   { key: "gain", label: "Gain", min: .1, max: 2, step: .05, unit: "x" }, { key: "reverb", label: "Reverb", min: 0, max: 1, step: .05 },
   { key: "fadeIn", label: "Fade in", min: 0, max: 8, step: .25, unit: "s" }, { key: "fadeOut", label: "Fade out", min: 0, max: 8, step: .25, unit: "s" },
   { key: "distortion", label: "Distortion", min: 0, max: 1, step: .05 },
+  // Tone, in dB either side of flat. Named for what they do to the sound, not for their frequencies.
+  { key: "bass", label: "Bass", min: -12, max: 12, step: .5, unit: " dB" },
+  { key: "mid", label: "Mids", min: -12, max: 12, step: .5, unit: " dB" },
+  { key: "treble", label: "Treble", min: -12, max: 12, step: .5, unit: " dB" },
 ];
 type Session = { selectedId: string; sequenceId: string; cueIndex: number; tab: string };
 const patch = (arr: Track[], id: string, p: Partial<Track>) => arr.map(t => t.id === id ? { ...t, ...p } : t);
@@ -247,7 +251,7 @@ export default function Studio() {
     const files = picked.filter(f => kindFromFile(f)); if (!files.length) return;
     const taken = tracks.map(t => t.title);
     const created: Track[] = files.map(f => {
-      const title = uniqueTitle(prettyName(f.name), taken); taken.push(title);
+      const title = uniqueTitle(prettyName(f.name, "file"), taken); taken.push(title);
       const kind = kindFromFile(f)!;
       return { id: crypto.randomUUID(), title, url: URL.createObjectURL(f), kind, mime: f.type, effects: defaultEffects(), ...(kind === "audio" ? {} : { visual: defaultVisual() }), createdAt: new Date().toISOString(), pending: true };
     });
@@ -453,6 +457,7 @@ const SOURCES: { id: Source; label: string }[] = [
   { id: "library", label: "My library" },
   { id: "archive", label: "Internet Archive" },
   { id: "commons", label: "Wikimedia Commons" },
+  { id: "openverse", label: "Openverse (stock audio + images)" },
   { id: "myinstants", label: "Myinstants" },
   { id: "url", label: "Paste a link" },
 ];
@@ -483,7 +488,8 @@ function SearchPanel({ importAsset, filter, setFilter }: { importAsset: (title: 
       return;
     }
     setLoading(true); setHits([]);
-    try { setHits(await (source === "archive" ? searchArchive(query) : searchCommons(query))); }
+    const search = { archive: searchArchive, commons: searchCommons, openverse: searchOpenverse }[source as "archive" | "commons" | "openverse"] ?? searchCommons;
+    try { setHits(await search(query)); }
     catch (e) { setNote((e as Error).message); }
     finally { setLoading(false); }
   };
@@ -671,11 +677,14 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
 }
 
 function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effects) => void }) {
+  // Tracks saved before the tone controls existed have no bass/mid/treble, and Number(undefined) is
+  // NaN, which a slider renders as an empty thumb. Fall back to the defaults for anything missing.
+  const base = defaultEffects();
   return (
     <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
       {controls.map(c => (
         <Slider key={c.key} size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
-          value={Number(effects[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
+          value={Number(effects[c.key] ?? base[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
           getValue={v => `${Number(v).toFixed(c.step < .1 ? 2 : 1)}${c.unit ?? ""}`} />
       ))}
     </div>
