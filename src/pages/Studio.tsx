@@ -3,7 +3,8 @@ import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFoo
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
-import MediaEditor, { blankSlide } from "../components/MediaEditor";
+import MediaEditor from "../components/MediaEditor";
+import SlideComposer from "../components/SlideComposer";
 import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
 import Stage from "../components/Stage";
@@ -286,18 +287,7 @@ export default function Studio() {
         toast("Couldn't import that", e.message, "warn");
       });
   };
-  const addSlide = async () => {
-    setBusy(true);
-    try {
-      const file = await blankSlide();
-      const url = await uploadTrack(file);
-      const title = uniqueTitle("Slide", tracks.map(t => t.title));
-      const id = crypto.randomUUID();
-      setTracks(o => [{ id, title, url, kind: "image", visual: { ...defaultVisual(), caption: title, fit: "cover" }, effects: defaultEffects(), createdAt: new Date().toISOString() }, ...o]);
-      setSelectedId(id); setTab("editor");
-    } catch (e) { toast("Couldn't create a slide", (e as Error).message, "warn"); }
-    finally { setBusy(false); }
-  };
+  const [slideOpen, setSlideOpen] = useState(false);
   const bakeReverse = async () => {
     if (!selected) return; setBusy(true);
     try { const file = await makeReversedFile(selected.url, selected.title); const url = await uploadTrack(file); setTracks(o => [{ id: crypto.randomUUID(), title: `${selected.title} (reversed)`, url, kind: "audio", effects: { ...selected.effects, reverse: false }, createdAt: new Date().toISOString() }, ...o]); }
@@ -359,7 +349,7 @@ export default function Studio() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="mt-6">
           <Tabs selectedKey={tab} onSelectionChange={setTab} classNames={{ tabList: "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
-              <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} onPlay={playTrack} onToggleSelect={toggleSelect} onClearSelection={() => setSelectedIds([])} onAdd={addFiles} onAddSlide={addSlide} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} onAddToSequence={addItem} hasSequence={!!sequenceId} />
+              <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} onPlay={playTrack} onToggleSelect={toggleSelect} onClearSelection={() => setSelectedIds([])} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
             <Tab key="editor" id="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
               <Editor track={selected} busy={busy} update={updateEffects} updateVisual={updateVisual} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => selected && openRename("track", selected.id, selected.title)} />
@@ -383,6 +373,7 @@ export default function Studio() {
         </>)}</ModalContent>
       </Modal>
 
+      <SlideComposer open={slideOpen} onClose={() => setSlideOpen(false)} onCreate={addProcessedFile} />
       <Onboarding control={guideModal} />
       <KeybindsModal disc={keybindsModal} binds={binds} setBinds={setBinds} />
     </div>

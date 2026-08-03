@@ -105,14 +105,18 @@ export async function searchArchive(q: string): Promise<Hit[]> {
   }));
 }
 
-/** Wikimedia Commons: freely licensed audio, open API, CORS enabled via origin=*. */
+/**
+ * Wikimedia Commons: freely licensed sound, stills and footage, open API, CORS enabled via origin=*.
+ * The one open library here that carries video, so it is not filtered to audio.
+ */
 export async function searchCommons(q: string): Promise<Hit[]> {
-  const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(`filetype:audio ${q}`)}&gsrnamespace=6&gsrlimit=15&prop=imageinfo&iiprop=url|mime`;
+  const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=20&prop=imageinfo&iiprop=url|mime`;
   const data = await j(url) as { query?: { pages?: Record<string, { title: string; imageinfo?: { url: string; mime: string }[] }> } };
   // Commons reports Ogg Vorbis as application/ogg, so a plain audio/* test drops half the results.
-  const playable = (mime = "") => mime.startsWith("audio/") || mime === "application/ogg";
+  // Everything else it holds -- PDFs, DjVu, spreadsheets -- has nowhere to go on a stage.
+  const usable = (mime = "") => /^(audio|image|video)\//.test(mime) || mime === "application/ogg";
   return Object.values(data.query?.pages ?? {})
-    .filter(p => playable(p.imageinfo?.[0]?.mime))
+    .filter(p => usable(p.imageinfo?.[0]?.mime))
     .map(p => ({ id: p.title, source: "commons" as const, title: p.title.replace(/^File:/, "").replace(/\.[^.]+$/, ""), url: p.imageinfo![0].url, by: "Wikimedia Commons" }));
 }
 

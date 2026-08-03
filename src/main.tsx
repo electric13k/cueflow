@@ -10,6 +10,7 @@ import Contact from "./pages/Contact";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Tutorial from "./pages/Tutorial";
+import Credits from "./pages/Credits";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
@@ -33,6 +34,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/audience" element={<Audience />} />
         <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/credits" element={<Credits />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/legal" element={<LegalRedirect />} />

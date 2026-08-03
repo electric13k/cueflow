@@ -15,6 +15,8 @@ export type Visual = {
   fit: "cover" | "contain";
   zoom: number; rotate: number; flipH: boolean;
   brightness: number; contrast: number; saturate: number; blur: number;
+  /** Warm (+) / cool (-) wash, -100..100, and a 0..1 corner darkening. Older saved looks have neither. */
+  temp?: number; vignette?: number;
   caption: string;
   trimIn: number; trimOut: number; muted: boolean; rate: number; loop: boolean;
   transition: Transition;
@@ -35,7 +37,7 @@ export const defaultEffects = (): Effects => ({ speed: 1, volume: 0.9, gain: 1, 
 export const cloneEffects = (effects: Effects): Effects => ({ ...effects });
 export const defaultVisual = (): Visual => ({
   fit: "contain", zoom: 1, rotate: 0, flipH: false,
-  brightness: 1, contrast: 1, saturate: 1, blur: 0,
+  brightness: 1, contrast: 1, saturate: 1, blur: 0, temp: 0, vignette: 0,
   caption: "", trimIn: 0, trimOut: 0, muted: false, rate: 1, loop: false, transition: "fade",
 });
 export const kindOf = (track: Pick<Track, "kind">) => track.kind ?? "audio";

@@ -1,5 +1,22 @@
 import { useEffect, useRef, type CSSProperties } from "react";
+import { tempAlpha, tempColour } from "../lib/image";
 import type { Stage as StageState, Visual } from "../types";
+
+/**
+ * Warm/cool wash and vignette, as two blend layers over the media rather than a filter on it.
+ * Filters cannot do a colour temperature shift, and doing it in blend layers means video gets the
+ * same grade as a still for free -- no per-frame work at all.
+ */
+export function Grade({ v }: { v: Visual }) {
+  return (
+    <>
+      {!!v.temp && <div className="pointer-events-none absolute inset-0 mix-blend-soft-light"
+        style={{ background: `rgb(${tempColour(v.temp)})`, opacity: tempAlpha(v.temp) * 2.6 }} />}
+      {!!v.vignette && <div className="pointer-events-none absolute inset-0"
+        style={{ background: `radial-gradient(closest-side, transparent 45%, rgba(0,0,0,${Math.min(v.vignette, 1)}) 100%)` }} />}
+    </>
+  );
+}
 
 /** Framing and colour are applied at display time, so nothing is ever re-encoded. */
 export const visualStyle = (v: Visual): CSSProperties => ({
@@ -49,6 +66,7 @@ export default function Stage({ stage, className = "" }: { stage: StageState; cl
         {stage.kind === "image" && <img src={stage.url} alt={stage.label} className="h-full w-full" style={visualStyle(stage.visual)} />}
         {stage.kind === "video" && <video ref={video} src={stage.url} playsInline className="h-full w-full" style={visualStyle(stage.visual)} />}
         {stage.kind === "embed" && <iframe src={stage.url} title={stage.label} allowFullScreen className="h-full w-full border-0" />}
+        {stage.kind !== "embed" && <Grade v={stage.visual} />}
         {stage.visual.caption && (
           <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-8 text-center text-2xl font-bold text-white sm:text-4xl">
             {stage.visual.caption}
