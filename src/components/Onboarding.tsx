@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Keyboard, ListMusic, Monitor, SlidersHorizontal, Upload, UserPlus } from "lucide-react";
+import { Keyboard, ListMusic, Monitor, Presentation, SlidersHorizontal, Upload, UserPlus } from "lucide-react";
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "../ui";
 
 const SEEN = "cueflow:onboarded";
@@ -7,28 +7,32 @@ const SEEN = "cueflow:onboarded";
 type Step = { icon: typeof Upload; title: string; body: ReactNode };
 const steps: Step[] = [
   {
-    icon: Upload, title: "1. Get sounds in",
-    body: <>Hit <b>Upload</b> in the Library tab to add files from your computer, or paste a direct link to an audio file in the import box. Everything you add stays in your library.</>,
+    icon: Upload, title: "1. Get media in",
+    body: <>Hit <b>Upload</b> in the Library tab to add audio, images or video from your computer. The search bar next to it picks where to look: your own library, the Internet Archive, Wikimedia Commons, Myinstants, or a link you paste. Imports are renamed for you.</>,
   },
   {
-    icon: SlidersHorizontal, title: "2. Shape a sound",
-    body: <>Pick a sound, open the <b>Editor</b> tab, and drag across the waveform to select a region. From there you can trim it, mix to mono, balance the left and right channels, and set speed, reverb, fades or distortion.</>,
+    icon: Presentation, title: "2. Add slides",
+    body: <><b>New slide</b> makes a blank 16:9 card you can put a title on. Exported slide images drop straight in, and a Google Slides or PowerPoint Online link is embedded as a live deck.</>,
   },
   {
-    icon: ListMusic, title: "3. Build a cue deck",
-    body: <>In <b>Sequences</b>, make a sequence and add cues to it, like slides in a deck. Nothing ever autoplays: you step through cues with the arrow keys, one press per cue. Turn on <b>Loop sequence</b> to wrap back to the start.</>,
+    icon: SlidersHorizontal, title: "3. Shape it",
+    body: <>Pick a sound and open <b>Editor</b> to drag across the waveform: cut, paste, merge, silence, mix to mono, balance the channels. Pick an image or video and the same tab becomes a media panel with framing, colour, a caption, and trim for video.</>,
   },
   {
-    icon: Monitor, title: "4. Run the show",
-    body: <><b>Audience display</b> opens a pure-black window, drag it onto the projector or mirrored screen so the room sees nothing while you drive the board. Arm a sequence straight into audience mode from the Sequences tab, and the arrow keys keep working while that black window has focus.</>,
+    icon: ListMusic, title: "4. Build a cue deck",
+    body: <>In <b>Sequences</b>, make a sequence and add cues to it. Sound and slides share one deck, so audio 1, slide 1, audio 2, slide 2 is a single list you drag into order. Nothing ever autoplays: you step through cues yourself.</>,
   },
   {
-    icon: Keyboard, title: "5. Make the keys yours",
-    body: <>Open <b>Keybinds</b> to rebind everything: arrows step cues, and any key you like can nudge reverb, volume or speed live during playback.</>,
+    icon: Monitor, title: "5. Run the show",
+    body: <><b>Audience display</b> opens the presenter window, drag it onto the projector or mirrored screen. It stays black on sound-only cues and shows the slide or video the moment a visual cue fires, with its transition.</>,
   },
   {
-    icon: UserPlus, title: "6. Keep your work",
-    body: <>Your library lives in this browser. <b>Sign in</b> from the top bar and your sounds and sequences save to your account instead, so they follow you to any device.</>,
+    icon: Keyboard, title: "6. Drive it from the keyboard",
+    body: <>Arrows step every cue. <b>A</b> and <b>D</b> step slides only, so the deck moves without cutting the sound underneath, and <b>W</b> / <b>S</b> zoom the stage. Keys work from either window. <b>Keybinds</b> rebinds all of it.</>,
+  },
+  {
+    icon: UserPlus, title: "7. Keep your work",
+    body: <>Your library lives in this browser. <b>Sign in</b> from the top bar and your media and sequences save to your account instead, so they follow you to any device.</>,
   },
 ];
 

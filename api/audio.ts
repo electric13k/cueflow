@@ -1,11 +1,7 @@
-import type { Config } from "@netlify/functions";
+// Vercel twin of netlify/functions/audio.mts. Same guards, same behaviour, so /api/audio works
+// identically on either host. Edge runtime: standard Request/Response, no Node-only APIs.
+export const config = { runtime: "edge" };
 
-// Server-side media fetcher (audio, image, video). Browsers cannot fetch most remote media directly,
-// the host sends no CORS headers, so the request fails and, worse, an <audio crossOrigin="anonymous">
-// element refuses to load it at all. Fetching here and re-uploading to our own storage sidesteps both.
-//
-// This is a URL fetcher exposed to the internet, so it is deliberately narrow: public http(s) hosts
-// only, no redirects into private space, media content-types, size-capped.
 const MAX_BYTES = 25 * 1024 * 1024;
 const MAX_HOPS = 4;
 
@@ -23,12 +19,14 @@ function check(raw: string) {
   return { url: u };
 }
 
-export default async (req: Request) => {
+const json = (body: unknown, status: number) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+export default async function handler(req: Request): Promise<Response> {
   const raw = new URL(req.url).searchParams.get("url");
-  if (!raw) return Response.json({ error: "Missing url" }, { status: 400 });
+  if (!raw) return json({ error: "Missing url" }, 400);
 
   let target = check(raw);
-  if ("error" in target) return Response.json({ error: target.error }, { status: 400 });
+  if ("error" in target) return json({ error: target.error }, 400);
 
   // Follow redirects by hand so every hop is re-checked against the private-address list.
   let res: Response | undefined;
@@ -40,27 +38,23 @@ export default async (req: Request) => {
     const next = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (!next) break;
     const hopped = check(new URL(next, target.url!).toString());
-    if ("error" in hopped) return Response.json({ error: hopped.error }, { status: 400 });
+    if ("error" in hopped) return json({ error: hopped.error }, 400);
     target = hopped;
     res = undefined;
   }
-  if (!res) return Response.json({ error: "That link redirects too many times." }, { status: 400 });
-  if (!res.ok) return Response.json({ error: `The host returned ${res.status} for that link.` }, { status: 502 });
+  if (!res) return json({ error: "That link redirects too many times." }, 400);
+  if (!res.ok) return json({ error: `The host returned ${res.status} for that link.` }, 502);
 
   const type = (res.headers.get("content-type") ?? "").toLowerCase();
   const looksMedia = ["audio/", "video/", "image/"].some(p => type.startsWith(p)) || type.includes("octet-stream");
-  if (!looksMedia) {
-    return Response.json({ error: "That link is a web page, not a media file. Copy the address of the file itself (it usually ends in .mp3, .wav, .ogg, .m4a, .png, .jpg or .mp4)." }, { status: 415 });
-  }
+  if (!looksMedia) return json({ error: "That link is a web page, not a media file. Copy the address of the file itself (it usually ends in .mp3, .wav, .ogg, .m4a, .png, .jpg or .mp4)." }, 415);
 
   const declared = Number(res.headers.get("content-length") ?? 0);
-  if (declared > MAX_BYTES) return Response.json({ error: "That file is bigger than 25 MB." }, { status: 413 });
+  if (declared > MAX_BYTES) return json({ error: "That file is bigger than 25 MB." }, 413);
   const bytes = await res.arrayBuffer();
-  if (bytes.byteLength > MAX_BYTES) return Response.json({ error: "That file is bigger than 25 MB." }, { status: 413 });
+  if (bytes.byteLength > MAX_BYTES) return json({ error: "That file is bigger than 25 MB." }, 413);
 
   return new Response(bytes, {
     headers: { "content-type": type.split(";")[0] || "audio/mpeg", "cache-control": "public, max-age=86400" },
   });
-};
-
-export const config: Config = { path: "/api/audio" };
+}

@@ -1,15 +1,19 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronUp, CircleHelp, ExternalLink, FastForward, GripVertical, Keyboard, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
+import MediaEditor, { blankSlide } from "../components/MediaEditor";
 import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
+import Stage from "../components/Stage";
 import WaveformEditor from "../components/WaveformEditor";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
+import { listen, send, type Msg } from "../lib/bus";
+import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, uniqueTitle, type Hit, type Source } from "../lib/media";
 import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, onAuth, persist, uploadTrack } from "../lib/store";
 import { toast } from "../lib/toast";
-import { cloneEffects, defaultEffects, Effects, Sequence, SequenceItem, Track } from "../types";
+import { cloneEffects, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual } from "../types";
 
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
 type Ctl = { key: keyof Effects; label: string; min: number; max: number; step: number; unit?: string };
@@ -22,12 +26,17 @@ const controls: Ctl[] = [
 type Session = { selectedId: string; sequenceId: string; cueIndex: number; tab: string };
 const patch = (arr: Track[], id: string, p: Partial<Track>) => arr.map(t => t.id === id ? { ...t, ...p } : t);
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+const kindIcon = { audio: Volume2, image: ImageIcon, video: Film, embed: Presentation };
+const UPLOAD_ACCEPT = "audio/*,image/*,video/*";
 
-// Configurable keybinds: arrows drive cues, other keys nudge live effects.
-type Action = "nextCue" | "prevCue" | "playPause" | "volUp" | "volDown" | "speedUp" | "speedDown" | "reverbUp" | "reverbDown";
+// Configurable keybinds: arrows drive cues, WASD drives whatever is on the screen, other keys nudge
+// live effects.
+type Action = "nextCue" | "prevCue" | "playPause" | "nextVisual" | "prevVisual" | "zoomIn" | "zoomOut" | "volUp" | "volDown" | "speedUp" | "speedDown" | "reverbUp" | "reverbDown";
 const keyActions: { id: Action; label: string; def: string }[] = [
   { id: "nextCue", label: "Next cue", def: "ArrowRight" }, { id: "prevCue", label: "Previous cue", def: "ArrowLeft" },
   { id: "playPause", label: "Play / pause", def: " " },
+  { id: "nextVisual", label: "Next slide or video", def: "d" }, { id: "prevVisual", label: "Previous slide or video", def: "a" },
+  { id: "zoomIn", label: "Zoom the stage in", def: "w" }, { id: "zoomOut", label: "Zoom the stage out", def: "s" },
   { id: "volUp", label: "Volume +", def: "ArrowUp" }, { id: "volDown", label: "Volume −", def: "ArrowDown" },
   { id: "speedUp", label: "Speed +", def: "]" }, { id: "speedDown", label: "Speed −", def: "[" },
   { id: "reverbUp", label: "Reverb +", def: "r" }, { id: "reverbDown", label: "Reverb −", def: "e" },
@@ -46,7 +55,7 @@ export default function Studio() {
   const lastPick = useRef(-1); // anchor for shift-click range selection in the library
   const [loop, setLoop] = useState(false);
   const [loopSeq, setLoopSeq] = useState(false);
-  const [binds, setBinds] = useState<Record<Action, string>>(() => local.get("keybinds", defaultBinds));
+  const [binds, setBinds] = useState<Record<Action, string>>(() => ({ ...defaultBinds, ...local.get("keybinds", defaultBinds) }));
   const keybindsModal = useDisclosure();
   const guideModal = useDisclosure();
   const [sequenceId, setSequenceId] = useState<string>(session.sequenceId);
@@ -58,6 +67,7 @@ export default function Studio() {
   const [busy, setBusy] = useState(false);
   const [editUrl, setEditUrl] = useState(""); // unsaved editor buffer, as a blob URL, takes over playback for the selected track
   const wasEditing = useRef(false);
+  const [stage, setStage] = useState<StageState>(null); // what the audience window is showing
   const renameModal = useDisclosure();
   const [draft, setDraft] = useState<{ kind: "track" | "sequence"; id: string; value: string }>({ kind: "track", id: "", value: "" });
 
@@ -81,15 +91,21 @@ export default function Studio() {
     a.addEventListener("timeupdate", tick); a.addEventListener("loadedmetadata", meta); a.addEventListener("durationchange", meta); a.addEventListener("ended", ended);
     return () => { a.removeEventListener("timeupdate", tick); a.removeEventListener("loadedmetadata", meta); a.removeEventListener("durationchange", meta); a.removeEventListener("ended", ended); };
   }, [selected]);
+
   // One place to run a bound key, whether it was pressed in this window or forwarded from the
   // audience one. Returns true if it matched something, so the caller can preventDefault.
   const runKey = (key: string) => {
     const action = (Object.keys(binds) as Action[]).find(a => binds[a] === key); if (!action) return false;
-    if ((action === "nextCue" || action === "prevCue") && !selectedSequence) return false;
+    if ((action === "nextCue" || action === "prevCue" || action === "nextVisual" || action === "prevVisual") && !selectedSequence) return false;
+    if ((action === "zoomIn" || action === "zoomOut") && !stage) return false;
     if (["volUp", "volDown", "speedUp", "speedDown", "reverbUp", "reverbDown"].includes(action) && !selected) return false;
     switch (action) {
       case "nextCue": advance(1); break;
       case "prevCue": advance(-1); break;
+      case "nextVisual": advanceVisual(1); break;
+      case "prevVisual": advanceVisual(-1); break;
+      case "zoomIn": zoomStage(.1); break;
+      case "zoomOut": zoomStage(-.1); break;
       case "playPause": toggle(); break;
       case "volUp": nudge("volume", .05, 0, 1); break;
       case "volDown": nudge("volume", -.05, 0, 1); break;
@@ -102,20 +118,27 @@ export default function Studio() {
   };
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement; if (["INPUT", "TEXTAREA"].includes(el.tagName) || el.isContentEditable) return;
+      const el = e.target as HTMLElement; if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable) return;
       if (runKey(e.key)) e.preventDefault();
     };
-    // The audience window is a separate document, so keys pressed while it has focus never reach
-    // this one. It forwards them instead; same-origin messages only.
-    const relay = (e: MessageEvent) => {
-      if (e.origin !== location.origin || (e.data as { cueflow?: string })?.cueflow !== "key") return;
-      runKey(String((e.data as { key: string }).key));
-    };
-    window.addEventListener("keydown", keys); window.addEventListener("message", relay);
-    return () => { window.removeEventListener("keydown", keys); window.removeEventListener("message", relay); };
+    window.addEventListener("keydown", keys);
+    return () => window.removeEventListener("keydown", keys);
   });
+  // The audience window is a separate document, so keys pressed while it has focus never reach this
+  // one; it forwards them over the same-origin channel instead, and a window that reloads asks for
+  // the current cue again with "hello". The channel is opened once: re-opening it per render drops
+  // whatever arrives between close and open.
+  const onBus = useRef<(msg: Msg) => void>(() => {});
+  onBus.current = msg => {
+    if (msg.type === "key") runKey(msg.key);
+    if (msg.type === "hello") send({ type: "stage", stage });
+  };
+  useEffect(() => listen(msg => onBus.current(msg)), []);
+  // Whatever the operator sees on the stage, the room sees too.
+  useEffect(() => { send({ type: "stage", stage }); }, [stage]);
 
   const updateEffects = (fx: Effects) => { if (!selected) return; setTracks(all => patch(all, selected.id, { effects: fx })); engine.current.apply(audio.current, fx); };
+  const updateVisual = (visual: Visual) => { if (!selected) return; setTracks(all => patch(all, selected.id, { visual })); setStage(s => s && s.url === selected.url ? { ...s, visual } : s); };
   // A fresh edit invalidates whatever the element has loaded: swap the source and rewind rather than
   // let the transport keep playing the pre-edit audio.
   useEffect(() => {
@@ -140,8 +163,17 @@ export default function Studio() {
     try { await engine.current.play(a, fx); setPlaying(true); } catch { setPlaying(false); }
   };
   const toggle = () => { if (playing) { audio.current.pause(); setPlaying(false); } else void play(selected, selected?.effects, false); };
-  // Soundboard: click a card to play it now (and make it the active/editor track).
-  const playTrack = (track: Track) => { if (track.id === selectedId && playing) { audio.current.pause(); setPlaying(false); return; } setSelectedId(track.id); void play(track, track.effects); };
+  /** Puts a slide or video on the stage. Audio keeps playing under it, which is the whole point. */
+  const show = (track: Track, visual = track.visual ?? defaultVisual()) =>
+    setStage(s => ({ url: track.url, kind: kindOf(track), visual, label: track.title, n: (s?.n ?? 0) + 1 }));
+  const zoomStage = (delta: number) => setStage(s => s && ({ ...s, visual: { ...s.visual, zoom: clamp(s.visual.zoom + delta, .25, 4) } }));
+  // Soundboard: click a card to fire it (and make it the active/editor asset).
+  const playTrack = (track: Track) => {
+    setSelectedId(track.id);
+    if (isVisual(track)) return show(track);
+    if (track.id === selectedId && playing) { audio.current.pause(); setPlaying(false); return; }
+    void play(track, track.effects);
+  };
   // Shift-click picks a whole run in one go instead of one checkmark at a time. selectedIds stays
   // ordered, so a card can show the position it will take in the sequence.
   const toggleSelect = (id: string, index = -1, range = false) => setSelectedIds(ids => {
@@ -155,49 +187,100 @@ export default function Studio() {
   });
   const jump = (s: number) => { audio.current.currentTime = Math.max(0, Math.min(audio.current.duration || 0, audio.current.currentTime + s)); };
   const seek = (v: number) => { audio.current.currentTime = v; setTime(v); };
-  const playCue = (i: number) => { if (!selectedSequence) return; const item = selectedSequence.items[i]; if (!item) return; const track = tracks.find(t => t.id === item.trackId); setCueIndex(i); if (track) void play(track, item.effects); };
+  const playCue = (i: number) => {
+    if (!selectedSequence) return;
+    const item = selectedSequence.items[i]; if (!item) return;
+    const track = tracks.find(t => t.id === item.trackId);
+    setCueIndex(i);
+    if (!track) return;
+    if (isVisual(track)) show(track, item.visual ?? track.visual ?? defaultVisual());
+    else void play(track, item.effects);
+  };
   const advance = (dir: 1 | -1) => { if (!selectedSequence) return; const n = selectedSequence.items.length; if (!n) return; const i = loopSeq ? (cueIndex + dir + n) % n : clamp(cueIndex + dir, 0, n - 1); playCue(i); };
+  /** WASD steps the deck's visuals only, so slides move without disturbing the sound already running. */
+  const advanceVisual = (dir: 1 | -1) => {
+    const items = selectedSequence?.items ?? []; if (!items.length) return;
+    const visualAt = (i: number) => { const t = tracks.find(x => x.id === items[i]?.trackId); return t && isVisual(t); };
+    for (let step = 1; step <= items.length; step++) {
+      const i = loopSeq ? (cueIndex + dir * step + items.length * step) % items.length : cueIndex + dir * step;
+      if (i < 0 || i >= items.length) break;
+      if (visualAt(i)) return playCue(i);
+    }
+  };
   const nudge = (key: keyof Effects, delta: number, min: number, max: number) => { if (!selected) return; updateEffects({ ...selected.effects, [key]: clamp(Number(selected.effects[key]) + delta, min, max) }); };
   // Arms the deck without firing anything: cue 1 waits for the first arrow press, so nothing ever
   // hits the room the moment a window opens.
-  const startSequence = (audience: boolean) => { if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); setCueIndex(-1); audio.current.pause(); setPlaying(false); };
+  const startSequence = (audience: boolean) => { if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); setCueIndex(-1); setStage(null); audio.current.pause(); setPlaying(false); };
 
-  // Optimistic: the track appears instantly with a local object URL, then swaps to the cloud URL once uploaded.
+  // Optimistic: the asset appears instantly with a local object URL, then swaps to the cloud URL once uploaded.
   const addFiles = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = [...(e.target.files ?? [])].filter(f => f.type.startsWith("audio/")); e.target.value = "";
-    if (!files.length) return;
-    const created: Track[] = files.map(f => ({ id: crypto.randomUUID(), title: f.name.replace(/\.[^.]+$/, ""), url: URL.createObjectURL(f), effects: defaultEffects(), createdAt: new Date().toISOString(), pending: true }));
+    const picked = [...(e.target.files ?? [])]; e.target.value = "";
+    const files = picked.filter(f => kindFromFile(f)); if (!files.length) return;
+    const taken = tracks.map(t => t.title);
+    const created: Track[] = files.map(f => {
+      const title = uniqueTitle(prettyName(f.name), taken); taken.push(title);
+      const kind = kindFromFile(f)!;
+      return { id: crypto.randomUUID(), title, url: URL.createObjectURL(f), kind, mime: f.type, effects: defaultEffects(), ...(kind === "audio" ? {} : { visual: defaultVisual() }), createdAt: new Date().toISOString(), pending: true };
+    });
     setTracks(o => [...created, ...o]); setSelectedId(created[0].id);
     created.forEach((t, i) => uploadTrack(files[i])
       .then(url => { setTracks(o => patch(o, t.id, { url, pending: false })); URL.revokeObjectURL(t.url); })
       .catch(() => setTracks(o => patch(o, t.id, { pending: false, error: true }))));
   };
-  // Import a sound by URL, re-hosts Myinstants sounds through the serverless proxy so they play through the effects graph.
-  const importSound = (title: string, src: string) => {
+  /**
+   * Import by URL. Everything goes through the serverless proxy: fetching remote media straight from
+   * the page trips CORS on nearly every host, and an <audio crossOrigin="anonymous"> element then
+   * refuses to load it at all. Slide-deck links (Google Slides, PowerPoint Online) are embedded
+   * rather than downloaded, since there is no file to fetch.
+   */
+  const importAsset = (rawTitle: string, src: string) => {
+    const title = uniqueTitle(rawTitle, tracks.map(t => t.title));
+    const embed = embedUrl(src);
     const id = crypto.randomUUID();
-    setTracks(o => [{ id, title, url: src, effects: defaultEffects(), createdAt: new Date().toISOString(), pending: true }, ...o]); setSelectedId(id);
-    // Always via the proxy: fetching a remote sound straight from the page trips CORS on nearly
-    // every host, and an <audio crossOrigin="anonymous"> element then refuses to load it at all.
+    if (embed) {
+      setTracks(o => [{ id, title, url: embed, kind: "embed", visual: defaultVisual(), effects: defaultEffects(), createdAt: new Date().toISOString() }, ...o]);
+      setSelectedId(id);
+      return;
+    }
+    const kind = kindFromUrl(src);
+    setTracks(o => [{ id, title, url: src, kind, ...(kind === "audio" ? {} : { visual: defaultVisual() }), effects: defaultEffects(), createdAt: new Date().toISOString(), pending: true }, ...o]);
+    setSelectedId(id);
     fetch(`/api/audio?url=${encodeURIComponent(src)}`)
       .then(async r => {
         if (r.ok) return r.blob();
         const { error } = await r.json().catch(() => ({ error: "" }));
         throw new Error(error || `Import failed (${r.status}).`);
       })
-      .then(blob => uploadTrack(new File([blob], `${title}.mp3`, { type: blob.type || "audio/mpeg" })))
+      .then(blob => uploadTrack(new File([blob], `${title}.${src.split(/[?#]/)[0].split(".").pop() || "mp3"}`, { type: blob.type || "audio/mpeg" })))
       .then(url => setTracks(o => patch(o, id, { url, pending: false })))
       .catch((e: Error) => {
         setTracks(o => o.filter(t => t.id !== id)); // a card that can never play is worse than none
-        toast("Couldn't import that sound", e.message, "warn");
+        toast("Couldn't import that", e.message, "warn");
       });
+  };
+  const addSlide = async () => {
+    setBusy(true);
+    try {
+      const file = await blankSlide();
+      const url = await uploadTrack(file);
+      const title = uniqueTitle("Slide", tracks.map(t => t.title));
+      const id = crypto.randomUUID();
+      setTracks(o => [{ id, title, url, kind: "image", visual: { ...defaultVisual(), caption: title, fit: "cover" }, effects: defaultEffects(), createdAt: new Date().toISOString() }, ...o]);
+      setSelectedId(id); setTab("editor");
+    } catch (e) { toast("Couldn't create a slide", (e as Error).message, "warn"); }
+    finally { setBusy(false); }
   };
   const bakeReverse = async () => {
     if (!selected) return; setBusy(true);
-    try { const file = await makeReversedFile(selected.url, selected.title); const url = await uploadTrack(file); setTracks(o => [{ id: crypto.randomUUID(), title: `${selected.title} (reversed)`, url, effects: { ...selected.effects, reverse: false }, createdAt: new Date().toISOString() }, ...o]); }
+    try { const file = await makeReversedFile(selected.url, selected.title); const url = await uploadTrack(file); setTracks(o => [{ id: crypto.randomUUID(), title: `${selected.title} (reversed)`, url, kind: "audio", effects: { ...selected.effects, reverse: false }, createdAt: new Date().toISOString() }, ...o]); }
     catch (err) { alert(`Reverse failed: ${(err as Error).message}`); } finally { setBusy(false); }
   };
-  // Save an edited/clipped buffer from the waveform editor as a new cloud-backed track.
-  const addProcessedFile = async (file: File, title: string) => { const url = await uploadTrack(file); setTracks(o => [{ id: crypto.randomUUID(), title, url, effects: defaultEffects(), createdAt: new Date().toISOString() }, ...o]); };
+  // Save an edited buffer or flattened image from an editor as a new cloud-backed asset.
+  const addProcessedFile = async (file: File, title: string) => {
+    const url = await uploadTrack(file);
+    const kind = kindFromFile(file) ?? "audio";
+    setTracks(o => [{ id: crypto.randomUUID(), title: uniqueTitle(title, o.map(t => t.title)), url, kind, ...(kind === "audio" ? {} : { visual: defaultVisual() }), effects: defaultEffects(), createdAt: new Date().toISOString() }, ...o]);
+  };
   const deleteTrack = (id: string) => { const gone = tracks.find(t => t.id === id); void deleteTrackEverywhere(id, gone?.url ?? ""); setTracks(o => o.filter(t => t.id !== id)); setSequences(o => o.map(s => ({ ...s, items: s.items.filter(i => i.trackId !== id) }))); if (selectedId === id) setSelectedId(tracks.find(t => t.id !== id)?.id ?? ""); };
 
   const addSequence = () => { const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() }; setSequences(o => [...o, seq]); setSequenceId(seq.id); setCueIndex(0); };
@@ -206,7 +289,7 @@ export default function Studio() {
     if (!sequenceId) return;
     const chosen = (selectedIds.length ? selectedIds.map(id => tracks.find(t => t.id === id)) : [selected]).filter(Boolean) as Track[];
     if (!chosen.length) return;
-    setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: [...s.items, ...chosen.map(t => ({ id: crypto.randomUUID(), trackId: t.id, label: t.title, effects: cloneEffects(t.effects) }))] }));
+    setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: [...s.items, ...chosen.map(t => ({ id: crypto.randomUUID(), trackId: t.id, label: t.title, effects: cloneEffects(t.effects), ...(isVisual(t) ? { visual: { ...(t.visual ?? defaultVisual()) } } : {}) }))] }));
   };
   const deleteItem = (itemId: string) => setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: s.items.filter(i => i.id !== itemId) }));
   const moveItem = (i: number, dir: -1 | 1) => reorder(i, i + dir);
@@ -214,6 +297,9 @@ export default function Studio() {
     if (s.id !== sequenceId || to < 0 || to >= s.items.length || from === to) return s;
     const items = [...s.items]; items.splice(to, 0, ...items.splice(from, 1));
     return { ...s, items };
+  }));
+  const setItemTransition = (itemId: string, transition: Visual["transition"]) => setSequences(o => o.map(s => s.id !== sequenceId ? s : {
+    ...s, items: s.items.map(i => i.id !== itemId ? i : { ...i, visual: { ...(i.visual ?? defaultVisual()), transition } }),
   }));
 
   const openRename = (kind: "track" | "sequence", id: string, value: string) => { setDraft({ kind, id, value }); renameModal.onOpen(); };
@@ -231,30 +317,30 @@ export default function Studio() {
           {/* Labels collapse to icons on phones, three full-width buttons do not fit a 375px row. */}
           <div className="flex flex-wrap gap-2">
             <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>
-            <Tooltip content="Set the keys for cues and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
-            {/* Sequences has its own "Start in audience mode", so this would be a second door to the same room. */}
-            {tab !== "sequence" && <Tooltip content="Opens a black window, drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}><span className="hidden sm:inline">Audience display</span></Button></Tooltip>}
+            <Tooltip content="Set the keys for cues, slides and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
+            {/* Sequences has its own "Arm in audience mode", so this would be a second door to the same room. */}
+            {tab !== "sequence" && <Tooltip content="Opens the presenter window, drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}><span className="hidden sm:inline">Audience display</span></Button></Tooltip>}
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="mt-6">
           <Tabs selectedKey={tab} onSelectionChange={setTab} classNames={{ tabList: "glass-soft" }}>
-            <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Volume2 size={16} />Library</span>}>
-              <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} onPlay={playTrack} onToggleSelect={toggleSelect} onClearSelection={() => setSelectedIds([])} onAdd={addFiles} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importSound={importSound} onAddToSequence={addItem} hasSequence={!!sequenceId} />
+            <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
+              <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} onPlay={playTrack} onToggleSelect={toggleSelect} onClearSelection={() => setSelectedIds([])} onAdd={addFiles} onAddSlide={addSlide} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
             <Tab key="editor" id="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
-              <Editor track={selected} busy={busy} update={updateEffects} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => selected && openRename("track", selected.id, selected.title)} />
+              <Editor track={selected} busy={busy} update={updateEffects} updateVisual={updateVisual} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => selected && openRename("track", selected.id, selected.title)} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
-              <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} />
+              <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} />
             </Tab>
           </Tabs>
         </motion.div>
       </div>
 
       {/* Hidden in the editor: that tab has its own transport, and three play buttons on one screen
-          is two too many. */}
-      <AnimatePresence>{selected && tab !== "editor" && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+          is two too many. Visual assets have no transport at all. */}
+      <AnimatePresence>{selected && !isVisual(selected) && tab !== "editor" && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -270,32 +356,45 @@ export default function Studio() {
   );
 }
 
-function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleSelect, onClearSelection, onAdd, onDelete, onRename, importSound, onAddToSequence, hasSequence }: any) {
+function Library({ tracks, selectedId, playingId, selectedIds, busy, onPlay, onToggleSelect, onClearSelection, onAdd, onAddSlide, onDelete, onRename, importAsset, onAddToSequence, hasSequence }: any) {
   const count = selectedIds.length;
+  const [filter, setFilter] = useState("");
+  const shown: Track[] = filter ? tracks.filter((t: Track) => t.title.toLowerCase().includes(filter.toLowerCase())) : tracks;
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Soundboard</p><h2 className="text-xl font-bold">Click a sound to play</h2></div>
-        <div className="flex gap-2">
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Soundboard and slides</p><h2 className="text-xl font-bold">Click a card to fire it</h2></div>
+        <div className="flex flex-wrap gap-2">
           {count > 0 && <Button variant="light" size="sm" onPress={onClearSelection}>Clear {count}</Button>}
           <Tooltip content={hasSequence ? "Adds them in the order you picked them" : "Create a sequence first"}><span><Button variant="bordered" startContent={<Plus size={16} />} isDisabled={!hasSequence} onPress={onAddToSequence}>Add {count > 1 ? `${count} ` : ""}to sequence</Button></span></Tooltip>
-          <Tooltip content="Add audio files from this device"><Button as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept="audio/*" multiple onChange={onAdd} /></Button></Tooltip>
+          <Tooltip content="A blank 16:9 slide you can put a title on"><Button variant="bordered" isDisabled={busy} startContent={<Presentation size={16} />} onPress={onAddSlide}>New slide</Button></Tooltip>
+          <Tooltip content="Audio, images and video from this device"><Button as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept={UPLOAD_ACCEPT} multiple onChange={onAdd} /></Button></Tooltip>
         </div>
       </div>
-      {tracks.length === 0 ? (
+
+      <SearchPanel importAsset={importAsset} filter={filter} setFilter={setFilter} />
+
+      {shown.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center rounded-2xl border border-dashed border-default-200 py-16 text-center">
-          <Music size={40} className="text-muted" /><p className="mt-3 font-semibold">No sounds yet</p><p className="text-sm text-muted">Upload files or search Myinstants below.</p>
+          <Music size={40} className="text-muted" />
+          <p className="mt-3 font-semibold">{tracks.length ? "Nothing matches that" : "Nothing here yet"}</p>
+          <p className="text-sm text-muted">{tracks.length ? "Clear the search to see everything." : "Upload audio, images or video, or search the free libraries above."}</p>
         </motion.div>
       ) : (
         <motion.div layout className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <AnimatePresence>{tracks.map((t: Track, i: number) => {
+          <AnimatePresence>{shown.map((t: Track, i: number) => {
             const isPlaying = playingId === t.id, pick = selectedIds.indexOf(t.id), isChecked = pick >= 0;
+            const kind = kindOf(t), Icon = kindIcon[kind];
             return (
             <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={{ y: -3 }}>
-              <Card isPressable onPress={() => onPlay(t)} className={`w-full border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
+              <Card isPressable onPress={() => onPlay(t)} className={`w-full overflow-hidden border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
+                {kind === "image" && <img src={t.url} alt="" className="h-24 w-full object-cover" />}
+                {kind === "video" && <video src={t.url} muted preload="metadata" className="h-24 w-full object-cover" />}
                 <CardBody className="gap-2">
                   <div className="flex items-start gap-2">
-                    <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${isPlaying ? "bg-accent text-accent-foreground" : "bg-surface-secondary text-foreground"}`}>{t.pending ? <Spinner size="sm" /> : isPlaying ? <Pause fill="currentColor" size={15} /> : <Play fill="currentColor" size={15} />}</span>
+                    <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${isPlaying ? "bg-accent text-accent-foreground" : "bg-surface-secondary text-foreground"}`}>
+                      {t.pending ? <Spinner size="sm" /> : kind !== "audio" ? <Icon size={15} /> : isPlaying ? <Pause fill="currentColor" size={15} /> : <Play fill="currentColor" size={15} />}
+                    </span>
                     <p className="min-w-0 flex-1 truncate pt-1.5 font-semibold capitalize leading-tight">{t.title}</p>
                     <div className="flex shrink-0 gap-1">
                       <Tooltip content={isChecked ? `Cue ${pick + 1} of the selection, click to drop it` : "Select (shift-click to take a run)"}>
@@ -303,94 +402,142 @@ function Library({ tracks, selectedId, playingId, selectedIds, onPlay, onToggleS
                           {isChecked ? <span className="text-xs font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
                         </Button>
                       </Tooltip>
+                      <Tooltip content="Download"><Button isIconOnly size="sm" variant="light" isDisabled={kind === "embed"} onPress={() => void downloadAsset(t.url, t.title)}><Download size={14} /></Button></Tooltip>
                       <Tooltip content="Rename"><Button isIconOnly size="sm" variant="light" onPress={() => onRename(t.id)}><Pencil size={14} /></Button></Tooltip>
                       <Tooltip content="Delete everywhere"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => onDelete(t.id)}><Trash2 size={14} /></Button></Tooltip>
                     </div>
                   </div>
                   {t.error
                     ? <p className="flex items-center gap-1 text-xs text-warning"><TriangleAlert size={12} /> local only, cloud save failed</p>
-                    : <p className="pl-10 text-xs text-muted">{t.effects.speed}x • {Math.round(t.effects.volume * 100)}% vol{t.effects.reverb ? " • reverb" : ""}</p>}
+                    : <p className="pl-10 text-xs capitalize text-muted">{kind === "audio" ? `${t.effects.speed}x • ${Math.round(t.effects.volume * 100)}% vol${t.effects.reverb ? " • reverb" : ""}` : `${kind} • ${t.visual?.transition ?? "fade"} in`}</p>}
                 </CardBody>
               </Card>
             </motion.div>
           );})}</AnimatePresence>
         </motion.div>
       )}
-      <MyInstantsPanel importSound={importSound} />
     </div>
   );
 }
 
-// "airhorn-2.mp3" / "%20vine%20boom_45123" -> "Airhorn", "Vine Boom". Trailing numeric ids that
-// Myinstants and most CDNs append are noise, not part of the name.
-function titleFromUrl(raw: string) {
-  let slug = "";
-  try { slug = decodeURIComponent(new URL(raw, location.href).pathname.split("/").filter(Boolean).pop() ?? ""); }
-  catch { slug = decodeURIComponent(raw.split(/[?#]/)[0].split("/").filter(Boolean).pop() ?? ""); }
-  const words = slug
-    .replace(/\.[a-z0-9]{2,4}$/i, "")
-    .replace(/[-_+]+/g, " ")
-    .replace(/\s*\b\d{3,}\b\s*$/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!words) return "Sound";
-  return words.replace(/\b\w/g, c => c.toUpperCase());
-}
+const SOURCES: { id: Source; label: string }[] = [
+  { id: "library", label: "My library" },
+  { id: "archive", label: "Internet Archive" },
+  { id: "commons", label: "Wikimedia Commons" },
+  { id: "myinstants", label: "Myinstants" },
+  { id: "url", label: "Paste a link" },
+];
 
-function MyInstantsPanel({ importSound }: { importSound: (title: string, url: string) => void }) {
+function SearchPanel({ importAsset, filter, setFilter }: { importAsset: (title: string, url: string) => void; filter: string; setFilter: (v: string) => void }) {
+  const [source, setSource] = useState<Source>("library");
   const [q, setQ] = useState("");
-  const [url, setUrl] = useState("");
+  const [hits, setHits] = useState<Hit[]>([]);
   const [note, setNote] = useState("");
-  // Myinstants sits behind Cloudflare, which blocks server-side search from datacenter IPs, so
-  // search hands off to their own site rather than pretending to work.
-  const search = () => {
-    const query = q.trim(); if (!query) return;
-    window.open(`https://www.myinstants.com/en/search/?name=${encodeURIComponent(query)}`, "_blank", "noopener,noreferrer");
-  };
-  const importUrl = () => {
-    const u = url.trim(); if (!u) return;
-    if (/myinstants\.com\/(en\/)?instant\//.test(u)) {
-      setNote("That's the page, not the sound. On Myinstants, right-click the sound button → “Copy audio address”, or use its Download button, then paste that here.");
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    const query = q.trim();
+    setNote("");
+    if (source === "library") return setFilter(query);
+    if (!query) return;
+    if (source === "myinstants") {
+      // Myinstants sits behind Cloudflare, which blocks server-side search from datacenter IPs, so
+      // search hands off to their own site rather than pretending to work.
+      window.open(`https://www.myinstants.com/en/search/?name=${encodeURIComponent(query)}`, "_blank", "noopener,noreferrer");
+      setNote("Opened Myinstants in a new tab. Right-click a sound there, copy its audio address, then paste it back here with “Paste a link”.");
       return;
     }
-    setNote("");
-    importSound(titleFromUrl(u), u);
-    setUrl("");
+    if (source === "url") {
+      if (/myinstants\.com\/(en\/)?instant\//.test(query)) return setNote("That's the page, not the sound. On Myinstants, right-click the sound button, copy the audio address, and paste that instead.");
+      importAsset(prettyName(query), query);
+      setQ("");
+      return;
+    }
+    setLoading(true); setHits([]);
+    try { setHits(await (source === "archive" ? searchArchive(query) : searchCommons(query))); }
+    catch (e) { setNote((e as Error).message); }
+    finally { setLoading(false); }
   };
+  const take = async (hit: Hit) => {
+    setNote("");
+    try { importAsset(hit.title, await resolveHit(hit)); }
+    catch (e) { setNote((e as Error).message); }
+  };
+  const placeholder = source === "library" ? "Filter your library" : source === "url" ? "Paste a direct media link (.mp3, .wav, .png, .mp4) or a Google Slides link" : source === "myinstants" ? "Search Myinstants (e.g. airhorn, vine boom)" : "Search freely licensed audio";
+
   return (
     <div className="glass-soft space-y-3 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Add from Myinstants</p>
+      <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Find media</p>
       <div className="flex flex-wrap gap-2">
-        <Input className="flex-1 min-w-56" size="sm" value={q} onValueChange={setQ} placeholder="Search Myinstants (e.g. airhorn, vine boom)" onKeyDown={(e: any) => e.key === "Enter" && search()} />
-        <Button size="sm" color="primary" variant="flat" endContent={<ExternalLink size={14} />} onPress={search}>Search</Button>
+        <select aria-label="Where to search" value={source}
+          onChange={e => { setSource(e.target.value as Source); setHits([]); setNote(""); if (e.target.value !== "library") setFilter(""); }}
+          className="rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent">
+          {SOURCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+        <Input className="min-w-56 flex-1" size="sm" value={q}
+          onValueChange={(v: string) => { setQ(v); if (source === "library") setFilter(v); }}
+          placeholder={placeholder} onKeyDown={(e: any) => e.key === "Enter" && void run()} />
+        <Button size="sm" color="primary" variant="flat" isLoading={loading} endContent={source === "myinstants" ? <ExternalLink size={14} /> : undefined} onPress={() => void run()}>
+          {source === "url" ? "Import" : "Search"}
+        </Button>
       </div>
-      <p className="text-xs text-muted">Search opens Myinstants in a new tab. Copy a sound's audio address there, paste it below, and it lands in your library under its own name.</p>
-      <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-        <Input className="flex-1 min-w-56" size="sm" value={url} onValueChange={setUrl} placeholder="Paste a direct sound URL (.mp3, .wav, .ogg)" onKeyDown={(e: any) => e.key === "Enter" && importUrl()} />
-        <Button size="sm" variant="bordered" onPress={importUrl}>Import URL</Button>
-      </div>
+      {source === "library" && filter && <p className="text-xs text-muted">Filtering by “{filter}”. <button className="text-accent underline-offset-2 hover:underline" onClick={() => { setQ(""); setFilter(""); }}>Clear</button></p>}
+      {(source === "archive" || source === "commons") && (
+        <p className="text-xs text-muted">Public-domain and freely licensed recordings. Imports land in your library under a cleaned-up name; check the licence before you perform anything publicly.</p>
+      )}
+      {source === "url" && <p className="text-xs text-muted">Direct file links only. A Google Slides or PowerPoint Online link is added as an embedded deck instead of a download.</p>}
+      {hits.length > 0 && (
+        <ul className="max-h-64 space-y-1 overflow-auto border-t border-border pt-3">
+          {hits.map(h => (
+            <li key={h.id}>
+              <button className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-white/5" onClick={() => void take(h)}>
+                <Plus size={14} className="shrink-0 text-accent" />
+                <span className="min-w-0 flex-1 truncate text-sm">{h.title}</span>
+                {h.by && <span className="shrink-0 truncate text-xs text-muted">{h.by}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {note && <p className="text-xs text-warning">{note}</p>}
     </div>
   );
 }
 
-function Editor({ track, busy, update, bakeReverse, onSave, onPreview, onRename }: any) {
-  if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Select a sound in the Library to edit it.</div>;
+function Editor({ track, busy, update, updateVisual, bakeReverse, onSave, onPreview, onRename }: any) {
+  if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Select something in the Library to edit it.</div>;
+  const kind = kindOf(track);
+  const heading = (
+    <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Non-destructive editor</p>
+      <h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button></h2></div>
+  );
+  if (kind !== "audio") return (
+    <div className="mt-5 space-y-6">
+      {heading}
+      <p className="max-w-2xl text-sm text-muted">
+        {kind === "embed"
+          ? "An embedded deck. Edit the slides in Google Slides or PowerPoint itself; the transition and caption below are what CueFlow adds when the cue fires."
+          : "Framing, colour and timing ride with this asset and are applied when the cue fires, so the original file is never touched. Flatten to a new image if you want a copy with the look baked in."}
+      </p>
+      <MediaEditor track={track} onChange={updateVisual} onSave={onSave} />
+    </div>
+  );
   return (
     <div className="mt-5 space-y-6">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Non-destructive editor</p><h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button></h2></div>
+      {heading}
       <p className="max-w-2xl text-sm text-muted">Effects save with this sound and apply live in playback and sequences. The waveform tools render new cloud-backed WAVs, clip a region, mix to mono, or balance the left/right channels.</p>
       <WaveformEditor track={track} onSave={onSave} onPreview={onPreview} />
       <EffectGrid effects={track.effects} update={update} />
       <div className="glass-soft flex flex-wrap items-center gap-4 p-4">
-        <Switch isSelected={track.effects.reverse} onValueChange={v => update({ ...track.effects, reverse: v })}>Mark for reverse render</Switch>
+        <Switch isSelected={track.effects.reverse} onValueChange={(v: boolean) => update({ ...track.effects, reverse: v })}>Mark for reverse render</Switch>
         {track.effects.reverse && <Button color="primary" variant="flat" startContent={busy ? <Spinner size="sm" color="current" /> : <RotateCcw size={16} />} isDisabled={busy} onPress={bakeReverse}>Render & save reversed</Button>}
+        <Button variant="light" startContent={<Download size={16} />} onPress={() => void downloadAsset(track.url, track.title)}>Download</Button>
       </div>
     </div>
   );
 }
 
-function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, playCue, cueIndex, loopSeq, setLoopSeq, startSequence }: any) {
+function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage }: any) {
   const seq = sequences.find((s: Sequence) => s.id === sequenceId);
   const [drag, setDrag] = useState(-1); // index being dragged; native DnD, no library needed
   return (
@@ -411,44 +558,69 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
         </div>
       )}
       {!seq ? (
-        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Create a sequence, then add sounds from the Library. It never autoplays, drive it with the ← → arrow keys or click a cue.</div>
+        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Create a sequence, then add sounds and slides from the Library. It never autoplays, drive it with the ← → arrow keys or click a cue.</div>
       ) : (
         <div className="space-y-3">
           <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
             <Tooltip content="Arms the deck. Nothing plays until you press →"><Button size="sm" color="primary" startContent={<Play size={14} fill="currentColor" />} isDisabled={!seq.items.length} onPress={() => startSequence(false)}>Arm</Button></Tooltip>
-            <Tooltip content="Opens the black window and arms the deck"><Button size="sm" color="secondary" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(true)}>Arm in audience mode</Button></Tooltip>
+            <Tooltip content="Opens the presenter window and arms the deck"><Button size="sm" color="secondary" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(true)}>Arm in audience mode</Button></Tooltip>
             <Switch size="sm" isSelected={loopSeq} onValueChange={setLoopSeq}>Loop sequence</Switch>
-            <span className="ml-auto text-xs text-muted">{cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → to step through cues"}</span>
+            <span className="ml-auto text-xs text-muted">{cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → step every cue, A / D step slides only, W / S zoom"}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted">
-            <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected sounds</b>.</> : <>Adds the selected sound{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
-            <Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
+
+          {/* What the audience window is showing. Also the whole preview when no window is open. */}
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="order-2 space-y-3 lg:order-1">
+              <div className="flex items-center gap-2 text-sm text-muted">
+                <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected items</b>.</> : <>Adds the selected item{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
+                <Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
+              </div>
+              {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (
+                <ol className="space-y-2">
+                  <AnimatePresence>{seq.items.map((item: SequenceItem, i: number) => {
+                    const track = tracks.find((t: Track) => t.id === item.trackId);
+                    const kind: Kind = track ? kindOf(track) : "audio";
+                    const Icon = kindIcon[kind];
+                    return (
+                    <motion.li key={item.id} layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                      draggable onDragStart={() => setDrag(i)} onDragEnd={() => setDrag(-1)}
+                      onDragOver={e => { e.preventDefault(); if (drag >= 0 && drag !== i) { reorder(drag, i); setDrag(i); } }}
+                      onDrop={e => e.preventDefault()}
+                    >
+                      <div className={`flex cursor-grab items-center gap-3 rounded-xl border px-3 py-2.5 active:cursor-grabbing ${drag === i ? "opacity-60" : ""} ${i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
+                        <GripVertical size={15} className="shrink-0 text-muted" aria-hidden />
+                        <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
+                          <span className="font-mono text-sm text-accent">{String(i + 1).padStart(2, "0")}</span>
+                          <Icon size={14} className="shrink-0 text-muted" aria-hidden />
+                          <span className="truncate font-medium capitalize">{item.label}</span>
+                          <span className="ml-auto hidden shrink-0 text-xs text-muted sm:inline">{track?.title ?? "missing"}</span>
+                        </button>
+                        {kind !== "audio" && (
+                          <select aria-label="Transition" value={item.visual?.transition ?? "fade"} onChange={e => setItemTransition(item.id, e.target.value)}
+                            className="shrink-0 rounded-lg border border-border bg-surface/60 px-2 py-1 text-xs capitalize outline-none focus:border-accent">
+                            {["cut", "fade", "slide", "zoom"].map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        )}
+                        <div className="flex shrink-0">
+                          <Tooltip content="Move up"><Button isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button></Tooltip>
+                          <Tooltip content="Move down"><Button isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
+                          <Tooltip content="Remove cue"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteItem(item.id)}><Trash2 size={14} /></Button></Tooltip>
+                        </div>
+                      </div>
+                    </motion.li>
+                  );})}</AnimatePresence>
+                </ol>
+              )}
+            </div>
+            <div className="order-1 space-y-2 lg:order-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted">Stage</p>
+                {stage && <Button size="sm" variant="light" onPress={clearStage}>Blackout</Button>}
+              </div>
+              <Stage stage={stage} className="aspect-video w-full rounded-xl border border-border" />
+              <p className="text-xs text-muted">{stage ? stage.label : "Black. Audio-only cues leave the room dark."}</p>
+            </div>
           </div>
-          {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-muted">Empty sequence. Add the selected sound above.</p> : (
-            <ol className="space-y-2">
-              <AnimatePresence>{seq.items.map((item: SequenceItem, i: number) => (
-                <motion.li key={item.id} layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
-                  draggable onDragStart={() => setDrag(i)} onDragEnd={() => setDrag(-1)}
-                  onDragOver={e => { e.preventDefault(); if (drag >= 0 && drag !== i) { reorder(drag, i); setDrag(i); } }}
-                  onDrop={e => e.preventDefault()}
-                >
-                  <div className={`flex cursor-grab items-center gap-3 rounded-xl border px-3 py-2.5 active:cursor-grabbing ${drag === i ? "opacity-60" : ""} ${i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
-                    <GripVertical size={15} className="shrink-0 text-muted" aria-hidden />
-                    <button className="flex flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
-                      <span className="font-mono text-sm text-accent">{String(i + 1).padStart(2, "0")}</span>
-                      <span className="font-medium capitalize">{item.label}</span>
-                      <span className="ml-auto text-xs text-muted">{tracks.find((t: Track) => t.id === item.trackId)?.title ?? "missing"}</span>
-                    </button>
-                    <div className="flex shrink-0">
-                      <Tooltip content="Move up"><Button isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button></Tooltip>
-                      <Tooltip content="Move down"><Button isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
-                      <Tooltip content="Remove cue"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteItem(item.id)}><Trash2 size={14} /></Button></Tooltip>
-                    </div>
-                  </div>
-                </motion.li>
-              ))}</AnimatePresence>
-            </ol>
-          )}
         </div>
       )}
     </div>
@@ -533,7 +705,7 @@ function KeybindsModal({ disc, binds, setBinds }: { disc: ReturnType<typeof useD
       <ModalContent>{onClose => (<>
         <ModalHeader className="flex items-center gap-2"><Keyboard size={18} className="text-accent" />Keybinds</ModalHeader>
         <ModalBody className="gap-2">
-          <p className="text-xs text-muted">Click a key box, then press a key to bind it. Cue keys work in the Sequences tab; effect keys nudge the currently playing sound.</p>
+          <p className="text-xs text-muted">Click a key box, then press a key to bind it. Arrows step every cue; WASD drives whatever is on the stage, so slides move without touching the sound underneath.</p>
           {keyActions.map(a => <KeybindRow key={a.id} label={a.label} value={binds[a.id]} onSet={k => setBinds(b => ({ ...b, [a.id]: k }))} />)}
         </ModalBody>
         <ModalFooter>

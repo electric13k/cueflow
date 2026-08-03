@@ -20,7 +20,9 @@ export default function Nav() {
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
           <Button href="/" size="sm" {...link("/")}>Home</Button>
           <Button href="/studio" size="sm" {...link("/studio")}>Studio</Button>
+          <Button href="/features" size="sm" {...link("/features")} className="hidden md:inline-flex">Features</Button>
           <Button href="/tutorial" size="sm" {...link("/tutorial")} className="hidden sm:inline-flex">Tutorial</Button>
+          <Button href="/contact" size="sm" {...link("/contact")} className="hidden lg:inline-flex">Contact</Button>
           <Tooltip content={theme === "dark" ? "Switch to light" : "Switch to dark"}>
             <Button size="sm" variant="light" isIconOnly aria-label="Toggle colour theme" onPress={flip}>{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</Button>
           </Tooltip>

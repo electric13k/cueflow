@@ -71,6 +71,19 @@
 }
 
 @layer components {
+  /* Cue transitions for the presenter stage. Each animates *from* the entry state, so the resting
+     state is the visible one: if the animation never runs, the slide is simply on screen rather
+     than stuck at opacity 0 in front of a room. */
+  @keyframes cue-fade { from { opacity: 0; } }
+  @keyframes cue-slide { from { opacity: 0; transform: translateX(8%); } }
+  @keyframes cue-zoom { from { opacity: 0; transform: scale(1.08); } }
+  .cue-fade { animation: cue-fade .45s ease-out; }
+  .cue-slide { animation: cue-slide .45s ease-out; }
+  .cue-zoom { animation: cue-zoom .45s ease-out; }
+  @media (prefers-reduced-motion: reduce) {
+    .cue-fade, .cue-slide, .cue-zoom { animation: none; }
+  }
+
   /* Liquid glass: translucent, blurred, inner top highlight + soft outer shadow. */
   .glass {
     @apply rounded-3xl border shadow-glass backdrop-blur-2xl;
