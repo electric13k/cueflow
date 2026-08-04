@@ -52,9 +52,9 @@ export async function deleteSequenceEverywhere(id: string) {
  */
 export type SyncState = { cloud: boolean; ok: boolean; reason?: string; skipped?: number };
 
-export async function persist(tracks: Track[], sequences: Sequence[]): Promise<SyncState> {
-  local.set("tracks", tracks);
-  local.set("sequences", sequences);
+export async function persist(tracks: Track[], sequences: Sequence[], projectId: string | null = null): Promise<SyncState> {
+  local.set(projectId ? `tracks:${projectId}` : "tracks", tracks);
+  local.set(projectId ? `sequences:${projectId}` : "sequences", sequences);
   if (!supabase) return { cloud: false, ok: true, reason: "Cloud is not configured for this build." };
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { cloud: false, ok: true, reason: "Sign in to save to your account." };
@@ -63,12 +63,13 @@ export async function persist(tracks: Track[], sequences: Sequence[]): Promise<S
   const { error: trackError } = await supabase.from("tracks").upsert(cloudTracks.map(track => ({
     id: track.id, user_id: user.id, title: track.title, source_url: track.url,
     effects: track.effects, kind: track.kind ?? "audio", visual: track.visual ?? null,
+    project_id: projectId,
   })));
   if (trackError) return { cloud: true, ok: false, reason: trackError.message };
 
   const cloudSequences = sequences.filter(sequence => isUuid(sequence.id));
   const { error: seqError } = await supabase.from("sequences").upsert(
-    cloudSequences.map(sequence => ({ id: sequence.id, user_id: user.id, name: sequence.name })),
+    cloudSequences.map(sequence => ({ id: sequence.id, user_id: user.id, name: sequence.name, project_id: projectId })),
   );
   if (seqError) return { cloud: true, ok: false, reason: seqError.message };
 
@@ -115,5 +116,12 @@ export function mergeInto(tracks: Track[], sequences: Sequence[], cloud: { track
   return merged;
 }
 
-export async function hydrateCloud() { if (!supabase) return null; const { data: { user } } = await supabase.auth.getUser(); if (!user) return null; const { data: tracks } = await supabase.from("tracks").select("id,title,source_url,effects,kind,visual,created_at").eq("user_id", user.id); const { data: sequences } = await supabase.from("sequences").select("id,name,created_at").eq("user_id", user.id); if (!tracks || !sequences) return null; const ids = sequences.map(sequence => sequence.id); const { data: items } = ids.length ? await supabase.from("sequence_items").select("id,sequence_id,track_id,label,effects,visual,link,position").in("sequence_id", ids).order("position") : { data: [] }; return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, kind: row.kind ?? "audio", visual: row.visual ?? undefined, createdAt: row.created_at } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, items: (items ?? []).filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects, visual: item.visual ?? undefined, link: item.link ?? undefined } as SequenceItem)) } as Sequence)) };
+// A project scopes every read: its own library, its own running orders. No project means the
+// personal one, which is every row that was here before projects existed.
+export async function hydrateCloud(projectId: string | null = null) { if (!supabase) return null; const { data: { user } } = await supabase.auth.getUser(); if (!user) return null;
+  // Row-level security already limits this to rows you own or projects you belong to, so the only
+  // question left is which of the two: a project's shared library, or the personal one. Filtering
+  // by user_id as well would hide a collaborator's work, which is the whole point of a project.
+  const where = projectId ? `eq.${projectId}` : "is.null";
+  const { data: tracks } = await supabase.from("tracks").select("id,title,source_url,effects,kind,visual,created_at").or(`project_id.${where}`); const { data: sequences } = await supabase.from("sequences").select("id,name,created_at").or(`project_id.${where}`); if (!tracks || !sequences) return null; const ids = sequences.map(sequence => sequence.id); const { data: items } = ids.length ? await supabase.from("sequence_items").select("id,sequence_id,track_id,label,effects,visual,link,position").in("sequence_id", ids).order("position") : { data: [] }; return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, kind: row.kind ?? "audio", visual: row.visual ?? undefined, createdAt: row.created_at } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, items: (items ?? []).filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects, visual: item.visual ?? undefined, link: item.link ?? undefined } as SequenceItem)) } as Sequence)) };
 }

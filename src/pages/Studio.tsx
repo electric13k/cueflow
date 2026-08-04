@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Check, ChevronDown, ChevronUp, CircleHelp, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { BookOpen, Check, ChevronDown, ChevronUp, CircleHelp, FolderOpen, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, Radio, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
@@ -11,6 +11,9 @@ import KeybindRow from "../components/KeybindRow";
 import { clashes, defaultBinds, keyActions, loadBinds, saveBinds, type Action } from "../lib/keys";
 import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
+import ShowHost from "../components/ShowHost";
+import { currentProject, listProjects, setCurrentProject, type Project } from "../lib/projects";
+import { SCRIPT_LIMIT, showChannel, type Show, type ShowMsg } from "../lib/shows";
 import Stage from "../components/Stage";
 import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
@@ -35,6 +38,13 @@ const controls: Ctl[] = [
   { key: "treble", label: "Treble", min: -12, max: 12, step: .5, unit: " dB" },
 ];
 type Session = { selectedId: string; sequenceId: string; cueIndex: number; tab: string };
+/**
+ * Which project this device is working in, read once. Switching reloads the page rather than
+ * swapping the state in place: the selection, the open deck, the cue index and what is on the stage
+ * all belong to the project that was open, and carrying any of them across is a bug, not a feature.
+ */
+const project = currentProject();
+const key = (k: string) => (project ? `${k}:${project}` : k);
 const patch = (arr: Track[], id: string, p: Partial<Track>) => arr.map(t => t.id === id ? { ...t, ...p } : t);
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 const kindIcon = { audio: Volume2, image: ImageIcon, video: Film, embed: Presentation };
@@ -44,10 +54,10 @@ const UPLOAD_ACCEPT = "audio/*,image/*,video/*";
 export default function Studio() {
   const audio = useRef<HTMLAudioElement>(new Audio());
   const engine = useRef(new AudioEngine());
-  const session = local.get<Session>("session", { selectedId: "", sequenceId: "", cueIndex: 0, tab: "library" });
-  const [tracks, setTracks] = useState<Track[]>(() => local.get("tracks", []));
-  const [sequences, setSequences] = useState<Sequence[]>(() => local.get("sequences", []));
-  const [selectedId, setSelectedId] = useState<string>(session.selectedId || local.get<Track[]>("tracks", [])[0]?.id || "");
+  const session = local.get<Session>(key("session"), { selectedId: "", sequenceId: "", cueIndex: 0, tab: "library" });
+  const [tracks, setTracks] = useState<Track[]>(() => local.get(key("tracks"), []));
+  const [sequences, setSequences] = useState<Sequence[]>(() => local.get(key("sequences"), []));
+  const [selectedId, setSelectedId] = useState<string>(session.selectedId || local.get<Track[]>(key("tracks"), [])[0]?.id || "");
   const [selectedIds, setSelectedIds] = useState<string[]>([]); // multi-select for editor + add-to-sequence
   const lastPick = useRef(-1); // anchor for shift-click range selection in the library
   const [loop, setLoop] = useState(false);
@@ -82,6 +92,27 @@ export default function Studio() {
   const renameModal = useDisclosure();
   const [draft, setDraft] = useState<{ kind: "track" | "sequence"; id: string; value: string }>({ kind: "track", id: "", value: "" });
 
+  // The show: one performance across every device in the room. The channel lives here rather than in
+  // the host panel because the things worth broadcasting -- a cue going out, the stage changing --
+  // happen out here, and a panel that is closed must not stop them reaching anyone.
+  const [liveShow, setLiveShow] = useState<Show | null>(null);
+  const showModal = useDisclosure();
+  const showBus = useRef<{ send: (m: ShowMsg) => void; close: () => void } | null>(null);
+  const onShowMsg = useRef<(m: ShowMsg) => void>(() => {});
+  const [projects, setProjects] = useState<Project[]>([]);
+  useEffect(() => { void listProjects().then(setProjects).catch(() => setProjects([])); }, []);
+  useEffect(() => {
+    if (!liveShow) return;
+    const channel = showChannel(liveShow.id, m => onShowMsg.current(m));
+    showBus.current = channel;
+    return () => { channel.close(); showBus.current = null; };
+  }, [liveShow?.id]);
+  // Starting and ending are the two moments every device has to hear about, and the stage changing
+  // is the only other thing a device might be mirroring. Both resend rather than diff: a deck is
+  // small, and a device that missed one message would otherwise stay wrong all night.
+  useEffect(() => { if (liveShow) showBus.current?.send(liveShow.startedAt ? { type: "start", at: liveShow.startedAt } : { type: "end" }); }, [liveShow?.startedAt]);
+  useEffect(() => { if (liveShow) showBus.current?.send(deck()); }, [stage?.n, liveShow?.id]);
+
   const selected = tracks.find(t => t.id === selectedId) ?? tracks[0];
   const selectedSequence = sequences.find(s => s.id === sequenceId);
   useEffect(() => { audio.current.loop = loop; }, [loop]);
@@ -96,17 +127,17 @@ export default function Studio() {
   // A failed save used to be indistinguishable from a good one. Report it once per distinct reason,
   // so a broken sync is visible on the device it happens on instead of at the next show.
   useEffect(() => {
-    void persist(tracks, sequences).then(state => {
+    void persist(tracks, sequences, project).then(state => {
       setSync(state);
       const note = state.ok ? "" : state.reason ?? "unknown error";
       if (note && note !== lastSyncNote.current) toast("Couldn't save to your account", note, "warn");
       lastSyncNote.current = note;
     });
   }, [tracks, sequences]);
-  useEffect(() => { local.set("session", { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
+  useEffect(() => { local.set(key("session"), { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
   useEffect(() => { saveBinds(binds); }, [binds]);
   const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
-  const mergeCloud = () => hydrateCloud().then(cloud => {
+  const mergeCloud = () => hydrateCloud(project).then(cloud => {
     if (!cloud) return false;
     const merged = mergeInto(data.current.tracks, data.current.sequences, cloud);
     setTracks(merged.tracks); setSequences(merged.sequences);
@@ -120,7 +151,7 @@ export default function Studio() {
   ));
   useEffect(() => { void mergeCloud(); }, []);
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
-  useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences)); }), []);
+  useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences, project)); }), []);
   useEffect(() => {
     const a = audio.current; a.crossOrigin = "anonymous";
     const tick = () => { setTime(a.currentTime); const fade = selected?.effects.fadeOut ?? 0; if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, selected!.effects.volume * (a.duration - a.currentTime) / fade); };
@@ -244,6 +275,32 @@ export default function Studio() {
     // deck's position stays on the cue that was actually called.
     const linked = item.link && selectedSequence.items.find(x => x.id === item.link);
     if (linked) fire(linked);
+    showBus.current?.send({ type: "cue", index: i, label: cueLabels[i] ?? String(i + 1) });
+  };
+
+  /**
+   * What the room is allowed to know: the running order as labels, and the script. No source URLs
+   * for sounds, because a device that only reads cues has no business being able to download them.
+   */
+  const cueLabels = selectedSequence ? cueNumbers(selectedSequence.items.map(it => kindOf(tracks.find(t => t.id === it.trackId) ?? { kind: "audio" }))) : [];
+  const deck = (): ShowMsg => ({
+    type: "deck",
+    show: selectedSequence?.name ?? "Show",
+    index: cueIndex,
+    cues: (selectedSequence?.items ?? []).map((it, i) => ({
+      id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1),
+      kind: kindOf(tracks.find(t => t.id === it.trackId) ?? { kind: "audio" }),
+    })),
+    script: scriptDoc.html.length > SCRIPT_LIMIT ? undefined : scriptDoc.html,
+    stage: stage ? { url: stage.url, kind: stage.kind, label: stage.label } : null,
+  });
+  onShowMsg.current = msg => {
+    if (msg.type === "here") { showBus.current?.send(deck()); toast("Someone joined", `${msg.role ?? "A device"} is in the show.`, "info"); }
+    if (msg.type === "fire") playCue(msg.index);
+    if (msg.type === "flash") showAlert("warn", msg.text);
+    if (msg.type === "relabel") setSequences(all => all.map(s => s.id !== sequenceId ? s : ({
+      ...s, items: s.items.map(it => (it.id === msg.id ? { ...it, label: msg.label } : it)),
+    })));
   };
   /** Both sides hold the link, and each cue has at most one partner, so an old pairing is dropped. */
   const linkCues = (aId: string, bId: string) => setSequences(all => all.map(s => s.id !== sequenceId ? s : ({
@@ -396,6 +453,22 @@ export default function Studio() {
             {armed ? (
               <Button variant="bordered" onPress={standDown}>Stand down</Button>
             ) : (<>
+              {/* Switching project reloads the Studio: the library, the decks and the shows all change. */}
+              <label className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
+                <FolderOpen size={16} className="text-muted" aria-hidden />
+                <span className="sr-only">Project</span>
+                <select value={project ?? ""} className="max-w-36 bg-transparent py-2 pr-1 text-sm outline-none"
+                  onChange={e => { if (e.target.value === "manage") return void location.assign("/projects"); setCurrentProject(e.target.value || null); location.reload(); }}>
+                  <option value="">Personal library</option>
+                  {projects.map(p => <option key={p.id} value={p.id} className="bg-background">{p.name}</option>)}
+                  <option value="manage" className="bg-background">Manage projects…</option>
+                </select>
+              </label>
+              <Tooltip content="Run this deck across every device in the room" placement="bottom">
+                <Button variant="flat" color={liveShow?.startedAt ? "danger" : "default"} startContent={<Radio size={17} />} onPress={showModal.onOpen}>
+                  <span className="hidden sm:inline">{liveShow ? liveShow.code : "Show"}</span>
+                </Button>
+              </Tooltip>
               <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>
               <Tooltip content="Set the keys for cues, slides and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
               <Tooltip content={syncHint(sync)} placement="bottom">
@@ -468,6 +541,22 @@ export default function Studio() {
           <ModalBody><Input autoFocus label="Name" value={draft.value} onValueChange={v => setDraft(d => ({ ...d, value: v }))} onKeyDown={e => { if (e.key === "Enter") { commitRename(); onClose(); } }} /></ModalBody>
           <ModalFooter><Button variant="light" onPress={onClose}>Cancel</Button><Button color="primary" onPress={() => { commitRename(); onClose(); }}>Save</Button></ModalFooter>
         </>)}</ModalContent>
+      </Modal>
+
+      <Modal isOpen={showModal.isOpen} onOpenChange={showModal.onOpenChange} placement="center" backdrop="blur">
+        <ModalContent>
+          <ModalHeader>{liveShow ? liveShow.name : "Run a show"}</ModalHeader>
+          <ModalBody>
+            <div className="max-h-[70vh] overflow-auto pr-1">
+              <ShowHost projectId={project} sequenceId={sequenceId} show={liveShow} setShow={setLiveShow}
+                onFlash={text => { showBus.current?.send({ type: "flash", text, from: "host" }); showAlert("warn", text); }} />
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            {liveShow && <Button variant="light" onPress={() => showBus.current?.send(deck())}>Resend the deck</Button>}
+            <Button color="primary" onPress={showModal.onClose}>Done</Button>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
 
       <SlideComposer open={slideOpen} onClose={() => setSlideOpen(false)} onCreate={addProcessedFile} />

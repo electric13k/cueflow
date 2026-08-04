@@ -14,6 +14,8 @@ import Credits from "./pages/Credits";
 import Script from "./pages/Script";
 import Account from "./pages/Account";
 import Settings from "./pages/Settings";
+import Projects from "./pages/Projects";
+import Show from "./pages/Show";
 import UsernamePrompt from "./components/UsernamePrompt";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
@@ -40,6 +42,8 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/contact" element={<Contact />} />
         <Route path="/credits" element={<Credits />} />
         <Route path="/script" element={<Script />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/show" element={<Show />} />
         <Route path="/account" element={<Account />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/terms" element={<Terms />} />

@@ -10,6 +10,8 @@ const links = [
   { to: "/features", label: "Features" },
   { to: "/tutorial", label: "Tutorial" },
   { to: "/contact", label: "Contact" },
+  { to: "/projects", label: "Projects" },
+  { to: "/show", label: "Join a show" },
   { to: "/credits", label: "Credits" },
   { to: "/settings", label: "Settings" },
   { to: "/account", label: "Account" },
