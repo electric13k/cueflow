@@ -1,10 +1,12 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { BookOpen, Check, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
+import ScriptReader, { AlertFlash } from "../components/ScriptReader";
+import { loadScript, type ScriptDoc } from "../lib/script";
 import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
 import Stage from "../components/Stage";
@@ -76,6 +78,19 @@ export default function Studio() {
   const wasEditing = useRef(false);
   const [stage, setStage] = useState<StageState>(null); // what the audience window is showing
   const [armed, setArmed] = useState(false);            // deck is loaded and the arrows are hot
+  const [scriptMode, setScriptMode] = useState<"off" | "split" | "popup" | "tab">("off");
+  const [scriptDoc, setScriptDoc] = useState<ScriptDoc>(() => loadScript());
+  const [flash, setFlash] = useState<"warn" | "hit" | null>(null);
+  const [alertNote, setAlertNote] = useState("");
+  const alertTimer = useRef(0);
+  /** Flash the control screen and hold the words a moment longer than the flash itself. */
+  const showAlert = (level: "warn" | "hit", message: string) => {
+    setAlertNote(message);
+    setFlash(level);
+    clearTimeout(alertTimer.current);
+    alertTimer.current = window.setTimeout(() => setFlash(null), level === "hit" ? 1600 : 1100);
+    window.setTimeout(() => setAlertNote(n => (n === message ? "" : n)), 6000);
+  };
   const renameModal = useDisclosure();
   const [draft, setDraft] = useState<{ kind: "track" | "sequence"; id: string; value: string }>({ kind: "track", id: "", value: "" });
 
@@ -167,6 +182,9 @@ export default function Studio() {
   onBus.current = msg => {
     if (msg.type === "key") runKey(msg.key);
     if (msg.type === "hello") send({ type: "stage", stage });
+    if (msg.type === "script") setScriptDoc(loadScript());
+    // A cue word coming up in a reader in another window still has to reach the operator here.
+    if (msg.type === "alert") showAlert(msg.level, msg.message);
   };
   useEffect(() => listen(msg => onBus.current(msg)), []);
   // Whatever the operator sees on the stage, the room sees too.
@@ -326,11 +344,26 @@ export default function Studio() {
   const openRename = (kind: "track" | "sequence", id: string, value: string) => { setDraft({ kind, id, value }); renameModal.onOpen(); };
   const commitRename = () => { const { kind, id, value } = draft; const v = value.trim(); if (!v) return; if (kind === "track") setTracks(o => patch(o, id, { title: v })); else setSequences(o => o.map(s => s.id === id ? { ...s, name: v } : s)); };
   const openAudience = () => window.open(`${location.origin}${import.meta.env.BASE_URL}audience`, "cueflow-audience", "popup,width=1000,height=650");
+  // Split, popup or its own tab: the same reader either way, so where it lives is only a preference.
+  const openScript = (where: "off" | "split" | "popup" | "tab") => {
+    setScriptMode(where);
+    if (where === "off" || where === "split") return;
+    const url = `${location.origin}${import.meta.env.BASE_URL}script`;
+    window.open(url, "cueflow-script", where === "popup" ? "popup,width=560,height=820" : "");
+  };
 
   return (
     <div className="relative min-h-screen">
       <Backdrop />
       <Nav />
+      <AlertFlash level={flash} />
+      {/* The alert's own words, held on screen after the flash has gone: a flash you half-caught
+          while looking at the deck is no use if it does not say what it was for. */}
+      {alertNote && (
+        <div className={`fixed inset-x-0 top-16 z-50 mx-auto w-fit rounded-full border px-4 py-1.5 text-sm font-semibold shadow-glass ${flash === "hit" ? "border-live/50 bg-live/20" : "border-armed/50 bg-armed/20"}`}>
+          {alertNote}
+        </div>
+      )}
       {/* Bottom padding clears the fixed player, which stacks taller on phones. */}
       <div className="mx-auto max-w-7xl px-4 py-6 pb-60 sm:px-6 sm:pb-44 lg:px-8">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
@@ -340,6 +373,18 @@ export default function Studio() {
           </div>
           {/* Labels collapse to icons on phones, three full-width buttons do not fit a 375px row. */}
           <div className="flex flex-wrap gap-2">
+            {/* A native select: three modes, one control, and it opens as a proper picker on a phone. */}
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
+              <BookOpen size={16} className="text-muted" aria-hidden />
+              <span className="sr-only">Script reader</span>
+              <select value={scriptMode} onChange={e => openScript(e.target.value as typeof scriptMode)}
+                className="bg-transparent py-2 pr-1 text-sm outline-none">
+                <option value="off">Script: off</option>
+                <option value="split">Split screen</option>
+                <option value="popup">Popup</option>
+                <option value="tab">New tab</option>
+              </select>
+            </label>
             {armed ? (
               <Button variant="bordered" onPress={standDown}>Stand down</Button>
             ) : (<>
@@ -369,7 +414,8 @@ export default function Studio() {
           </div>
         )}
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="mt-6">
+        <div className={scriptMode === "split" ? "mt-6 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,30rem)]" : "mt-6"}>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="min-w-0">
           {/* Armed, the library and the editor go away: the deck is the only thing that matters and
               nothing on this screen should invite a stray click during a show. */}
           <Tabs selectedKey={tab} onSelectionChange={setTab} classNames={{ tabList: armed ? "hidden" : "glass-soft" }}>
@@ -384,6 +430,14 @@ export default function Studio() {
             </Tab>
           </Tabs>
         </motion.div>
+        {scriptMode === "split" && (
+          <div className="h-[75vh] min-w-0 xl:sticky xl:top-4">
+            {/* BroadcastChannel never echoes to the window that posted, so this one raises its own. */}
+            <ScriptReader doc={scriptDoc} setDoc={setScriptDoc}
+              onAlert={(level, message, cue) => { showAlert(level, message); send({ type: "alert", level, message, cue }); }} />
+          </div>
+        )}
+        </div>
       </div>
 
       {/* Hidden in the editor: that tab has its own transport, and three play buttons on one screen
