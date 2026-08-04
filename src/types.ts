@@ -27,7 +27,12 @@ export type Track = {
   kind?: Kind; mime?: string; visual?: Visual;
   effects: Effects; createdAt: string; pending?: boolean; error?: boolean;
 };
-export type SequenceItem = { id: string; trackId: string; label: string; effects: Effects; visual?: Visual };
+/**
+ * `link` is another item's id in the same sequence, and both sides hold it. Firing either one fires
+ * the other, which is how a slide and the sound under it stay together without becoming one cue --
+ * they still have their own numbers, their own effects, and can still be called separately.
+ */
+export type SequenceItem = { id: string; trackId: string; label: string; effects: Effects; visual?: Visual; link?: string };
 export type Sequence = { id: string; name: string; items: SequenceItem[]; createdAt: string };
 
 /** What the audience window is showing right now. `n` bumps per cue so a repeat still animates. */

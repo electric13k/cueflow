@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Check, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { BookOpen, Check, ChevronDown, ChevronUp, CircleHelp, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
 import Backdrop from "../components/Backdrop";
 import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
@@ -240,15 +240,35 @@ export default function Studio() {
   });
   const jump = (s: number) => { audio.current.currentTime = Math.max(0, Math.min(audio.current.duration || 0, audio.current.currentTime + s)); };
   const seek = (v: number) => { audio.current.currentTime = v; setTime(v); };
-  const playCue = (i: number) => {
-    if (!selectedSequence) return;
-    const item = selectedSequence.items[i]; if (!item) return;
+  /** Sends one cue to the room. No index bookkeeping, so a linked partner can go out through it too. */
+  const fire = (item: SequenceItem) => {
     const track = tracks.find(t => t.id === item.trackId);
-    setCueIndex(i);
     if (!track) return;
     if (isVisual(track)) show(track, item.visual ?? track.visual ?? defaultVisual());
     else void play(track, item.effects);
   };
+  const playCue = (i: number) => {
+    if (!selectedSequence) return;
+    const item = selectedSequence.items[i]; if (!item) return;
+    setCueIndex(i);
+    fire(item);
+    // A linked cue goes out with its partner: put up the slide, the sound under it starts, and the
+    // deck's position stays on the cue that was actually called.
+    const linked = item.link && selectedSequence.items.find(x => x.id === item.link);
+    if (linked) fire(linked);
+  };
+  /** Both sides hold the link, and each cue has at most one partner, so an old pairing is dropped. */
+  const linkCues = (aId: string, bId: string) => setSequences(all => all.map(s => s.id !== sequenceId ? s : ({
+    ...s,
+    items: s.items.map(it => {
+      if (it.id === aId) return { ...it, link: bId };
+      if (it.id === bId) return { ...it, link: aId };
+      return it.link === aId || it.link === bId ? { ...it, link: undefined } : it;
+    }),
+  })));
+  const unlinkCue = (id: string) => setSequences(all => all.map(s => s.id !== sequenceId ? s : ({
+    ...s, items: s.items.map(it => (it.id === id || it.link === id ? { ...it, link: undefined } : it)),
+  })));
   const advance = (dir: 1 | -1) => { if (!selectedSequence) return; const n = selectedSequence.items.length; if (!n) return; const i = loopSeq ? (cueIndex + dir + n) % n : clamp(cueIndex + dir, 0, n - 1); playCue(i); };
   /** WASD steps the deck's visuals only, so slides move without disturbing the sound already running. */
   const advanceVisual = (dir: 1 | -1) => {
@@ -426,7 +446,7 @@ export default function Studio() {
               <Editor track={selected} busy={busy} update={updateEffects} updateVisual={updateVisual} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => selected && openRename("track", selected.id, selected.title)} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
-              <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} />
+              <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} />
             </Tab>
           </Tabs>
         </motion.div>
@@ -652,7 +672,9 @@ function Editor({ track, busy, update, updateVisual, bakeReverse, onSave, onPrev
   );
 }
 
-function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage }: any) {
+function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage }: any) {
+  // Which cue is waiting to be paired. Linking is two clicks, so the second one has to know.
+  const [linking, setLinking] = useState("");
   const seq = sequences.find((s: Sequence) => s.id === sequenceId);
   const cueDrag = useDragList(reorder);
   // Rendered order is the drag preview while a drag is in flight, and the real order otherwise.
@@ -722,6 +744,7 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                           <span className={`w-6 shrink-0 rounded-md text-center font-mono text-sm font-bold ${kind === "audio" ? "bg-audio/15 text-audio" : "bg-visual/15 text-visual"}`}>{numbers[i]}</span>
                           <Icon size={14} className="shrink-0 text-muted" aria-hidden />
                           <span className="truncate font-medium capitalize">{item.label}</span>
+                          {item.link && <span className="shrink-0 rounded-md bg-visual/15 px-1.5 font-mono text-[11px] font-bold text-visual" title="Fires together with this cue">+{numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}</span>}
                           <span className="ml-auto hidden shrink-0 text-xs text-muted sm:inline">{track?.title ?? "missing"}</span>
                         </button>
                         {kind !== "audio" && (
@@ -731,6 +754,17 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                           </select>
                         )}
                         <div className="flex shrink-0">
+                          {/* Two clicks: chain this cue, then click the one it goes with. */}
+                          {linking && linking !== item.id ? (
+                            <Button size="sm" variant="flat" color="primary" onPress={() => { linkCues(linking, item.id); setLinking(""); }}>Link here</Button>
+                          ) : (
+                            <Tooltip content={item.link ? `Linked to cue ${numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"} — click to unlink` : linking === item.id ? "Now click the cue this goes with" : "Fire this cue together with another"}>
+                              <Button isIconOnly size="sm" variant={item.link || linking === item.id ? "solid" : "light"} color={item.link ? "secondary" : linking === item.id ? "primary" : "default"}
+                                onPress={() => { if (item.link) { unlinkCue(item.id); setLinking(""); } else setLinking(l => (l === item.id ? "" : item.id)); }}>
+                                {item.link ? <Unlink size={14} /> : <Link2 size={15} />}
+                              </Button>
+                            </Tooltip>
+                          )}
                           <Tooltip content="Move up"><Button isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button></Tooltip>
                           <Tooltip content="Move down"><Button isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
                           <Tooltip content="Remove cue"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteItem(item.id)}><Trash2 size={14} /></Button></Tooltip>

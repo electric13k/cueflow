@@ -4,9 +4,16 @@ import Page from "../components/Page";
 import { Button, Card, CardBody } from "../ui";
 
 const highlights = [
-  { icon: Presentation, title: "Sound, slides and video", body: "One library for audio, images, video and embedded decks. Edit any of them in the browser." },
-  { icon: ListMusic, title: "One deck, mixed cues", body: "Audio 1, slide 1, audio 2, slide 2. Drag to reorder, choose the transition, drive it with your arrow keys." },
+  { icon: Presentation, title: "Sound, slides and video", body: "One library for audio, images, video and embedded decks, with an editor for each. Nothing leaves your browser to be processed." },
+  { icon: ListMusic, title: "One deck, two runs of numbers", body: "Sound counts 1, 2, 3. Anything the room sees counts a, b, c. “Play 3” and “put up b” can never be confused over comms." },
   { icon: Monitor, title: "A presenter window that shows up", body: "Black when the cue is sound alone, the slide or video itself the moment a visual cue fires." },
+];
+
+/** The mental model, in the order you meet it. Three steps, because that is all there is to it. */
+const steps = [
+  { n: "1", title: "Put everything in the library", body: "Upload it, paste a link, or search the open archives. Trim the sound, crop the picture, type a slide — all of it here, none of it uploaded to be processed." },
+  { n: "2", title: "Line the cues up in order", body: "Drag them into the running order for your show. Link a slide to the sound underneath it and one keypress fires both." },
+  { n: "3", title: "Arm it, then drive it", body: "The screen turns amber to say it is loaded, and stays that way until you press an arrow. Every cue goes out because you sent it, not because a timer said so." },
 ];
 
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-80px" }, transition: { duration: .5, delay: d } });
@@ -28,6 +35,23 @@ export default function Home() {
           <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>
           <Button href="/tutorial" size="lg" variant="bordered">See how it works</Button>
         </motion.div>
+      </section>
+
+      <section className="py-10">
+        <motion.h2 {...fade()} className="text-center text-3xl font-black tracking-tight sm:text-4xl">What it actually is</motion.h2>
+        <motion.p {...fade(.05)} className="mx-auto mt-4 max-w-2xl text-center text-muted">
+          A theatre desk decides <em>what</em> goes out and <em>when</em>. CueFloww takes the first half and gives the
+          second half back to you — it holds the running order, and you call it.
+        </motion.p>
+        <div className="mt-12 grid gap-4 sm:grid-cols-3">
+          {steps.map((s, i) => (
+            <motion.div key={s.n} {...fade(i * .06)} className="glass-soft p-6">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 font-mono text-sm font-black text-accent">{s.n}</span>
+              <h3 className="mt-4 text-lg font-bold">{s.title}</h3>
+              <p className="mt-2 text-sm text-muted">{s.body}</p>
+            </motion.div>
+          ))}
+        </div>
       </section>
 
       <section id="features" className="scroll-mt-20 py-10">
