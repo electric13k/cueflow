@@ -174,7 +174,18 @@ export default function Show() {
               {cues.map((cue, i) => (
                 <li key={cue.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${i === index ? "bg-live/20 ring-1 ring-live" : "bg-white/5"}`}>
                   <span className={`w-7 shrink-0 text-center font-mono font-bold ${cue.kind === "audio" ? "text-audio" : "text-visual"}`}>{cue.number}</span>
-                  <span className="min-w-0 flex-1 truncate">{cue.label}</span>
+                  {can(ticket, "edit") ? (
+                    // Renaming is the edit that actually happens mid-show. The host's copy is the
+                    // real one, so it goes over the channel and is applied there, not here.
+                    <button type="button" className="min-w-0 flex-1 truncate text-left underline decoration-dotted underline-offset-4"
+                      onClick={() => {
+                        const label = prompt("Rename this cue", cue.label);
+                        if (label && label !== cue.label) {
+                          bus.current?.send({ type: "relabel", id: cue.id, label, from: ticket.role ?? "crew" });
+                          setCues(cs => cs.map(c => (c.id === cue.id ? { ...c, label } : c)));
+                        }
+                      }}>{cue.label}</button>
+                  ) : <span className="min-w-0 flex-1 truncate">{cue.label}</span>}
                   {can(ticket, "fire") && (
                     <Button size="sm" variant="flat" onPress={() => bus.current?.send({ type: "fire", index: i, from: ticket.role ?? "crew" })}>Go</Button>
                   )}
