@@ -4,7 +4,7 @@ import { Lock, Maximize, MessageSquare, Send, Unlock } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
 import {
-  forgetTicket, joinShow, refreshTicket, rolesForCode, savedTicket, showChannel,
+  forgetTicket, joinShow, refreshTicket, savedTicket, showChannel,
   type DeckCue, type Perm, type ShowMsg, type Ticket,
 } from "../lib/shows";
 
@@ -21,28 +21,16 @@ function Flash({ text }: { text: string }) {
 }
 
 function Door({ onIn }: { onIn: (t: Ticket) => void }) {
-  const [code, setCode] = useState("");
-  const [password, setPassword] = useState("");
+  const [key, setKey] = useState("");
   const [name, setName] = useState(() => localStorage.getItem("cueflow:showName") ?? "");
-  const [roles, setRoles] = useState<{ id: string; name: string }[]>([]);
-  const [roleId, setRoleId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-
-  // Only offered for a show with no password: listing the jobs of a locked show to anyone who types
-  // six characters would hand out half of what the password is protecting.
-  useEffect(() => {
-    if (code.trim().length < 4) return setRoles([]);
-    let live = true;
-    void rolesForCode(code).then(r => { if (live) { setRoles(r); setRoleId(r[0]?.id ?? null); } }).catch(() => setRoles([]));
-    return () => { live = false; };
-  }, [code]);
 
   const go = async () => {
     setBusy(true); setNote("");
     try {
       localStorage.setItem("cueflow:showName", name.trim());
-      onIn(await joinShow(code, password, name, roleId));
+      onIn(await joinShow(key, name));
     } catch (e) { setNote((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -50,29 +38,19 @@ function Door({ onIn }: { onIn: (t: Ticket) => void }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
       <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Join a show</p>
-      <h1 className="text-3xl font-black tracking-tight">Type the code</h1>
+      <h1 className="text-3xl font-black tracking-tight">Type your key</h1>
       <p className="text-sm text-muted">
-        No account needed. Whoever is running the show gives you a code and tells you which job you
-        are doing; what you can see and do follows from that.
+        No account needed. Whoever is running the show gives you a key, and the key is the job — type
+        it and you are on followspot, or on sound, or holding the whole thing. Nothing to choose.
       </p>
-      <Input autoFocus label="Show code" value={code} onValueChange={v => setCode(v.trim())}
-        className="font-mono" placeholder="K7QM2X" />
+      <Input autoFocus label="Your key" value={key} onValueChange={v => setKey(v.trim())}
+        className="font-mono" placeholder="K7QM2X" onKeyDown={e => { if (e.key === "Enter") void go(); }} />
       <Input label="Your name" value={name} onValueChange={setName} placeholder="Sam on sound" />
-      <Input type="password" label="Password (if the show has one)" value={password} onValueChange={setPassword} autoComplete="off" />
-      {roles.length > 0 && (
-        <label className="text-sm">
-          <span className="text-muted">Your job</span>
-          <select value={roleId ?? ""} onChange={e => setRoleId(e.target.value || null)}
-            className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-foreground">
-            {roles.map(r => <option key={r.id} value={r.id} className="bg-background">{r.name}</option>)}
-          </select>
-        </label>
-      )}
       {note && <p className="text-sm text-live">{note}</p>}
-      <Button color="primary" isLoading={busy} isDisabled={code.trim().length < 4} onPress={go}>Go in</Button>
+      <Button color="primary" isLoading={busy} isDisabled={key.trim().length < 4} onPress={go}>Go in</Button>
       <p className="text-xs text-muted">
-        A show with a password does not list its jobs until you are through the door — the host will
-        assign you one.
+        Lost it, or it stopped working? Ask whoever is running the show — they can hand out a new one,
+        and the old one dies the moment they do.
       </p>
     </div>
   );
@@ -156,6 +134,10 @@ export default function Show() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* A collaborator holds the show password, which is the host's own key: they can call it on. */}
+          {ticket.host && (started
+            ? <Button size="sm" variant="flat" color="danger" onPress={() => { bus.current?.send({ type: "end" }); setStarted(null); }}>End</Button>
+            : <Button size="sm" color="primary" onPress={() => { const at = new Date().toISOString(); bus.current?.send({ type: "start", at }); setStarted(at); }}>Start the show</Button>)}
           {started
             ? <span className="flex items-center gap-1 text-xs text-live"><Lock size={13} />Locked in</span>
             : <span className="flex items-center gap-1 text-xs text-muted"><Unlock size={13} />Not started</span>}

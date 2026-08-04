@@ -13,7 +13,7 @@ import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
 import ShowHost from "../components/ShowHost";
 import { currentProject, listProjects, setCurrentProject, type Project } from "../lib/projects";
-import { SCRIPT_LIMIT, showChannel, type Show, type ShowMsg } from "../lib/shows";
+import { SCRIPT_LIMIT, showChannel, updateShow, type Show, type ShowMsg } from "../lib/shows";
 import Stage from "../components/Stage";
 import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
@@ -298,6 +298,10 @@ export default function Studio() {
     if (msg.type === "here") { showBus.current?.send(deck()); toast("Someone joined", `${msg.role ?? "A device"} is in the show.`, "info"); }
     if (msg.type === "fire") playCue(msg.index);
     if (msg.type === "flash") showAlert("warn", msg.text);
+    // A collaborator holds the show password, so calling the show on is theirs to do as well. The
+    // host's copy is still the one that gets written down.
+    if (msg.type === "start" && liveShow) { setLiveShow({ ...liveShow, startedAt: msg.at }); void updateShow(liveShow.id, { started_at: msg.at }); }
+    if (msg.type === "end" && liveShow) { setLiveShow({ ...liveShow, startedAt: null }); void updateShow(liveShow.id, { started_at: null }); }
     if (msg.type === "relabel") setSequences(all => all.map(s => s.id !== sequenceId ? s : ({
       ...s, items: s.items.map(it => (it.id === msg.id ? { ...it, label: msg.label } : it)),
     })));
@@ -466,7 +470,7 @@ export default function Studio() {
               </label>
               <Tooltip content="Run this deck across every device in the room" placement="bottom">
                 <Button variant="flat" color={liveShow?.startedAt ? "danger" : "default"} startContent={<Radio size={17} />} onPress={showModal.onOpen}>
-                  <span className="hidden sm:inline">{liveShow ? liveShow.code : "Show"}</span>
+                  <span className="hidden sm:inline">{liveShow ? liveShow.name : "Show"}</span>
                 </Button>
               </Tooltip>
               <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>

@@ -3,8 +3,8 @@ import { Button, Input, Switch } from "../ui";
 import { Copy, Plus, RefreshCw, Send, Square, Trash2, Radio } from "lucide-react";
 import { toast } from "../lib/toast";
 import {
-  addRole, createShow, deleteRole, deleteShow, listRoles, listShows, PERMS, regenerateCode,
-  setShowPassword, updateRole, updateShow, type Perm, type Role, type Show,
+  addRole, createShow, deleteRole, deleteShow, listRoles, listShows, PERMS, regeneratePassword,
+  regenerateRoleCode, updateRole, updateShow, type Perm, type Role, type Show,
 } from "../lib/shows";
 
 /**
@@ -22,7 +22,6 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
   const [shows, setShows] = useState<Show[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [roleName, setRoleName] = useState("");
   const [message, setMessage] = useState("");
@@ -31,10 +30,10 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
   const reload = () => void listShows(projectId).then(setShows).catch(e => toast("Could not load shows", (e as Error).message, "warn"));
   useEffect(reload, [projectId]);
   useEffect(() => {
-    setCode(show?.code ?? ""); setPassword("");
+    setName(show?.name ?? ""); setPassword(show?.password ?? "");
     if (show) void listRoles(show.id).then(setRoles).catch(() => setRoles([]));
     else setRoles([]);
-  }, [show?.id, show?.code]);
+  }, [show?.id, show?.password]);
 
   const run = async (job: () => Promise<unknown>, done: string) => {
     setBusy(true);
@@ -71,7 +70,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
             <button key={s.id} type="button" onClick={() => setShow(s)}
               className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10">
               <span>{s.name}</span>
-              <span className="font-mono tracking-widest text-muted">{s.code}</span>
+              <span className="font-mono tracking-widest text-muted">{s.password}</span>
             </button>
           ))}
         </div>
@@ -83,50 +82,62 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Show code</p>
-          <p className="font-mono text-3xl font-black tracking-[.3em] text-accent">{show.code}</p>
+          <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Collaborator password</p>
+          <p className="font-mono text-3xl font-black tracking-[.3em] text-accent">{show.password ?? "—"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="bordered" startContent={<Copy size={14} />}
-            onPress={() => void navigator.clipboard?.writeText(`${location.origin}/show — code ${show.code}`).then(() => toast("Copied", "Send that to the room.", "success"))}>
+            onPress={() => void navigator.clipboard?.writeText(`${location.origin}/show — ${show.password ?? ""}`).then(() => toast("Copied", "Only give that to someone who should run the show with you.", "success"))}>
             Copy
           </Button>
           <Button size="sm" variant="light" startContent={<RefreshCw size={14} />} isLoading={busy}
-            onPress={() => void run(async () => { await regenerateCode(show.id); await refresh(); }, "New code. The old one no longer works.")}>
-            New code
+            onPress={() => void run(async () => { await regeneratePassword(show.id); await refresh(); }, "New password. The old one no longer works.")}>
+            New password
           </Button>
           <Button size="sm" variant="light" onPress={() => setShow(null)}>Close</Button>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Input className="min-w-40 flex-1" label="Code" value={code} onValueChange={v => setCode(v.trim())} />
-        <Input className="min-w-40 flex-1" type="password" label="Password (blank for none)" value={password}
-          onValueChange={setPassword} autoComplete="off" />
+        <Input className="min-w-40 flex-1" label="Name" value={name} onValueChange={setName} />
+        <Input className="min-w-40 flex-1" label="Password" value={password} onValueChange={v => setPassword(v.trim())} autoComplete="off" />
         <Button className="self-end" isLoading={busy}
           onPress={() => void run(async () => {
-            if (code !== show.code) await updateShow(show.id, { code });
-            await setShowPassword(show.id, password);
+            await updateShow(show.id, { name, password: password.trim() || null });
             await refresh();
           }, "Saved.")}>
           Save
         </Button>
       </div>
       <p className="text-xs text-muted">
-        {show.hasPassword ? "This show has a password. " : "No password: the code alone lets someone in. "}
-        Forgotten it? There is nothing to recover — type a new one here and tell the room. Leave the
-        box empty to remove it entirely.
+        The password lets someone in as a <strong>collaborator</strong>: everything a job can see, plus
+        firing cues, editing them and calling the show on. Give it only to the person running it with
+        you. It is yours to choose — 4 to 12 letters and numbers — and it may be the same string as one
+        of the job keys below, but it can never be a key another show is already using. Nothing to
+        recover if it is lost: type a new one and tell the person who needs it.
       </p>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-bold">Jobs</h3>
-        <p className="text-xs text-muted">Tick what each job is allowed to see and do. Changes reach every device on its next load.</p>
+        <h3 className="text-sm font-bold">Jobs and their keys</h3>
+        <p className="text-xs text-muted">
+          Each job has its own key. Whoever types it lands in that job — you decide who does what by
+          deciding who gets which key, and a key you replace stops working the moment you save it.
+        </p>
         {roles.map(role => (
           <div key={role.id} className="rounded-2xl bg-white/5 p-3">
-            <div className="flex items-center gap-2">
-              <Input size="sm" className="flex-1" value={role.name}
+            <div className="flex flex-wrap items-center gap-2">
+              <Input size="sm" className="min-w-32 flex-1" value={role.name}
                 onValueChange={v => { setRoles(rs => rs.map(r => (r.id === role.id ? { ...r, name: v } : r))); }} />
-              <Button size="sm" variant="light" onPress={() => void updateRole(role.id, { name: role.name })}>Rename</Button>
+              <Input size="sm" className="min-w-28 flex-1 font-mono" value={role.code ?? ""}
+                onValueChange={v => { setRoles(rs => rs.map(r => (r.id === role.id ? { ...r, code: v.trim() } : r))); }} />
+              <Button size="sm" variant="light" isLoading={busy}
+                onPress={() => void run(async () => { await updateRole(role.id, { name: role.name, code: role.code ?? undefined }); setRoles(await listRoles(show.id)); }, "Saved.")}>
+                Save
+              </Button>
+              <Button isIconOnly size="sm" variant="light" aria-label="New key for this job" isLoading={busy}
+                onPress={() => void run(async () => { await regenerateRoleCode(role.id); setRoles(await listRoles(show.id)); }, "New key. The old one no longer works.")}>
+                <RefreshCw size={14} />
+              </Button>
               <Button isIconOnly size="sm" variant="light" aria-label="Delete job"
                 onPress={() => void run(async () => { await deleteRole(role.id); setRoles(rs => rs.filter(r => r.id !== role.id)); }, "")}>
                 <Trash2 size={14} />

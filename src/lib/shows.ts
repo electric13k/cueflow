@@ -16,15 +16,33 @@ export const PERMS = [
 ] as const;
 export type Perm = typeof PERMS[number]["key"];
 
-export type Show = { id: string; name: string; code: string; sequenceId: string | null; startedAt: string | null; hasPassword: boolean };
-export type Role = { id: string; name: string; perms: Perm[] };
-export type Ticket = { member: string; show: string; name: string; sequence: string | null; started: string | null; role: string | null; perms: Perm[] };
+/** `password` is the collaborator key. Each job's own join key lives on its role, not here. */
+export type Show = { id: string; name: string; password: string | null; sequenceId: string | null; startedAt: string | null };
+export type Role = { id: string; name: string; perms: Perm[]; code: string | null };
+export type Ticket = { member: string; show: string; name: string; sequence: string | null; started: string | null; role: string | null; perms: Perm[]; host: boolean };
 
 const need = () => { if (!supabase) throw new Error("Cloud is not configured for this build."); return supabase; };
 const me = async () => (await need().auth.getUser()).data.user;
-const row = (s: { id: string; name: string; code: string; sequence_id: string | null; started_at: string | null; password_hash?: string | null }): Show =>
-  ({ id: s.id, name: s.name, code: s.code, sequenceId: s.sequence_id, startedAt: s.started_at, hasPassword: !!s.password_hash });
-const COLUMNS = "id,name,code,sequence_id,started_at,password_hash";
+const row = (s: { id: string; name: string; password: string | null; sequence_id: string | null; started_at: string | null }): Show =>
+  ({ id: s.id, name: s.name, password: s.password, sequenceId: s.sequence_id, startedAt: s.started_at });
+const COLUMNS = "id,name,password,sequence_id,started_at";
+
+/**
+ * Every key in the system -- every role code and every show password -- shares one namespace,
+ * because the door takes one box and has to know what you meant by what you typed. The database
+ * enforces it; here we just retry, since two people naming a show at the same second is likelier
+ * than a genuine 31^6 collision.
+ */
+const TAKEN = (e: { code?: string; message?: string }) => e.code === "23505" || /already using that key/i.test(e.message ?? "");
+type Attempt = { data: unknown; error: { code?: string; message?: string } | null };
+async function tryKeys<T>(attempt: (key: string) => PromiseLike<Attempt>): Promise<T> {
+  for (let n = 0; n < 4; n++) {
+    const { data, error } = await attempt(newCode());
+    if (!error) return data as T;
+    if (!TAKEN(error)) throw new Error(error.message ?? "Unknown error");
+  }
+  throw new Error("Could not find a free key. Try again.");
+}
 
 export async function listShows(projectId: string | null): Promise<Show[]> {
   if (!supabase) return [];
@@ -38,49 +56,43 @@ export async function listShows(projectId: string | null): Promise<Show[]> {
 export async function createShow(name: string, projectId: string | null, sequenceId: string | null): Promise<Show> {
   const user = await me();
   if (!user) throw new Error("Sign in to run a show.");
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const { data, error } = await need().from("shows")
-      .insert({ name: name.trim() || "Untitled show", code: newCode(), owner: user.id, project_id: projectId, sequence_id: sequenceId })
-      .select(COLUMNS).single();
-    if (!error) return row(data);
-    if (error.code !== "23505") throw new Error(error.message);
-  }
-  throw new Error("Could not find a free code. Try again.");
+  const made = await tryKeys(key => need().from("shows")
+    .insert({ name: name.trim() || "Untitled show", password: key, owner: user.id, project_id: projectId, sequence_id: sequenceId })
+    .select(COLUMNS).single());
+  return row(made as Parameters<typeof row>[0]);
 }
 
-export async function updateShow(id: string, patch: { name?: string; code?: string; sequence_id?: string | null; started_at?: string | null }) {
-  if (patch.code) {
-    const problem = codeProblem(patch.code);
+export async function updateShow(id: string, patch: { name?: string; password?: string | null; sequence_id?: string | null; started_at?: string | null }) {
+  if (patch.password) {
+    const problem = codeProblem(patch.password);
     if (problem) throw new Error(problem);
   }
   const { error } = await need().from("shows").update(patch).eq("id", id);
-  if (error) throw new Error(error.code === "23505" ? "Another show already uses that code." : error.message);
+  if (error) throw new Error(TAKEN(error) ? "Another show is already using that key." : error.message);
 }
 
-export const regenerateCode = (id: string) => updateShow(id, { code: newCode() });
+export const regeneratePassword = (id: string) => updateShow(id, { password: newCode() });
 export const deleteShow = async (id: string) => { const { error } = await need().from("shows").delete().eq("id", id); if (error) throw new Error(error.message); };
 
-/** Empty clears it. Hashing happens in the database, so a plaintext password is never stored here. */
-export async function setShowPassword(id: string, password: string) {
-  const { error } = await need().rpc("set_show_password", { p_show: id, p_password: password });
-  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ""));
-}
-
 export async function listRoles(showId: string): Promise<Role[]> {
-  const { data, error } = await need().from("show_roles").select("id,name,perms").eq("show_id", showId).order("created_at");
+  const { data, error } = await need().from("show_roles").select("id,name,perms,code").eq("show_id", showId).order("created_at");
   if (error) throw new Error(error.message);
   return (data ?? []) as Role[];
 }
 export async function addRole(showId: string, name: string, perms: Perm[]): Promise<Role> {
-  const { data, error } = await need().from("show_roles").insert({ show_id: showId, name: name.trim() || "Crew", perms })
-    .select("id,name,perms").single();
-  if (error) throw new Error(error.message);
-  return data as Role;
+  return await tryKeys<Role>(key => need().from("show_roles")
+    .insert({ show_id: showId, name: name.trim() || "Crew", perms, code: key })
+    .select("id,name,perms,code").single());
 }
-export async function updateRole(id: string, patch: { name?: string; perms?: Perm[] }) {
+export async function updateRole(id: string, patch: { name?: string; perms?: Perm[]; code?: string }) {
+  if (patch.code) {
+    const problem = codeProblem(patch.code);
+    if (problem) throw new Error(problem);
+  }
   const { error } = await need().from("show_roles").update(patch).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(TAKEN(error) ? "Another job is already using that key." : error.message);
 }
+export const regenerateRoleCode = (id: string) => updateRole(id, { code: newCode() });
 export async function deleteRole(id: string) {
   const { error } = await need().from("show_roles").delete().eq("id", id);
   if (error) throw new Error(error.message);
@@ -88,17 +100,12 @@ export async function deleteRole(id: string) {
 
 // --- the door -------------------------------------------------------------------------------
 
-/** Roles a device can pick from before it has joined. Only offered when the show has no password. */
-export async function rolesForCode(code: string): Promise<{ id: string; name: string }[]> {
-  const { data, error } = await need().rpc("show_roles_for", { p_code: code.trim() });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as { id: string; name: string }[];
-}
-
-export async function joinShow(code: string, password: string, name: string, roleId: string | null): Promise<Ticket> {
-  const { data, error } = await need().rpc("join_show", {
-    p_code: code.trim(), p_password: password, p_name: name.trim(), p_role: roleId,
-  });
+/**
+ * One box. A job's code puts you in that job; the show's password puts you in as a collaborator with
+ * everything. Nothing to pick, so nothing to pick wrong five minutes before curtain.
+ */
+export async function joinShow(key: string, name: string): Promise<Ticket> {
+  const { data, error } = await need().rpc("join_show", { p_key: key.trim(), p_name: name.trim() });
   if (error) throw new Error(error.message.replace(/^.*?:\s*/, ""));
   const ticket = data as Ticket;
   local.set("ticket", ticket);
