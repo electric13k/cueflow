@@ -12,6 +12,9 @@ import Terms from "./pages/Terms";
 import Tutorial from "./pages/Tutorial";
 import Credits from "./pages/Credits";
 import Script from "./pages/Script";
+import Account from "./pages/Account";
+import Settings from "./pages/Settings";
+import UsernamePrompt from "./components/UsernamePrompt";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
@@ -37,6 +40,8 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/contact" element={<Contact />} />
         <Route path="/credits" element={<Credits />} />
         <Route path="/script" element={<Script />} />
+        <Route path="/account" element={<Account />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/legal" element={<LegalRedirect />} />
@@ -45,6 +50,7 @@ createRoot(document.getElementById("root")!).render(
       <Toaster />
       <CookieConsent />
       <SignInPrompt />
+      <UsernamePrompt />
     </BrowserRouter>
   </StrictMode>
 );

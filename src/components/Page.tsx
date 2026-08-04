@@ -11,6 +11,8 @@ const links = [
   { to: "/tutorial", label: "Tutorial" },
   { to: "/contact", label: "Contact" },
   { to: "/credits", label: "Credits" },
+  { to: "/settings", label: "Settings" },
+  { to: "/account", label: "Account" },
   { to: "/terms", label: "Terms" },
   { to: "/privacy", label: "Privacy" },
 ];

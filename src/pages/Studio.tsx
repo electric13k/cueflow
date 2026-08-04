@@ -7,6 +7,8 @@ import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import { loadScript, type ScriptDoc } from "../lib/script";
+import KeybindRow from "../components/KeybindRow";
+import { clashes, defaultBinds, keyActions, loadBinds, saveBinds, type Action } from "../lib/keys";
 import Nav from "../components/Nav";
 import Onboarding from "../components/Onboarding";
 import Stage from "../components/Stage";
@@ -38,20 +40,6 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 const kindIcon = { audio: Volume2, image: ImageIcon, video: Film, embed: Presentation };
 const UPLOAD_ACCEPT = "audio/*,image/*,video/*";
 
-// Configurable keybinds: arrows drive cues, WASD drives whatever is on the screen, other keys nudge
-// live effects.
-type Action = "nextCue" | "prevCue" | "playPause" | "nextVisual" | "prevVisual" | "zoomIn" | "zoomOut" | "volUp" | "volDown" | "speedUp" | "speedDown" | "reverbUp" | "reverbDown";
-const keyActions: { id: Action; label: string; def: string }[] = [
-  { id: "nextCue", label: "Next cue", def: "ArrowRight" }, { id: "prevCue", label: "Previous cue", def: "ArrowLeft" },
-  { id: "playPause", label: "Play / pause", def: " " },
-  { id: "nextVisual", label: "Next slide or video", def: "d" }, { id: "prevVisual", label: "Previous slide or video", def: "a" },
-  { id: "zoomIn", label: "Zoom the stage in", def: "w" }, { id: "zoomOut", label: "Zoom the stage out", def: "s" },
-  { id: "volUp", label: "Volume +", def: "ArrowUp" }, { id: "volDown", label: "Volume −", def: "ArrowDown" },
-  { id: "speedUp", label: "Speed +", def: "]" }, { id: "speedDown", label: "Speed −", def: "[" },
-  { id: "reverbUp", label: "Reverb +", def: "r" }, { id: "reverbDown", label: "Reverb −", def: "e" },
-];
-const defaultBinds = Object.fromEntries(keyActions.map(a => [a.id, a.def])) as Record<Action, string>;
-const keyLabel = (k: string) => k === " " ? "Space" : ({ ArrowRight: "→", ArrowLeft: "←", ArrowUp: "↑", ArrowDown: "↓" } as Record<string, string>)[k] ?? (k.length === 1 ? k.toUpperCase() : k);
 
 export default function Studio() {
   const audio = useRef<HTMLAudioElement>(new Audio());
@@ -64,7 +52,7 @@ export default function Studio() {
   const lastPick = useRef(-1); // anchor for shift-click range selection in the library
   const [loop, setLoop] = useState(false);
   const [loopSeq, setLoopSeq] = useState(false);
-  const [binds, setBinds] = useState<Record<Action, string>>(() => ({ ...defaultBinds, ...local.get("keybinds", defaultBinds) }));
+  const [binds, setBinds] = useState<Record<Action, string>>(loadBinds);
   const keybindsModal = useDisclosure();
   const guideModal = useDisclosure();
   const [sequenceId, setSequenceId] = useState<string>(session.sequenceId);
@@ -116,7 +104,7 @@ export default function Studio() {
     });
   }, [tracks, sequences]);
   useEffect(() => { local.set("session", { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
-  useEffect(() => { local.set("keybinds", binds); }, [binds]);
+  useEffect(() => { saveBinds(binds); }, [binds]);
   const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
   const mergeCloud = () => hydrateCloud().then(cloud => {
     if (!cloud) return false;
@@ -851,20 +839,6 @@ function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, l
   );
 }
 
-function KeybindRow({ label, value, onSet }: { label: string; value: string; onSet: (k: string) => void }) {
-  const [listening, setListening] = useState(false);
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2">
-      <span className="text-sm">{label}</span>
-      <button
-        className={`min-w-24 rounded-lg border px-3 py-1.5 font-mono text-sm ${listening ? "border-accent bg-accent/15 text-accent" : "border-white/15 bg-white/5"}`}
-        onClick={() => setListening(true)} onBlur={() => setListening(false)}
-        onKeyDown={e => { if (!listening) return; e.preventDefault(); if (e.key === "Escape") return setListening(false); onSet(e.key); setListening(false); }}
-      >{listening ? "Press a key…" : keyLabel(value)}</button>
-    </div>
-  );
-}
-
 function KeybindsModal({ disc, binds, setBinds }: { disc: ReturnType<typeof useDisclosure>; binds: Record<Action, string>; setBinds: (u: (b: Record<Action, string>) => Record<Action, string>) => void }) {
   return (
     <Modal isOpen={disc.isOpen} onOpenChange={disc.onOpenChange} placement="center" backdrop="blur" scrollBehavior="inside">
@@ -872,7 +846,7 @@ function KeybindsModal({ disc, binds, setBinds }: { disc: ReturnType<typeof useD
         <ModalHeader className="flex items-center gap-2"><Keyboard size={18} className="text-accent" />Keybinds</ModalHeader>
         <ModalBody className="gap-2">
           <p className="text-xs text-muted">Click a key box, then press a key to bind it. Arrows step every cue; WASD drives whatever is on the stage, so slides move without touching the sound underneath.</p>
-          {keyActions.map(a => <KeybindRow key={a.id} label={a.label} value={binds[a.id]} onSet={k => setBinds(b => ({ ...b, [a.id]: k }))} />)}
+          {keyActions.map(a => <KeybindRow key={a.id} label={a.label} value={binds[a.id]} clash={clashes(binds).has(a.id)} onSet={k => setBinds(b => ({ ...b, [a.id]: k }))} />)}
         </ModalBody>
         <ModalFooter>
           <Button variant="light" onPress={() => setBinds(() => defaultBinds)}>Reset defaults</Button>
