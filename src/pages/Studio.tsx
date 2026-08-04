@@ -75,6 +75,7 @@ export default function Studio() {
   const [editUrl, setEditUrl] = useState(""); // unsaved editor buffer, as a blob URL, takes over playback for the selected track
   const wasEditing = useRef(false);
   const [stage, setStage] = useState<StageState>(null); // what the audience window is showing
+  const [armed, setArmed] = useState(false);            // deck is loaded and the arrows are hot
   const renameModal = useDisclosure();
   const [draft, setDraft] = useState<{ kind: "track" | "sequence"; id: string; value: string }>({ kind: "track", id: "", value: "" });
 
@@ -244,7 +245,9 @@ export default function Studio() {
   const nudge = (key: keyof Effects, delta: number, min: number, max: number) => { if (!selected) return; updateEffects({ ...selected.effects, [key]: clamp(Number(selected.effects[key]) + delta, min, max) }); };
   // Arms the deck without firing anything: cue 1 waits for the first arrow press, so nothing ever
   // hits the room the moment a window opens.
-  const startSequence = (audience: boolean) => { if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); setCueIndex(-1); setStage(null); audio.current.pause(); setPlaying(false); };
+  const startSequence = (audience: boolean) => { if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); setCueIndex(-1); setStage(null); setArmed(true); audio.current.pause(); setPlaying(false); };
+  // Stand down puts the room back to black and the studio back to a normal editing screen.
+  const standDown = () => { setArmed(false); setCueIndex(0); setStage(null); audio.current.pause(); setPlaying(false); };
 
   // Optimistic: the asset appears instantly with a local object URL, then swaps to the cloud URL once uploaded.
   const addFiles = (e: ChangeEvent<HTMLInputElement>) => {
@@ -331,23 +334,45 @@ export default function Studio() {
       {/* Bottom padding clears the fixed player, which stacks taller on phones. */}
       <div className="mx-auto max-w-7xl px-4 py-6 pb-60 sm:px-6 sm:pb-44 lg:px-8">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Studio</p><h1 className="text-2xl font-black tracking-tight sm:text-3xl">Cue board</h1></div>
+          <div>
+            <p className={`text-[11px] font-semibold uppercase tracking-[.3em] ${armed ? "text-armed" : "text-accent"}`}>{armed ? (cueIndex < 0 ? "Armed" : "Running") : "Studio"}</p>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">{armed ? (selectedSequence?.name ?? "Cue board") : "Cue board"}</h1>
+          </div>
           {/* Labels collapse to icons on phones, three full-width buttons do not fit a 375px row. */}
           <div className="flex flex-wrap gap-2">
-            <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>
-            <Tooltip content="Set the keys for cues, slides and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
-            <Tooltip content={syncHint(sync)} placement="bottom">
-              <Button variant="flat" color={sync.ok ? "default" : "danger"} startContent={<RefreshCw size={17} />} onPress={syncNow}>
-                <span className="hidden sm:inline">{sync.ok ? "Sync" : "Not synced"}</span>
-              </Button>
-            </Tooltip>
-            {/* Sequences has its own "Arm in audience mode", so this would be a second door to the same room. */}
-            {tab !== "sequence" && <Tooltip content="Opens the presenter window, drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}><span className="hidden sm:inline">Audience display</span></Button></Tooltip>}
+            {armed ? (
+              <Button variant="bordered" onPress={standDown}>Stand down</Button>
+            ) : (<>
+              <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>
+              <Tooltip content="Set the keys for cues, slides and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
+              <Tooltip content={syncHint(sync)} placement="bottom">
+                <Button variant="flat" color={sync.ok ? "default" : "danger"} startContent={<RefreshCw size={17} />} onPress={syncNow}>
+                  <span className="hidden sm:inline">{sync.ok ? "Sync" : "Not synced"}</span>
+                </Button>
+              </Tooltip>
+              {/* Sequences has its own "Arm in audience mode", so this would be a second door to the same room. */}
+              {tab !== "sequence" && <Tooltip content="Opens the presenter window, drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}><span className="hidden sm:inline">Audience display</span></Button></Tooltip>}
+            </>)}
           </div>
         </motion.div>
 
+        {/* Armed: an amber frame round the window, red once cues are running. No sound, ever. */}
+        {armed && <div aria-hidden className={`armed-frame ${cueIndex >= 0 ? "live-frame" : ""}`} />}
+        {armed && (
+          <div className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 ${cueIndex < 0 ? "border-armed/40 bg-armed/10" : "border-live/40 bg-live/10"}`}>
+            <span className={`armed-dot h-2.5 w-2.5 rounded-full ${cueIndex < 0 ? "bg-armed" : "bg-live"}`} />
+            <span className="text-sm font-semibold">
+              {cueIndex < 0 ? "Deck armed. Nothing has gone out yet." : `Cue ${cueIndex + 1} of ${selectedSequence?.items.length ?? 0} is out.`}
+            </span>
+            <span className="text-xs text-muted">Press → for the next cue, ← to go back.</span>
+            <span className="ml-auto"><Button size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button></span>
+          </div>
+        )}
+
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="mt-6">
-          <Tabs selectedKey={tab} onSelectionChange={setTab} classNames={{ tabList: "glass-soft" }}>
+          {/* Armed, the library and the editor go away: the deck is the only thing that matters and
+              nothing on this screen should invite a stray click during a show. */}
+          <Tabs selectedKey={tab} onSelectionChange={setTab} classNames={{ tabList: armed ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
               <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} onPlay={playTrack} onToggleSelect={toggleSelect} onClearSelection={() => setSelectedIds([])} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
@@ -363,7 +388,17 @@ export default function Studio() {
 
       {/* Hidden in the editor: that tab has its own transport, and three play buttons on one screen
           is two too many. Visual assets have no transport at all. */}
-      <AnimatePresence>{selected && !isVisual(selected) && tab !== "editor" && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+      {/* A phone has no arrow keys. Armed, the deck gets a thumb-sized transport of its own. */}
+      {armed && (
+        <div className="fixed inset-x-0 bottom-0 z-40 flex gap-3 border-t border-white/10 bg-background/90 p-3 backdrop-blur-xl lg:hidden">
+          <Button className="h-14 flex-1 text-base" variant="flat" onPress={() => advance(-1)}>← Back</Button>
+          <Button className="h-14 flex-[2] text-base" color="primary" onPress={() => advance(1)}>
+            {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
+          </Button>
+        </div>
+      )}
+
+      <AnimatePresence>{selected && !isVisual(selected) && tab !== "editor" && !armed && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -630,7 +665,7 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                           <GripVertical size={15} aria-hidden />
                         </span>
                         <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
-                          <span className={`w-6 shrink-0 text-center font-mono text-sm font-bold ${kind === "audio" ? "text-accent" : "text-secondary"}`}>{numbers[i]}</span>
+                          <span className={`w-6 shrink-0 rounded-md text-center font-mono text-sm font-bold ${kind === "audio" ? "bg-audio/15 text-audio" : "bg-visual/15 text-visual"}`}>{numbers[i]}</span>
                           <Icon size={14} className="shrink-0 text-muted" aria-hidden />
                           <span className="truncate font-medium capitalize">{item.label}</span>
                           <span className="ml-auto hidden shrink-0 text-xs text-muted sm:inline">{track?.title ?? "missing"}</span>
