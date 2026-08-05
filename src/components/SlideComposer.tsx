@@ -5,12 +5,12 @@ import { defaultSlide, drawSlide, slideFile, type Slide } from "../lib/image";
 
 /** Backgrounds that stay legible from the back of a room, and a matching accent for each. */
 const THEMES: { name: string; bg: string; fg: string; accent: string }[] = [
-  { name: "Night", bg: "#0b1220", fg: "#f8fafc", accent: "#22d3ee" },
-  { name: "Ink", bg: "#111827", fg: "#f9fafb", accent: "#a78bfa" },
-  { name: "Paper", bg: "#faf7f2", fg: "#1c1917", accent: "#c2410c" },
-  { name: "Sand", bg: "#f5f0e6", fg: "#292524", accent: "#0f766e" },
-  { name: "Deep", bg: "#052e2b", fg: "#ecfdf5", accent: "#fbbf24" },
-  { name: "Blackout", bg: "#000000", fg: "#ffffff", accent: "#ef4444" },
+  { name: "House", bg: "#1A1614", fg: "#EFE7D8", accent: "#C9737C" },
+  { name: "Foolscap", bg: "#EFE7D8", fg: "#241F1C", accent: "#6E2029" },
+  { name: "Curtain", bg: "#3A0F14", fg: "#F3E2D6", accent: "#D4A957" },
+  { name: "Olive", bg: "#2A2E22", fg: "#EFE7D8", accent: "#A3B37A" },
+  { name: "Brass", bg: "#241F1C", fg: "#F5E9D4", accent: "#D4A957" },
+  { name: "Blackout", bg: "#000000", fg: "#FFFFFF", accent: "#A32330" },
 ];
 
 /**

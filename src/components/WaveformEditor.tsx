@@ -17,7 +17,17 @@ const fmt = (s: number) => `${s.toFixed(2)}s`;
 /** Ruler labels: sub-second zoom wants decimals, a whole song wants m:ss. */
 const stamp = (s: number, step: number) =>
   step < 1 ? `${s.toFixed(2)}s` : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-const RULER = 18;                       // px reserved at the top of the canvas for the time ruler
+const RULER = 18;
+/**
+ * A canvas gets no CSS, so the palette has to be read out of the document and handed to it -- and
+ * re-read on every draw, because the theme toggle changes what these resolve to.
+ */
+const MONO = `"Courier Prime", ui-monospace, monospace`;
+const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
+const ink = (alpha: number) => {
+  const on = document.documentElement.classList.contains("dark");
+  return `rgba(${on ? "239,231,216" : "36,31,28"}, ${alpha})`;
+};                       // px reserved at the top of the canvas for the time ruler
 const TICKS = [.01, .02, .05, .1, .25, .5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
 const DB3 = Math.SQRT2;                 // +3 dB, the step every mixer uses
 
@@ -109,14 +119,14 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
 
     // Ruler
     const step = TICKS.find(s => (s / span) * W >= 64) ?? span / 4;
-    g.fillStyle = "rgba(255,255,255,.04)"; g.fillRect(0, 0, W, RULER);
-    g.font = "500 10px Inter, system-ui, sans-serif"; g.textBaseline = "middle";
+    g.fillStyle = ink(.05); g.fillRect(0, 0, W, RULER);
+    g.font = `500 10px ${MONO}`; g.textBaseline = "middle";
     for (let t = Math.ceil(view.start / step) * step; t <= view.end + 1e-6; t += step) {
       const x = Math.round(xOf(t)) + .5;
-      g.strokeStyle = "rgba(255,255,255,.16)"; g.beginPath(); g.moveTo(x, RULER - 6); g.lineTo(x, RULER); g.stroke();
-      g.fillStyle = "rgba(148,163,184,.85)"; g.fillText(stamp(t, step), x + 4, RULER / 2);
+      g.strokeStyle = ink(.28); g.beginPath(); g.moveTo(x, RULER - 6); g.lineTo(x, RULER); g.stroke();
+      g.fillStyle = ink(.8); g.fillText(stamp(t, step), x + 4, RULER / 2);
     }
-    g.strokeStyle = "rgba(255,255,255,.1)"; g.beginPath(); g.moveTo(0, RULER + .5); g.lineTo(W, RULER + .5); g.stroke();
+    g.strokeStyle = ink(.14); g.beginPath(); g.moveTo(0, RULER + .5); g.lineTo(W, RULER + .5); g.stroke();
 
     // Lanes. Mono collapses to one lane whose peaks are the average of the levelled channels, which
     // is what "mix to mono" actually renders.
@@ -129,7 +139,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       // Ghost of the untouched signal, so a cut level reads as a change and not as a quiet file.
       const ghosted = idx.some(c => level(c) !== 1);
       for (const pass of ghosted ? ["ghost", "live"] as const : ["live"] as const) {
-        g.strokeStyle = pass === "ghost" ? "rgba(148,163,184,.22)" : silent ? "rgba(148,163,184,.45)" : "rgba(34,211,238,.9)";
+        g.strokeStyle = pass === "ghost" ? ink(.22) : silent ? ink(.4) : token("--cue-audio");
         g.beginPath();
         for (let x = 0; x < W; x++) {
           let min = 0, max = 0;
@@ -143,24 +153,24 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
         g.stroke();
       }
       // Anything a boost pushes past full scale is flagged, the way a meter would.
-      g.fillStyle = "rgba(251,146,60,.75)";
+      g.fillStyle = token("--cue-armed");
       for (let x = 0; x < W; x++) {
         const hot = idx.some(c => { const p = wave[c]; return p && (Math.abs(p[x * 2]) * level(c) > 1 || Math.abs(p[x * 2 + 1]) * level(c) > 1); });
         if (hot) g.fillRect(x, top + 1, 1, 3);
       }
-      g.font = "600 11px Inter, system-ui, sans-serif";
+      g.font = `600 11px ${MONO}`;
       const name = mono ? "Mono mix" : labels[lane] ?? `Ch ${lane + 1}`, w = g.measureText(name).width;
       g.fillStyle = "rgba(2,6,23,.72)"; g.fillRect(8, top + 8, w + 14, 18);
       g.fillStyle = "rgba(226,232,240,.92)"; g.fillText(name, 15, top + 17);
-      g.strokeStyle = "rgba(255,255,255,.08)"; g.beginPath(); g.moveTo(0, top + laneH); g.lineTo(W, top + laneH); g.stroke();
+      g.strokeStyle = ink(.1); g.beginPath(); g.moveTo(0, top + laneH); g.lineTo(W, top + laneH); g.stroke();
     }
 
     if (sel) {
       const x0 = xOf(sel.start), x1 = xOf(sel.end);
       const laneTop = sel.channel == null || mono ? RULER : RULER + laneH * sel.channel;
       const laneBot = sel.channel == null || mono ? H : RULER + laneH * (sel.channel + 1);
-      g.fillStyle = "rgba(167,139,250,.22)"; g.fillRect(x0, laneTop, x1 - x0, laneBot - laneTop);
-      g.strokeStyle = "rgba(167,139,250,.8)"; g.strokeRect(x0 + .5, laneTop + .5, x1 - x0 - 1, laneBot - laneTop - 1);
+      g.fillStyle = ink(.16); g.fillRect(x0, laneTop, x1 - x0, laneBot - laneTop);
+      g.strokeStyle = token("--cue-visual"); g.strokeRect(x0 + .5, laneTop + .5, x1 - x0 - 1, laneBot - laneTop - 1);
     }
     for (const [t, colour] of [[cursor, "rgba(226,232,240,.55)"], [head, "rgba(52,211,153,.95)"]] as const) {
       if (t == null || t < view.start || t > view.end) continue;

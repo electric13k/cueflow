@@ -69,7 +69,7 @@ export async function flatten(url: string, v: Visual, title: string) {
   grade(ctx, v, w, h);
   if (v.caption) {
     const size = Math.round(h * .07);
-    ctx.font = `700 ${size}px Inter, system-ui, sans-serif`;
+    ctx.font = `700 ${size}px "Source Serif 4", Georgia, serif`;
     ctx.textAlign = "center";
     const band = ctx.createLinearGradient(0, h - size * 3, 0, h);
     band.addColorStop(0, "rgba(0,0,0,0)"); band.addColorStop(1, "rgba(0,0,0,.8)");
@@ -102,7 +102,7 @@ export type Slide = {
   bullets: boolean;
 };
 export const defaultSlide = (): Slide => ({
-  title: "", body: "", bg: "#0b1220", fg: "#f8fafc", accent: "#22d3ee", align: "left", bullets: true,
+  title: "", body: "", bg: "#1A1614", fg: "#EFE7D8", accent: "#C9737C", align: "left", bullets: true,
 });
 
 /** Greedy wrap, because a slide with a sentence running off the edge is worse than a small font. */
@@ -138,7 +138,7 @@ export function drawSlide(canvas: HTMLCanvasElement, s: Slide) {
 
   if (s.title) {
     ctx.fillStyle = s.fg;
-    ctx.font = `700 104px "Space Grotesk", Inter, system-ui, sans-serif`;
+    ctx.font = `700 104px "Bodoni Moda", Georgia, serif`;
     for (const line of wrap(ctx, s.title, SLIDE_W - pad * 2)) { ctx.fillText(line, x, y); y += 124; }
     ctx.fillStyle = s.accent;
     if (centred) ctx.fillRect(SLIDE_W / 2 - 60, y - 40, 120, 8);
@@ -148,7 +148,7 @@ export function drawSlide(canvas: HTMLCanvasElement, s: Slide) {
 
   if (s.body) {
     ctx.fillStyle = s.fg;
-    ctx.font = `400 58px Inter, system-ui, sans-serif`;
+    ctx.font = `400 58px "Source Serif 4", Georgia, serif`;
     for (const para of s.body.split("\n")) {
       if (!para.trim()) { y += 40; continue; }
       const dot = s.bullets && !centred;
