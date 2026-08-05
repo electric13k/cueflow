@@ -18,6 +18,7 @@ import Projects from "./pages/Projects";
 import Workspace from "./pages/Workspace";
 import Show from "./pages/Show";
 import UsernamePrompt from "./components/UsernamePrompt";
+import Coach from "./components/Coach";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
@@ -57,6 +58,7 @@ createRoot(document.getElementById("root")!).render(
       <CookieConsent />
       <SignInPrompt />
       <UsernamePrompt />
+      <Coach />
     </BrowserRouter>
   </StrictMode>
 );

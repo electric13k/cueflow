@@ -7,6 +7,7 @@ import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import { loadScript, type ScriptDoc } from "../lib/script";
+import { teach } from "../lib/coach";
 import KeybindRow from "../components/KeybindRow";
 import { clashes, defaultBinds, keyActions, loadBinds, saveBinds, type Action } from "../lib/keys";
 import Nav from "../components/Nav";
@@ -346,7 +347,7 @@ export default function Studio() {
   const nudge = (key: keyof Effects, delta: number, min: number, max: number) => { if (!selected) return; updateEffects({ ...selected.effects, [key]: clamp(Number(selected.effects[key]) + delta, min, max) }); };
   // Arms the deck without firing anything: cue 1 waits for the first arrow press, so nothing ever
   // hits the room the moment a window opens.
-  const startSequence = (audience: boolean) => { if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); setCueIndex(-1); setStage(null); setArmed(true); audio.current.pause(); setPlaying(false); };
+  const startSequence = (audience: boolean) => { teach("armed"); if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); setCueIndex(-1); setStage(null); setArmed(true); audio.current.pause(); setPlaying(false); };
   // Stand down puts the room back to black and the studio back to a normal editing screen.
   const standDown = () => { setArmed(false); setCueIndex(0); setStage(null); audio.current.pause(); setPlaying(false); };
 
@@ -460,7 +461,7 @@ export default function Studio() {
             <label className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
               <BookOpen size={16} className="text-muted" aria-hidden />
               <span className="sr-only">Script reader</span>
-              <select value={scriptMode} onChange={e => openScript(e.target.value as typeof scriptMode)}
+              <select data-coach="script" value={scriptMode} onChange={e => openScript(e.target.value as typeof scriptMode)}
                 className="bg-transparent py-2 pr-1 text-sm outline-none">
                 <option value="off">Script: off</option>
                 <option value="split">Split screen</option>
@@ -483,7 +484,7 @@ export default function Studio() {
                 </select>
               </label>
               <Tooltip content="Run this deck across every device in the room" placement="bottom">
-                <Button variant="flat" color={liveShow?.startedAt ? "danger" : "default"} startContent={<Radio size={17} />} onPress={showModal.onOpen}>
+                <Button data-coach="show" variant="flat" color={liveShow?.startedAt ? "danger" : "default"} startContent={<Radio size={17} />} onPress={showModal.onOpen}>
                   <span className="hidden sm:inline">{liveShow ? liveShow.name : "Show"}</span>
                 </Button>
               </Tooltip>
@@ -517,7 +518,7 @@ export default function Studio() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="min-w-0">
           {/* Armed, the library and the editor go away: the deck is the only thing that matters and
               nothing on this screen should invite a stray click during a show. */}
-          <Tabs selectedKey={tab} onSelectionChange={setTab} classNames={{ tabList: armed ? "hidden" : "glass-soft" }}>
+          <Tabs selectedKey={tab} onSelectionChange={k => { setTab(k as string); teach(k as "library" | "editor" | "sequence"); }} classNames={{ tabList: armed ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
               <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} onPlay={playTrack} onToggleSelect={toggleSelect} onClearSelection={() => setSelectedIds([])} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} onAddToSequence={addItem} hasSequence={!!sequenceId} />
             </Tab>
@@ -596,7 +597,7 @@ function Library({ tracks, selectedId, playingId, selectedIds, busy, onPlay, onT
           {count > 0 && <Button variant="light" size="sm" onPress={onClearSelection}>Clear {count}</Button>}
           <Tooltip content={hasSequence ? "Adds them in the order you picked them" : "Create a sequence first"}><span><Button variant="bordered" startContent={<Plus size={16} />} isDisabled={!hasSequence} onPress={onAddToSequence}>Add {count > 1 ? `${count} ` : ""}to sequence</Button></span></Tooltip>
           <Tooltip content="A blank 16:9 slide you can put a title on"><Button variant="bordered" isDisabled={busy} startContent={<Presentation size={16} />} onPress={onAddSlide}>New slide</Button></Tooltip>
-          <Tooltip content="Audio, images and video from this device"><Button as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept={UPLOAD_ACCEPT} multiple onChange={onAdd} /></Button></Tooltip>
+          <Tooltip content="Audio, images and video from this device"><Button data-coach="add" as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept={UPLOAD_ACCEPT} multiple onChange={onAdd} /></Button></Tooltip>
         </div>
       </div>
 
@@ -800,7 +801,7 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
       ) : (
         <div className="space-y-3">
           <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
-            <Tooltip content="Arms the deck. Nothing plays until you press →"><Button size="sm" color="primary" startContent={<Play size={14} fill="currentColor" />} isDisabled={!seq.items.length} onPress={() => startSequence(false)}>Arm</Button></Tooltip>
+            <Tooltip content="Arms the deck. Nothing plays until you press →"><Button size="sm" color="primary" startContent={<Play size={14} fill="currentColor" />} isDisabled={!seq.items.length} data-coach="arm" onPress={() => startSequence(false)}>Arm</Button></Tooltip>
             <Tooltip content="Opens the presenter window and arms the deck"><Button size="sm" color="secondary" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(true)}>Arm in audience mode</Button></Tooltip>
             <Switch size="sm" isSelected={loopSeq} onValueChange={setLoopSeq}>Loop sequence</Switch>
             <span className="ml-auto text-xs text-muted">{cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → step every cue, A / D step slides only, W / S zoom"}</span>
