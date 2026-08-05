@@ -15,6 +15,7 @@ import Script from "./pages/Script";
 import Account from "./pages/Account";
 import Settings from "./pages/Settings";
 import Projects from "./pages/Projects";
+import Workspace from "./pages/Workspace";
 import Show from "./pages/Show";
 import UsernamePrompt from "./components/UsernamePrompt";
 import CookieConsent from "./components/CookieConsent";
@@ -42,6 +43,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/contact" element={<Contact />} />
         <Route path="/credits" element={<Credits />} />
         <Route path="/script" element={<Script />} />
+        <Route path="/workspace" element={<Workspace />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/show" element={<Show />} />
         <Route path="/account" element={<Account />} />

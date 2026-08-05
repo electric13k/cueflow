@@ -54,7 +54,16 @@ const UPLOAD_ACCEPT = "audio/*,image/*,video/*";
 export default function Studio() {
   const audio = useRef<HTMLAudioElement>(new Audio());
   const engine = useRef(new AudioEngine());
-  const session = local.get<Session>(key("session"), { selectedId: "", sequenceId: "", cueIndex: 0, tab: "library" });
+  // Arriving from the workspace: ?tab=editor&track=<id> opens that sound in the editor, so "edit
+  // this" is one click from where you saw it rather than a hunt through the library.
+  const link = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
+  const stored = local.get<Session>(key("session"), { selectedId: "", sequenceId: "", cueIndex: 0, tab: "library" });
+  const session: Session = {
+    ...stored,
+    tab: link.get("tab") ?? stored.tab,
+    selectedId: link.get("track") ?? stored.selectedId,
+    sequenceId: link.get("seq") ?? stored.sequenceId,
+  };
   const [tracks, setTracks] = useState<Track[]>(() => local.get(key("tracks"), []));
   const [sequences, setSequences] = useState<Sequence[]>(() => local.get(key("sequences"), []));
   const [selectedId, setSelectedId] = useState<string>(session.selectedId || local.get<Track[]>(key("tracks"), [])[0]?.id || "");
@@ -816,11 +825,12 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                     // and the drop target is computed from those rectangles.
                     <motion.li key={item.id} layout={!cueDrag.dragging} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
                       <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${held ? "border-accent bg-accent/15 shadow-lg" : i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
-                        {/* The grip is the drag surface, and it is finger-sized: -m-2 p-2 gives it a
-                            40px target without changing the row's layout. */}
+                        {/* A 15px icon is a 15px target. The grip fills the row's height and is wide
+                            enough to hit without looking, which is how it actually gets used --
+                            negative margins keep the row's own spacing unchanged. */}
                         <span
                           role="button" tabIndex={-1} aria-label={`Reorder ${item.label}`}
-                          className="-m-2 shrink-0 cursor-grab touch-none p-2 text-muted active:cursor-grabbing"
+                          className="-my-2.5 -ml-3 flex shrink-0 cursor-grab touch-none items-center self-stretch px-3 py-3 text-muted hover:text-foreground active:cursor-grabbing"
                           onPointerDown={cueDrag.start(i)} onPointerMove={cueDrag.move}
                           onPointerUp={cueDrag.end} onPointerCancel={cueDrag.end}
                         >

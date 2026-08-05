@@ -14,11 +14,12 @@ export default function Nav() {
     <nav className="sticky top-0 z-30 border-b border-white/10 bg-background/60 backdrop-blur-2xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-xl bg-accent text-accent-foreground shadow-md shadow-accent/30"><Music size={17} /></div>
-          <span className="text-lg font-black tracking-tight">CueFloww</span>
+          <div className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accent-foreground"><Music size={17} /></div>
+          <span className="font-display text-xl font-bold tracking-tight">CueFloww</span>
         </Link>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
           <Button href="/" size="sm" {...link("/")}>Home</Button>
+          <Button href="/workspace" size="sm" {...link("/workspace")}>Workspace</Button>
           <Button href="/studio" size="sm" {...link("/studio")}>Studio</Button>
           <Button href="/features" size="sm" {...link("/features")} className="hidden md:inline-flex">Features</Button>
           <Button href="/tutorial" size="sm" {...link("/tutorial")} className="hidden sm:inline-flex">Tutorial</Button>
