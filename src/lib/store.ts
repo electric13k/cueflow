@@ -7,7 +7,38 @@ export const supabase = url && key ? createClient(url, key) : null;
 export async function signUp(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}${import.meta.env.BASE_URL}studio` } }); if (error) throw error; }
 // NOTE: emailRedirectTo only works if the URL is allow-listed in Supabase → Authentication → URL
 // Configuration. Otherwise Supabase falls back to Site URL, which defaults to http://localhost:3000.
-export async function signIn(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error; }
+/**
+ * Email or username, whichever they typed. A username cannot be resolved to an address in the
+ * browser without publishing a username-to-email directory to anyone holding the anon key, so that
+ * half runs in an edge function and the address never comes back here.
+ */
+export async function signIn(who: string, password: string) {
+  if (!supabase) throw new Error("Cloud not configured");
+  const id = who.trim();
+  if (id.includes("@")) {
+    const { error } = await supabase.auth.signInWithPassword({ email: id, password });
+    if (error) throw error;
+    return;
+  }
+  const res = await fetch(`${url}/functions/v1/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key },
+    body: JSON.stringify({ username: id, password }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.session) throw new Error(body.error ?? "That username and password did not match an account.");
+  const { error } = await supabase.auth.setSession(body.session);
+  if (error) throw error;
+}
+
+/** Google, if it is switched on for this project. Nothing here holds a secret; Supabase does. */
+export async function signInWith(provider: "google" | "github") {
+  if (!supabase) throw new Error("Cloud not configured");
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider, options: { redirectTo: `${location.origin}${import.meta.env.BASE_URL}workspace` },
+  });
+  if (error) throw error;
+}
 export async function signOut() { await supabase?.auth.signOut(); }
 export function onAuth(cb: (email: string | null) => void) { if (!supabase) { cb(null); return () => {}; } supabase.auth.getUser().then(({ data }) => cb(data.user?.email ?? null)); const { data } = supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.email ?? null)); return () => data.subscription.unsubscribe(); }
 export const local = { get<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(`cueflow:${key}`) || "") as T; } catch { return fallback; } }, set(key: string, value: unknown) { localStorage.setItem(`cueflow:${key}`, JSON.stringify(value)); } };

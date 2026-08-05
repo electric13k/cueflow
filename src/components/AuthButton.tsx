@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "../ui";
 import { LogIn, LogOut, User } from "lucide-react";
-import { onAuth, signIn, signOut, signUp } from "../lib/store";
+import { onAuth, signIn, signInWith, signOut, signUp } from "../lib/store";
 import { toast } from "../lib/toast";
 
 // Sign-in lives in the nav so the whole app shares one session. On sign-in, Studio's listener hydrates cloud data.
@@ -48,7 +48,15 @@ export default function AuthButton() {
           <ModalHeader className="flex items-center gap-2"><User size={18} className="text-accent" />{mode === "in" ? "Sign in" : "Create account"}</ModalHeader>
           <ModalBody>
             <p className="text-sm text-muted">Saves your sounds and sequences to your account so they follow you across devices.</p>
-            <Input type="email" label="Email" autoComplete="email" value={form.email} onValueChange={v => setForm(f => ({ ...f, email: v }))} />
+            <Button variant="bordered" onPress={() => void signInWith("google").catch(e => setNote((e as Error).message))}>
+              Continue with Google
+            </Button>
+            <p className="text-center font-mono text-[10px] uppercase tracking-[.3em] text-muted">or</p>
+            <Input
+              type={mode === "up" ? "email" : "text"}
+              label={mode === "up" ? "Email" : "Email or username"}
+              autoComplete={mode === "up" ? "email" : "username"}
+              value={form.email} onValueChange={v => setForm(f => ({ ...f, email: v }))} />
             <Input type="password" label="Password" autoComplete={mode === "in" ? "current-password" : "new-password"} value={form.password} onValueChange={v => setForm(f => ({ ...f, password: v }))} onKeyDown={e => e.key === "Enter" && submit()} />
             {note && <p className="text-xs text-warning">{note}</p>}
             <button className="self-start text-xs text-accent" onClick={() => { setMode(m => m === "in" ? "up" : "in"); setNote(""); }}>
