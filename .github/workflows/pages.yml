@@ -3,10 +3,11 @@ name: GitHub Pages
 # GitHub Pages serves the app from /<repo>/ and cannot run the /api functions, so this build sets
 # BASE_PATH for every link and VITE_STATIC_HOST so the app knows to skip the import proxy and the
 # contact form rather than calling endpoints that are not there.
-# Manual only: Pages refuses to enable on a private repo on the free plan, so an automatic run would
-# fail on every push. Make the repo public (or upgrade), enable Pages with build_type=workflow, then
-# put the push trigger back.
+# The repo is public and Pages is enabled, so every push to master publishes. Manual runs stay
+# available for re-deploying without a commit.
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
