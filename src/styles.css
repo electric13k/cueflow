@@ -7,10 +7,17 @@
 @source "./**/*.{ts,tsx}";
 
 @theme {
-  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", Inter, sans-serif;
-  --shadow-glass: 0 8px 32px -8px rgba(2, 6, 23, .6), inset 0 1px 0 rgba(255, 255, 255, .06);
+  /* Serif throughout. A prompt book is paper and a playbill is a Didone; neither has ever been set
+     in a grotesk. Courier is not a stylistic choice either -- it is the font scripts are typed in. */
+  --font-sans: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-display: "Bodoni Moda", "Source Serif 4", Georgia, serif;
+  --font-mono: "Courier Prime", ui-monospace, "Courier New", monospace;
+  --shadow-glass: 0 10px 34px -14px rgba(36, 31, 28, .5), inset 0 1px 0 rgba(255, 255, 255, .05);
   --color-secondary: var(--cue-visual);
+  /* The house palette, named for where each colour comes from. */
+  --color-curtain: var(--cue-curtain);   /* house tabs, the brand */
+  --color-foolscap: var(--cue-foolscap); /* script paper */
+  --color-brass: var(--cue-armed);       /* the rail, the footlights */
   /* One hue per idea, so colour carries meaning instead of decoration. Each resolves to a token
      that both themes set, because a shade that reads on black is invisible on white. */
   --color-audio: var(--cue-audio);     /* anything you hear */
@@ -29,58 +36,70 @@
    every component at once. Same layer + selector as HeroUI's own dark theme, declared after
    it, so these win. */
 @layer theme {
-  /* Light mode needs a deeper cyan: #22d3ee on white fails contrast for text and icons. */
+  /* Light mode is foolscap: the script on the desk before the house goes in. */
   :root:not(.dark) {
-    --accent: #0e7490;
-    --accent-foreground: #ecfeff;
-    --accent-hover: #0891b2;
-    --focus: #0e7490;
-    --cue-audio: #0e7490;
-    --cue-visual: #6d28d9;
-    --cue-armed: #b45309;
-    --cue-live: #be123c;
-    --cue-ready: #047857;
+    --accent: #6E2029;
+    --accent-foreground: #F7F2E7;
+    --accent-hover: #8A2B35;
+    --focus: #6E2029;
+    --background: #EFE7D8;
+    --foreground: #241F1C;
+    --cue-curtain: #6E2029;
+    --cue-foolscap: #EFE7D8;
+    --cue-audio: #4E5B39;   /* olive: the crew's colour, gaffer and flight case */
+    --cue-visual: #9C5A34;  /* rust: lamp on skin */
+    --cue-armed: #8A6A2A;   /* brass */
+    --cue-live: #A32330;    /* crimson */
+    --cue-ready: #4E5B39;
   }
   .dark,
   [data-theme="dark"] {
-    --accent: #22d3ee;
-    --accent-foreground: #04121a;
-    --accent-hover: #67e8f9;
-    /* Was a saturated navy. Near-neutral reads as depth rather than as another blue competing with
-       the cyan, which is the colour that has to mean something. */
-    --background: #0a0a0f;
-    --focus: #22d3ee;
-    --cue-audio: #22d3ee;
-    --cue-visual: #c4b5fd;
-    --cue-armed: #fbbf24;
-    --cue-live: #fb7185;
-    --cue-ready: #34d399;
+    --accent: #C9737C;
+    --accent-foreground: #241110;
+    --accent-hover: #DE9097;
+    /* Warm near-black. A theatre at half is brown-black, never blue-black -- and the blue was the
+       single thing that made this look like a synth plugin instead of a prompt desk. */
+    --background: #1A1614;
+    --foreground: #EFE7D8;
+    --focus: #C9737C;
+    --cue-curtain: #8A2B35;
+    --cue-foolscap: #EFE7D8;
+    --cue-audio: #A3B37A;
+    --cue-visual: #D98A5A;
+    --cue-armed: #D4A957;
+    --cue-live: #E05566;
+    --cue-ready: #A3B37A;
   }
 }
 
 @layer base {
   /* Glass is tinted with light on a dark page and with ink on a light one, so both themes drive the
      same utilities off these two tokens. */
+  /* Surfaces are paper on the light page and worn card on the dark one -- warm either way, and
+     tinted with the ink of the page rather than with blue light. */
   :root {
-    --glass-tint: 15, 23, 42;
-    --glass-face: rgba(255, 255, 255, .72);
-    --glass-face-hover: rgba(255, 255, 255, .92);
+    --glass-tint: 36, 31, 28;
+    --glass-face: rgba(255, 252, 245, .78);
+    --glass-face-hover: rgba(255, 252, 245, .94);
   }
   .dark {
-    --glass-tint: 255, 255, 255;
-    --glass-face: rgba(255, 255, 255, .045);
-    --glass-face-hover: rgba(255, 255, 255, .07);
+    --glass-tint: 239, 231, 216;
+    --glass-face: rgba(239, 231, 216, .045);
+    --glass-face-hover: rgba(239, 231, 216, .075);
   }
   body {
     @apply m-0 min-h-screen bg-background text-foreground font-sans antialiased;
-    /* Three washes at half the old strength: the page should read as warm dark, not as blue. */
+    /* Two washes, curtain and olive, and a paper grain over the top. No glow: a house at half is
+       lit from the sides, and nothing in a theatre emits its own light except the lanterns. */
     background-image:
-      radial-gradient(55rem 36rem at 82% -12%, rgba(34, 211, 238, .07), transparent 62%),
-      radial-gradient(45rem 34rem at 6% 108%, rgba(167, 139, 250, .06), transparent 62%),
-      radial-gradient(38rem 30rem at 50% 45%, rgba(251, 191, 36, .035), transparent 65%);
+      radial-gradient(60rem 40rem at 88% -14%, color-mix(in srgb, var(--cue-curtain) 26%, transparent), transparent 64%),
+      radial-gradient(48rem 36rem at 2% 110%, color-mix(in srgb, var(--cue-audio) 14%, transparent), transparent 64%);
     background-attachment: fixed;
   }
-  h1, h2, h3 { @apply font-display; }
+  h1, h2, h3 { @apply font-display; letter-spacing: -.015em; }
+  /* Bodoni's thin strokes shatter at small sizes, so the display face is for headings only and
+     everything under ~20px falls back to the body serif. */
+  h4, h5, h6 { @apply font-sans font-bold; }
 
   /* Anything you can act on says so under the cursor, and lifts a little when you get there. */
   button:not(:disabled), a[href], label[for], [role="button"], summary { cursor: pointer; }
@@ -169,15 +188,33 @@
   }
 
   /* Liquid glass: translucent, blurred, inner top highlight + soft outer shadow. */
+  /* Card, not glass. A 24px radius and a heavy blur is the house style of every SaaS dashboard;
+     paper has a corner you could cut yourself on and an edge you can see. */
   .glass {
-    @apply rounded-3xl border shadow-glass backdrop-blur-2xl;
+    @apply rounded-lg border shadow-glass backdrop-blur-md;
     background: var(--glass-face);
-    border-color: rgba(var(--glass-tint), .12);
+    border-color: rgba(var(--glass-tint), .16);
+  }
+  /**
+   * The prompt book's margin: a hairline down the left with the cue number pencilled beside it.
+   * This is the one device the whole interface is built around, and it is not decoration -- the
+   * number in the margin is the number the deputy calls over comms.
+   */
+  .margin-rule {
+    border-left: 1px solid rgba(var(--glass-tint), .18);
+    padding-left: 1.15rem;
+    position: relative;
+  }
+  .margin-rule > .cue-mark {
+    position: absolute; left: 0; transform: translateX(-50%);
+    @apply font-mono text-xs;
+    background: var(--background);
+    padding: 0 .3rem;
   }
   .glass-hover { @apply transition-colors hover:border-accent/40; }
   .glass-hover:hover { background: var(--glass-face-hover); }
   .glass-soft {
-    @apply rounded-2xl border backdrop-blur-xl;
+    @apply rounded-md border backdrop-blur-sm;
     background: rgba(var(--glass-tint), .035);
     border-color: rgba(var(--glass-tint), .12);
   }

@@ -1,88 +1,101 @@
-import { motion } from "framer-motion";
-import { ArrowRight, ListMusic, Monitor, Music, Presentation, Sparkles } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 import Page from "../components/Page";
-import { Button, Card, CardBody } from "../ui";
+import { Button } from "../ui";
 
-const highlights = [
-  { icon: Presentation, title: "Sound, slides and video", body: "One library for audio, images, video and embedded decks, with an editor for each. Nothing leaves your browser to be processed." },
-  { icon: ListMusic, title: "One deck, two runs of numbers", body: "Sound counts 1, 2, 3. Anything the room sees counts a, b, c. “Play 3” and “put up b” can never be confused over comms." },
-  { icon: Monitor, title: "A presenter window that shows up", body: "Black when the cue is sound alone, the slide or video itself the moment a visual cue fires." },
+/**
+ * The homepage is a playbill, not a manual. It says what this is and what it feels like to run one;
+ * the tutorial is where you learn to work it.
+ */
+
+/** The cue light in the prompt corner: red is standby, green is go. It is the whole language. */
+function CueLight() {
+  const still = useReducedMotion();
+  const lamp = (on: boolean, colour: string, delay: number) => ({
+    animate: still ? { opacity: on ? 1 : .18 } : { opacity: on ? [.18, 1, 1, .18] : [1, .18, .18, 1] },
+    transition: still ? {} : { duration: 6, times: [0, .18, .62, .8], repeat: Infinity, delay, ease: "easeInOut" as const },
+    style: { background: colour, boxShadow: `0 0 34px -4px ${colour}` },
+  });
+  return (
+    <div aria-hidden className="flex flex-col gap-3 rounded-md border border-brass/30 bg-black/25 p-3">
+      <motion.span className="block h-9 w-9 rounded-full" {...lamp(false, "var(--cue-live)", 0)} />
+      <motion.span className="block h-9 w-9 rounded-full" {...lamp(true, "var(--cue-ready)", 0)} />
+    </div>
+  );
+}
+
+const rise = (d = 0) => ({
+  initial: { opacity: 0, y: 28 }, whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-90px" }, transition: { duration: .7, delay: d, ease: [.16, 1, .3, 1] as const },
+});
+
+/** Three beats, and they are a real sequence — this is the order you do it in. */
+const beats = [
+  { n: "1", head: "Load the book", line: "Sound, slides, video. One library." },
+  { n: "2", head: "Set the running order", line: "Drag it into the order you will call it." },
+  { n: "3", head: "Stand by, and go", line: "One key. One cue. Nothing before you say so." },
 ];
-
-/** The mental model, in the order you meet it. Three steps, because that is all there is to it. */
-const steps = [
-  { n: "1", title: "Put everything in the library", body: "Upload it, paste a link, or search the open archives. Trim the sound, crop the picture, type a slide — all of it here, none of it uploaded to be processed." },
-  { n: "2", title: "Line the cues up in order", body: "Drag them into the running order for your show. Link a slide to the sound underneath it and one keypress fires both." },
-  { n: "3", title: "Arm it, then drive it", body: "The screen turns amber to say it is loaded, and stays that way until you press an arrow. Every cue goes out because you sent it, not because a timer said so." },
-];
-
-const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-80px" }, transition: { duration: .5, delay: d } });
 
 export default function Home() {
   return (
     <Page>
-      <section className="grid place-items-center py-16 text-center sm:py-24">
-        <motion.div initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .5 }} className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[.28em] text-accent">
-          <Sparkles size={13} /> Live cue system
-        </motion.div>
-        <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .05 }} className="mt-6 max-w-4xl text-5xl font-black leading-[1.03] tracking-tight sm:text-7xl">
-          Nothing happens until <span className="bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">you press the key</span>.
-        </motion.h1>
-        <motion.p initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .12 }} className="mt-6 max-w-2xl text-lg text-muted">
-          CueFloww is a cue board you run from a laptop. Your sound, slides and video go into one numbered list; each keypress fires the next thing on it, onto a second screen the audience sees. No desk, no install, and nothing plays on its own.
-        </motion.p>
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .19 }} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>
-          <Button href="/tutorial" size="lg" variant="bordered">See how it works</Button>
+      <section className="grid items-center gap-10 py-14 sm:py-20 lg:grid-cols-[1fr_auto]">
+        <div>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .8 }}
+            className="font-mono text-[11px] uppercase tracking-[.42em] text-brass">
+            The prompt corner, in a browser
+          </motion.p>
+          <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .8, delay: .08, ease: [.16, 1, .3, 1] }}
+            className="mt-5 text-6xl font-bold leading-[.92] sm:text-8xl">
+            Stand by.
+            <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .6, delay: .9 }}
+              className="block italic text-accent">Go.</motion.span>
+          </motion.h1>
+          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7, delay: .22 }}
+            className="mt-7 max-w-lg text-lg leading-relaxed text-muted">
+            Every sound and every slide in your show, in one numbered list, fired by one key.
+            The room hears it when you call it — never a second sooner.
+          </motion.p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7, delay: .3 }}
+            className="mt-10 flex flex-wrap items-center gap-3">
+            <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-semibold">Open the Studio</Button>
+            <Button href="/show" size="lg" variant="bordered">Join a show</Button>
+          </motion.div>
+        </div>
+        <motion.div initial={{ opacity: 0, scale: .8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .9, delay: .45 }}
+          className="hidden lg:block">
+          <CueLight />
         </motion.div>
       </section>
 
-      <section className="py-10">
-        <motion.h2 {...fade()} className="text-center text-3xl font-black tracking-tight sm:text-4xl">What it actually is</motion.h2>
-        <motion.p {...fade(.05)} className="mx-auto mt-4 max-w-2xl text-center text-muted">
-          A theatre desk decides <em>what</em> goes out and <em>when</em>. CueFloww takes the first half and gives the
-          second half back to you — it holds the running order, and you call it.
-        </motion.p>
-        <div className="mt-12 grid gap-4 sm:grid-cols-3">
-          {steps.map((s, i) => (
-            <motion.div key={s.n} {...fade(i * .06)} className="glass-soft p-6">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 font-mono text-sm font-black text-accent">{s.n}</span>
-              <h3 className="mt-4 text-lg font-bold">{s.title}</h3>
-              <p className="mt-2 text-sm text-muted">{s.body}</p>
+      {/* The prompt book: a hairline margin with the number pencilled beside it, which is where a
+          cue number lives on paper and where it lives everywhere else in this app. */}
+      <section className="border-y border-white/10 py-16">
+        <div className="space-y-12">
+          {beats.map((b, i) => (
+            <motion.div key={b.n} {...rise(i * .08)} className="margin-rule max-w-2xl">
+              <span className="cue-mark text-brass">{b.n}</span>
+              <h2 className="text-3xl font-bold sm:text-4xl">{b.head}</h2>
+              <p className="mt-2 text-lg text-muted">{b.line}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      <section id="features" className="scroll-mt-20 py-10">
-        <motion.h2 {...fade()} className="text-center text-3xl font-black tracking-tight sm:text-4xl">Everything a cue board needs</motion.h2>
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {highlights.map((f, i) => (
-            <motion.div key={f.title} {...fade(i * .05)}>
-              <Card className="glass glass-hover h-full bg-transparent"><CardBody className="gap-3 p-6">
-                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-accent/15 text-accent"><f.icon size={22} /></div>
-                <h3 className="text-lg font-bold">{f.title}</h3>
-                <p className="text-sm text-muted">{f.body}</p>
-              </CardBody></Card>
-            </motion.div>
-          ))}
-        </div>
-        <motion.div {...fade(.2)} className="mt-8 text-center">
-          <Button href="/features" variant="bordered" endContent={<ArrowRight size={16} />}>See the full feature list</Button>
-        </motion.div>
+      <section className="py-20">
+        <motion.blockquote {...rise()} className="mx-auto max-w-3xl text-center">
+          <p className="text-3xl font-bold italic leading-snug sm:text-5xl">
+            A desk decides what goes out and when.
+            <span className="text-accent"> You should decide the when.</span>
+          </p>
+        </motion.blockquote>
       </section>
 
-      <section className="py-16">
-        <motion.div {...fade()}>
-          <Card className="glass overflow-hidden border-accent/20 bg-gradient-to-br from-accent/15 to-secondary/10">
-            <CardBody className="grid items-center gap-6 p-8 sm:grid-cols-[1fr_auto] sm:p-12">
-              <div>
-                <h2 className="text-3xl font-black tracking-tight">Ready to build your first show?</h2>
-                <p className="mt-3 max-w-xl text-muted">Upload a few sounds, add a slide, drop them into a sequence, and drive it with your arrow keys. Sign in and it all saves to your account.</p>
-              </div>
-              <Button href="/studio" color="primary" size="lg" endContent={<Music size={18} />} className="font-bold shadow-lg shadow-accent/30">Launch Studio</Button>
-            </CardBody>
-          </Card>
+      <section className="pb-24">
+        <motion.div {...rise()} className="glass px-8 py-14 text-center sm:px-12">
+          <h2 className="text-4xl font-bold sm:text-5xl">Curtain up.</h2>
+          <p className="mx-auto mt-4 max-w-md text-muted">Free, in the browser, nothing to install.</p>
+          <Button className="mt-8 font-semibold" href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />}>Open the Studio</Button>
         </motion.div>
       </section>
     </Page>
