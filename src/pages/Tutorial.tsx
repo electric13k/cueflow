@@ -1,107 +1,101 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Keyboard, ListMusic, Monitor, Presentation, SlidersHorizontal, Upload, UserPlus } from "lucide-react";
+import { ArrowRight, RotateCcw } from "lucide-react";
 import Page from "../components/Page";
 import ScreenCard, { type Screen } from "../components/ScreenCard";
 import { Button } from "../ui";
+import { forgetLessons } from "../lib/coach";
+import { toast } from "../lib/toast";
 
-const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-80px" }, transition: { duration: .5, delay: d } });
+/**
+ * The long version used to live here: seven numbered paragraphs read before you had touched
+ * anything. The Studio teaches itself now, one control at a time, as you open it -- so this page is
+ * the shape of the thing and the keys, and nothing else.
+ */
+const rise = (d = 0) => ({
+  initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-70px" }, transition: { duration: .55, delay: d, ease: [.16, 1, .3, 1] as const },
+});
 
 const screens: Screen[] = [
   {
     shot: `${import.meta.env.BASE_URL}shots/soundboard.png`, title: "Library",
     alt: "The CueFloww library: a grid of media cards above the transport bar",
-    body: "Click a card and it fires. That's the whole interaction.",
-    points: ["Sound, images, video and decks together", "Search your library or the free archives", "Multi-select with the checkmarks", "Nothing plays until you say so"],
+    body: "Click a card and it fires. That is the whole interaction.",
+    points: ["Sound, pictures, video and decks together", "Search your own or the open archives", "Nothing plays until you say so"],
   },
   {
     shot: `${import.meta.env.BASE_URL}shots/editor.png`, title: "Editors",
     alt: "The CueFloww waveform editor showing a rendered waveform and channel controls",
-    body: "Drag across the waveform to pick a region, then reshape it. Images and video get their own panel.",
-    points: ["Shift-drag to grab one channel", "Cut, copy, paste, merge, silence", "Framing, colour and captions for slides", "Trim video without re-encoding"],
+    body: "Drag across the waveform to pick a region, then reshape it.",
+    points: ["Shift-drag grabs one channel", "Cut, level, tone, mono to stereo", "Pictures and video get their own panel"],
   },
   {
-    shot: `${import.meta.env.BASE_URL}shots/sequences.png`, title: "Cue sequences",
+    shot: `${import.meta.env.BASE_URL}shots/sequences.png`, title: "The deck",
     alt: "The CueFloww sequences tab showing a cue deck",
-    body: "A deck of cues you step through like slides.",
-    points: ["Mix sound, slides and video in one deck", "Arrow keys move one cue at a time", "A and D move slides only", "Every key is rebindable"],
+    body: "A list you step through, one key at a time.",
+    points: ["Sound and screens in one order", "Link a slide to the sound under it", "Arm it and the frame turns amber"],
   },
   {
-    shot: `${import.meta.env.BASE_URL}shots/phone.png`, title: "On your phone", fit: "contain",
+    shot: `${import.meta.env.BASE_URL}shots/phone.png`, title: "On a phone", fit: "contain",
     alt: "CueFloww running on a phone",
     body: "The same board, sized for one thumb.",
-    points: ["No install, no app store", "Sign in and it follows you", "Runs from the back of the room"],
+    points: ["No install, no app store", "Runs from the back of the room"],
   },
 ];
 
-const steps = [
-  {
-    icon: Upload, title: "Get media in",
-    body: "Hit Upload in the Library tab to add audio, images or video from your computer; names are cleaned up automatically, so airhorn-2_final.mp3 lands as “Airhorn 2 Final”. The search bar has a source picker: filter your own library, search the Internet Archive or Wikimedia Commons for freely licensed recordings, hand off to Myinstants, or paste a direct link. Every card also has a download button.",
-  },
-  {
-    icon: Presentation, title: "Add slides",
-    body: "New slide makes a blank 16:9 card you can put a title on, and that caption stays editable afterwards. Exported slide images drop straight in (PowerPoint: File, Export, PNG; Google Slides: File, Download, PNG). To keep a live deck instead, paste its Google Slides or PowerPoint Online link and CueFloww embeds it.",
-  },
-  {
-    icon: SlidersHorizontal, title: "Shape it",
-    body: "Pick a sound and open Editor to drag across the waveform: cut, copy, paste, merge, silence, mix to mono, balance the channels, then play the edit, the selection or the original before saving. Pick an image or video instead and the same tab becomes a media panel: transition, framing, zoom, rotation, mirroring, brightness, contrast, saturation, blur, caption, and for video the trim, speed, mute and loop. None of it touches the original file.",
-  },
-  {
-    icon: ListMusic, title: "Build a cue deck",
-    body: "In Sequences, make a sequence and add cues to it. Sound and visuals live in the same deck, so audio 1, slide 1, audio 2, slide 2 is one list you drag into order. Each visual cue picks its own transition. Nothing ever autoplays: you step through cues yourself.",
-  },
-  {
-    icon: Monitor, title: "Run the show",
-    body: "Audience display opens a presenter window, drag it onto the projector or mirrored screen. It stays black while the cue is sound alone, and shows the slide or video the moment a visual cue fires, with the transition you chose. Arm a sequence straight into audience mode from the Sequences tab; arming loads the deck without firing anything, so cue 1 waits for your first arrow press.",
-  },
-  {
-    icon: Keyboard, title: "Drive it from the keyboard",
-    body: "Arrow keys step every cue, one press per cue. A and D step the visual cues only, so the deck moves without cutting the sound underneath, and W and S zoom the stage. Keys work from whichever window has focus, including the presenter one. Open Keybinds to rebind any of it, or to put reverb, volume and speed on keys of your own.",
-  },
-  {
-    icon: UserPlus, title: "Keep your work",
-    body: "Your library lives in this browser. Sign in from the top bar and your media and sequences save to your account instead, so they follow you to any device.",
-  },
+/** The keys, which are the one thing worth memorising before you start. */
+const keys = [
+  { k: "→ ←", does: "Next cue, previous cue" },
+  { k: "D A", does: "Next slide only — the sound underneath keeps running" },
+  { k: "W S", does: "Zoom the stage" },
+  { k: "Space", does: "Play or pause" },
 ];
 
 export default function Tutorial() {
   return (
     <Page>
-      <motion.p {...fade()} className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Tutorial</motion.p>
-      <motion.h1 {...fade(.05)} className="mt-2 max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">Running a show, start to finish.</motion.h1>
-      <motion.p {...fade(.1)} className="mt-4 max-w-2xl text-lg text-muted">
-        Seven steps from an empty library to a deck of sound and slides you can drive with your arrow keys. The same guide opens on your first visit to the Studio, the Setup guide button brings it back any time.
+      <motion.p {...rise()} className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Tutorial</motion.p>
+      <motion.h1 {...rise(.05)} className="mt-3 max-w-3xl text-5xl font-bold leading-[1.02] sm:text-6xl">
+        Library, deck, <span className="italic text-accent">go.</span>
+      </motion.h1>
+      <motion.p {...rise(.1)} className="mt-5 max-w-xl text-lg text-muted">
+        Put everything in the library. Drag it into the order you will call it. Arm it, and drive.
+        The Studio explains each part as you open it, so there is nothing to memorise here except the keys.
       </motion.p>
 
-      <section className="py-12">
-        <h2 className="text-2xl font-black tracking-tight">The four screens</h2>
-        <p className="mt-2 text-sm text-muted">Tap a card to flip it over.</p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      <section className="mt-14">
+        <motion.h2 {...rise()} className="font-mono text-xs uppercase tracking-[.3em] text-muted">The four screens</motion.h2>
+        <p className="mt-2 text-sm text-muted">Tap a card to turn it over.</p>
+        <div className="mt-7 grid gap-4 sm:grid-cols-2">
           {screens.map((s, i) => <ScreenCard key={s.title} {...s} delay={i * .05} />)}
         </div>
       </section>
 
-      <section className="py-4">
-        <h2 className="text-2xl font-black tracking-tight">Step by step</h2>
-        <ol className="mt-8 space-y-4">
-          {steps.map((s, i) => (
-            <motion.li key={s.title} {...fade(i * .04)} className="glass flex gap-4 p-6">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent/15 text-accent"><s.icon size={22} /></div>
-              <div>
-                <h3 className="text-lg font-bold"><span className="text-accent">{i + 1}.</span> {s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{s.body}</p>
-              </div>
+      <section className="mt-16">
+        <motion.h2 {...rise()} className="font-mono text-xs uppercase tracking-[.3em] text-muted">The keys</motion.h2>
+        <ul className="mt-5 divide-y divide-white/10 border-y border-white/10">
+          {keys.map((k, i) => (
+            <motion.li key={k.k} {...rise(i * .05)} className="flex items-baseline gap-5 py-4">
+              <kbd className="w-24 shrink-0 font-mono text-lg font-bold text-accent">{k.k}</kbd>
+              <span className="text-muted">{k.does}</span>
             </motion.li>
           ))}
-        </ol>
+        </ul>
+        <p className="mt-4 text-sm text-muted">All of them rebindable in <a className="text-accent underline-offset-4 hover:underline" href="/settings">Settings</a>.</p>
       </section>
 
-      <motion.div {...fade()} className="glass mt-8 flex flex-wrap items-center justify-between gap-4 border-accent/20 bg-gradient-to-br from-accent/15 to-secondary/10 p-8">
+      <motion.div {...rise()} className="glass mt-16 flex flex-wrap items-center justify-between gap-5 p-8">
         <div>
-          <h2 className="text-2xl font-black tracking-tight">That's the whole tool.</h2>
-          <p className="mt-2 text-muted">Open the Studio and add your first cue.</p>
+          <h2 className="text-3xl font-bold">Open it and add one sound.</h2>
+          <p className="mt-2 text-muted">That is genuinely the first step.</p>
         </div>
-        <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="bordered" startContent={<RotateCcw size={16} />}
+            onPress={() => { forgetLessons(); toast("Tips reset", "The Studio will explain each part again as you open it.", "success"); }}>
+            Show the tips again
+          </Button>
+          <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-semibold">Open the Studio</Button>
+        </div>
       </motion.div>
     </Page>
   );

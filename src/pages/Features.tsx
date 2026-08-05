@@ -1,70 +1,75 @@
-import { motion } from "framer-motion";
-import { ArrowRight, Cloud, Film, Image, Keyboard, ListMusic, Monitor, Presentation, Search, SlidersHorizontal, Zap } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, Cloud, Film, Image, Keyboard, ListMusic, Monitor, Presentation, Radio, Search, SlidersHorizontal, Zap } from "lucide-react";
 import Page from "../components/Page";
-import { Button, Card, CardBody } from "../ui";
+import { Button } from "../ui";
 
-const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-80px" }, transition: { duration: .5, delay: d } });
+/**
+ * A feature list is a list, so it reads like one: a name and the shortest true sentence. The old
+ * page spent forty words on each entry explaining things nobody had asked about yet.
+ */
+const rise = (d = 0) => ({
+  initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-70px" }, transition: { duration: .55, delay: d, ease: [.16, 1, .3, 1] as const },
+});
 
 const groups = [
   {
-    title: "Get media in",
+    title: "Get it in",
     items: [
-      { icon: Cloud, title: "Upload anything", body: "Audio, images and video from your device, stored in the cloud and saved to your account. Imports are renamed automatically, so a file called airhorn-2_final.mp3 lands as “Airhorn 2 Final”." },
-      { icon: Search, title: "Search where you like", body: "One search bar with a source picker: filter your own library, or search the Internet Archive and Wikimedia Commons for freely licensed recordings. Myinstants opens in a tab; paste any direct link to import it." },
-      { icon: Presentation, title: "Slides and decks", body: "Make a blank 16:9 slide and type on it, drop in exported slide images, or paste a Google Slides or PowerPoint Online link to embed the deck itself." },
+      { icon: Cloud, title: "Upload anything", body: "Audio, images, video. Names tidy themselves." },
+      { icon: Search, title: "Search the open archives", body: "Internet Archive, Wikimedia Commons, Openverse." },
+      { icon: Presentation, title: "Slides", body: "Type one, drop one in, or embed a live deck." },
     ],
   },
   {
     title: "Shape it",
     items: [
-      { icon: SlidersHorizontal, title: "Waveform editor", body: "Cut, copy, paste, merge and silence a region, mix to mono, balance left and right, plus speed, reverb, fades, distortion and reverse. Hear the edit before you save it." },
-      { icon: Image, title: "Image and slide editor", body: "Framing, zoom, rotation, mirroring, brightness, contrast, saturation, blur and a caption. Non-destructive, or flatten the look into a new image." },
-      { icon: Film, title: "Video editor", body: "Trim in and out, set the speed, mute it, loop the trimmed section. Nothing is re-encoded, so the cue is ready the moment you set it." },
+      { icon: SlidersHorizontal, title: "Sound", body: "Cut, level, tone, mono to stereo. Hear it before you save." },
+      { icon: Image, title: "Pictures", body: "Crop, grade, warm or cool it. Nothing leaves the browser." },
+      { icon: Film, title: "Video", body: "Trim to the seconds you need. No re-encode." },
     ],
   },
   {
-    title: "Run the show",
+    title: "Call it",
     items: [
-      { icon: ListMusic, title: "Mixed cue decks", body: "One deck holds sound, slides and video together: audio 1, slide 1, audio 2, slide 2. Drag to reorder, pick a transition per cue." },
-      { icon: Monitor, title: "Presenter display", body: "A second window for the projector. Black on audio-only cues, the slide or video itself when a visual cue fires, with the transition you chose." },
-      { icon: Keyboard, title: "Arrows and WASD", body: "Arrow keys step every cue; A and D step slides only, so the deck moves without touching the sound underneath. W and S zoom the stage. Every key is rebindable, and they work from either window." },
-      { icon: Zap, title: "Live effects", body: "Tune reverb, speed, volume and fades on the fly during playback, not just in the editor." },
+      { icon: ListMusic, title: "One deck", body: "Sound counts 1, 2, 3. Screens count a, b, c." },
+      { icon: Monitor, title: "Presenter window", body: "Black until a visual cue fires." },
+      { icon: Keyboard, title: "Your keys", body: "Arrows step cues, A and D step slides. All rebindable." },
+      { icon: Zap, title: "Live", body: "Reverb, speed and level move while it plays." },
+      { icon: Radio, title: "The whole room", body: "Hand out a key; the crew join on their phones. Silent." },
     ],
   },
 ];
 
 export default function Features() {
+  const still = useReducedMotion();
   return (
     <Page>
-      <motion.p {...fade()} className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Features</motion.p>
-      <motion.h1 {...fade(.05)} className="mt-2 max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">A cue board for sound, slides and video.</motion.h1>
-      <motion.p {...fade(.1)} className="mt-4 max-w-2xl text-lg text-muted">
-        Everything runs in the browser. Nothing autoplays, nothing is installed, and your show is driven from the keyboard.
-      </motion.p>
+      <motion.p {...rise()} className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Features</motion.p>
+      <motion.h1 {...rise(.05)} className="mt-3 max-w-3xl text-5xl font-bold leading-[1.02] sm:text-6xl">
+        Everything a show needs. <span className="italic text-accent">Nothing it doesn't.</span>
+      </motion.h1>
 
       {groups.map((g, gi) => (
-        <section key={g.title} className="py-10">
-          <motion.h2 {...fade()} className="text-2xl font-black tracking-tight">{g.title}</motion.h2>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section key={g.title} className="mt-16">
+          <motion.h2 {...rise()} className="font-mono text-xs uppercase tracking-[.3em] text-muted">{g.title}</motion.h2>
+          <ul className="mt-5 divide-y divide-white/10 border-y border-white/10">
             {g.items.map((f, i) => (
-              <motion.div key={f.title} {...fade(i * .05 + gi * .02)}>
-                <Card className="glass glass-hover h-full bg-transparent"><CardBody className="gap-3 p-6">
-                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-accent/15 text-accent"><f.icon size={22} /></div>
-                  <h3 className="text-lg font-bold">{f.title}</h3>
-                  <p className="text-sm text-muted">{f.body}</p>
-                </CardBody></Card>
-              </motion.div>
+              <motion.li key={f.title} {...rise(i * .05 + gi * .02)}
+                whileHover={still ? undefined : { x: 6 }}
+                className="flex items-baseline gap-4 py-4 transition-colors hover:text-foreground">
+                <f.icon size={18} className="shrink-0 translate-y-0.5 text-accent" aria-hidden />
+                <h3 className="w-48 shrink-0 text-lg font-bold">{f.title}</h3>
+                <p className="text-muted">{f.body}</p>
+              </motion.li>
             ))}
-          </div>
+          </ul>
         </section>
       ))}
 
-      <motion.div {...fade()} className="glass mt-4 flex flex-wrap items-center justify-between gap-4 border-accent/20 bg-gradient-to-br from-accent/15 to-secondary/10 p-8">
-        <div>
-          <h2 className="text-2xl font-black tracking-tight">Build a deck in five minutes.</h2>
-          <p className="mt-2 text-muted">Upload a sound, add a slide, drop both into a sequence.</p>
-        </div>
-        <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-bold shadow-lg shadow-accent/30">Open the Studio</Button>
+      <motion.div {...rise()} className="glass mt-16 flex flex-wrap items-center justify-between gap-5 p-8">
+        <h2 className="text-3xl font-bold">Build a deck in five minutes.</h2>
+        <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-semibold">Open the Studio</Button>
       </motion.div>
     </Page>
   );
