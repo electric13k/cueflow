@@ -127,12 +127,17 @@ export default function Studio() {
   // A failed save used to be indistinguishable from a good one. Report it once per distinct reason,
   // so a broken sync is visible on the device it happens on instead of at the next show.
   useEffect(() => {
-    void persist(tracks, sequences, project).then(state => {
-      setSync(state);
-      const note = state.ok ? "" : state.reason ?? "unknown error";
-      if (note && note !== lastSyncNote.current) toast("Couldn't save to your account", note, "warn");
-      lastSyncNote.current = note;
-    });
+    // Wait for the typing to stop. Dragging a cue fires this on every frame, and a save per frame is
+    // both wasted work and the thing that used to make two of them overlap.
+    const timer = setTimeout(() => {
+      void persist(tracks, sequences, project).then(state => {
+        setSync(state);
+        const note = state.ok ? "" : state.reason ?? "unknown error";
+        if (note && note !== lastSyncNote.current) toast("Couldn't save to your account", note, "warn");
+        lastSyncNote.current = note;
+      });
+    }, 500);
+    return () => clearTimeout(timer);
   }, [tracks, sequences]);
   useEffect(() => { local.set(key("session"), { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
   useEffect(() => { saveBinds(binds); }, [binds]);

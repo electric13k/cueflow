@@ -52,7 +52,28 @@ export async function deleteSequenceEverywhere(id: string) {
  */
 export type SyncState = { cloud: boolean; ok: boolean; reason?: string; skipped?: number };
 
-export async function persist(tracks: Track[], sequences: Sequence[], projectId: string | null = null): Promise<SyncState> {
+/**
+ * Saves run one at a time. Every keystroke used to fire its own, and two overlapping runs would
+ * interleave -- one deleted a sequence's cues while the other was still inserting them, and the
+ * second insert then collided with the first on the primary key. That is the "duplicate key value
+ * violates unique constraint" every action was producing. A save asked for while one is in flight
+ * waits, and a third replaces the second: only the newest state is worth writing.
+ */
+let inFlight: Promise<SyncState> = Promise.resolve({ cloud: false, ok: true });
+let queued: (() => Promise<SyncState>) | null = null;
+export function persist(tracks: Track[], sequences: Sequence[], projectId: string | null = null): Promise<SyncState> {
+  const job = () => write(tracks, sequences, projectId);
+  queued = job;
+  const run = inFlight.then(async () => {
+    if (queued !== job) return { cloud: true, ok: true } as SyncState; // a newer save superseded this one
+    queued = null;
+    return job();
+  });
+  inFlight = run.catch(() => ({ cloud: false, ok: true }));
+  return run;
+}
+
+async function write(tracks: Track[], sequences: Sequence[], projectId: string | null): Promise<SyncState> {
   local.set(projectId ? `tracks:${projectId}` : "tracks", tracks);
   local.set(projectId ? `sequences:${projectId}` : "sequences", sequences);
   if (!supabase) return { cloud: false, ok: true, reason: "Cloud is not configured for this build." };
@@ -77,19 +98,30 @@ export async function persist(tracks: Track[], sequences: Sequence[], projectId:
   // than losing the whole sequence to a foreign-key error.
   const saved = new Set(cloudTracks.map(track => track.id));
   let skipped = 0;
+  // Upsert, then remove what is no longer there. Deleting first left a window in which the rows were
+  // gone, and anything that read or wrote during it saw a sequence with no cues.
+  const seen = new Set<string>();
   for (const sequence of cloudSequences) {
-    const items = sequence.items.filter(item => saved.has(item.trackId));
+    const items = sequence.items.filter(item => {
+      // The same cue id landing in two sequences -- which a bad merge can produce -- is a primary
+      // key collision waiting to happen. Keep the first one and drop the copy.
+      if (!saved.has(item.trackId) || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
     skipped += sequence.items.length - items.length;
-    const { error } = await supabase.from("sequence_items").delete().eq("sequence_id", sequence.id);
-    if (error) return { cloud: true, ok: false, reason: error.message };
-    if (!items.length) continue;
-    const { error: itemError } = await supabase.from("sequence_items").insert(items.map((item, position) => ({
-      id: item.id, sequence_id: sequence.id, track_id: item.trackId, position,
-      label: item.label, effects: item.effects, visual: item.visual ?? null,
-      // Only keep a link whose partner survived the track filter above, or it points at nothing.
-      link: item.link && items.some(other => other.id === item.link) ? item.link : null,
-    })));
-    if (itemError) return { cloud: true, ok: false, reason: itemError.message };
+    if (items.length) {
+      const { error } = await supabase.from("sequence_items").upsert(items.map((item, position) => ({
+        id: item.id, sequence_id: sequence.id, track_id: item.trackId, position,
+        label: item.label, effects: item.effects, visual: item.visual ?? null,
+        // Only keep a link whose partner survived the track filter above, or it points at nothing.
+        link: item.link && items.some(other => other.id === item.link) ? item.link : null,
+      })), { onConflict: "id" });
+      if (error) return { cloud: true, ok: false, reason: error.message };
+    }
+    const stale = supabase.from("sequence_items").delete().eq("sequence_id", sequence.id);
+    const { error: gone } = items.length ? await stale.not("id", "in", `(${items.map(i => i.id).join(",")})`) : await stale;
+    if (gone) return { cloud: true, ok: false, reason: gone.message };
   }
   return { cloud: true, ok: true, skipped };
 }
@@ -100,18 +132,21 @@ export async function persist(tracks: Track[], sequences: Sequence[], projectId:
  */
 export function mergeInto(tracks: Track[], sequences: Sequence[], cloud: { tracks: Track[]; sequences: Sequence[] }) {
   const merged = { tracks: [...tracks], sequences: [...sequences] };
+  // One cue id can only live in one deck. Held across the whole merge, not per sequence: a cue that
+  // moved decks on another device arrives in both copies, and saving both is a key collision.
+  const held = new Set(merged.sequences.flatMap(s => s.items.map(item => item.id)));
   for (const track of cloud.tracks) {
     if (isDeleted(track.id) || merged.tracks.some(t => t.id === track.id)) continue;
     merged.tracks.push(track);
   }
   for (const remote of cloud.sequences) {
     if (isDeleted(remote.id)) continue;
+    const fresh = remote.items.filter(item => !held.has(item.id) && !isDeleted(item.id));
+    fresh.forEach(item => held.add(item.id));
     const at = merged.sequences.findIndex(s => s.id === remote.id);
-    if (at < 0) { merged.sequences.push(remote); continue; }
+    if (at < 0) { merged.sequences.push({ ...remote, items: fresh }); continue; }
     const here = merged.sequences[at];
-    const have = new Set(here.items.map(item => item.id));
-    const extra = remote.items.filter(item => !have.has(item.id) && !isDeleted(item.id));
-    if (extra.length) merged.sequences[at] = { ...here, items: [...here.items, ...extra] };
+    if (fresh.length) merged.sequences[at] = { ...here, items: [...here.items, ...fresh] };
   }
   return merged;
 }

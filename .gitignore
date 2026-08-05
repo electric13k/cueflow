@@ -14,3 +14,6 @@ vite.config.d.ts
 .fastembed_cache/
 
 .netlify
+
+.vercel
+.env*
