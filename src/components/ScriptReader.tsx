@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input, Tooltip } from "../ui";
-import { Bell, FileUp, Minus, Plus, Trash2 } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, FileUp, Minus, Pause, Play, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { send } from "../lib/bus";
-import { emptyDoc, keywordsOf, markKeywords, parseScript, saveScript, type Cue, type ScriptDoc } from "../lib/script";
+import { emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Cue, type ScriptDoc } from "../lib/script";
 
 /** Where on screen the line you are reading sits. Not the very top: you need to see what is coming. */
 const READ_LINE = .38;
+
+/** `00:00:00`, the way a stage manager writes it. */
+const clock = (ms: number) => new Date(Math.max(0, ms)).toISOString().slice(11, 19);
 
 export function AlertFlash({ level }: { level: "warn" | "hit" | null }) {
   if (!level) return null;
@@ -13,9 +16,14 @@ export function AlertFlash({ level }: { level: "warn" | "hit" | null }) {
 }
 
 /**
- * The script, with the paper thrown away. Keywords you name are marked in the text, and as the
- * reading line approaches one the screen flashes -- amber a little before it arrives, red when it
- * does. Never a sound: this is for someone standing in the dark next to an audience.
+ * The script, with the paper thrown away but the shape kept. Keywords you name are marked in the
+ * text, and as the reading line approaches one the screen flashes -- amber a little before it
+ * arrives, red when it does. Never a sound: this is for someone standing in the dark next to an
+ * audience.
+ *
+ * It also runs as a teleprompter: start it and the text creeps upward at a speed you set, with a
+ * clock counting the run. Scroll position still drives the alerts, whether the scrolling is yours
+ * or the timer's, so there is only ever one source of truth for where the reading line is.
  *
  * `onAlert` lets the host window flash too, so the operator sees it on the control screen whether or
  * not the reader is the window they are looking at.
@@ -27,17 +35,28 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
   editable?: boolean;
 }) {
   const [size, setSize] = useState(() => Number(localStorage.getItem("cueflow:scriptSize")) || 18);
+  const [colour, setColour] = useState(() => localStorage.getItem("cueflow:scriptColour") || "");
+  const [speed, setSpeed] = useState(() => Number(localStorage.getItem("cueflow:scriptSpeed")) || 60);
+  const [playing, setPlaying] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [query, setQuery] = useState("");
+  const [at, setAt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState<"warn" | "hit" | null>(null);
   const [message, setMessage] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const fired = useRef<{ warn: Set<string>; hit: Set<string> }>({ warn: new Set(), hit: new Set() });
+  const accrued = useRef(0);
 
   const marked = useMemo(() => markKeywords(doc.html, doc.cues), [doc.html, doc.cues]);
+  const found = useMemo(() => findInScript(marked.html, query), [marked.html, query]);
   useEffect(() => { localStorage.setItem("cueflow:scriptSize", String(size)); }, [size]);
+  useEffect(() => { localStorage.setItem("cueflow:scriptSpeed", String(speed)); }, [speed]);
+  useEffect(() => { localStorage.setItem("cueflow:scriptColour", colour); }, [colour]);
   // A changed script or cue list makes every past alert irrelevant.
   useEffect(() => { fired.current = { warn: new Set(), hit: new Set() }; }, [marked.html]);
+  useEffect(() => { setAt(0); }, [query]);
 
   const raise = (level: "warn" | "hit", cue: Cue) => {
     const text = cue.message || (level === "warn" ? `${keywordsOf(cue)[0] ?? "Cue"} coming up` : `${keywordsOf(cue)[0] ?? "Cue"} now`);
@@ -47,7 +66,8 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
     onAlert?.(level, text, cue.id);
   };
 
-  // Scroll position drives everything: no timers, no playback, nothing to fall out of sync with.
+  // Scroll position drives the alerts: whether the scrolling came from a hand or from the timer
+  // below, there is one place that knows where the reading line is.
   const check = () => {
     const box = scroller.current;
     if (!box) return;
@@ -62,6 +82,63 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
       else if (ahead > 0 && ahead <= doc.lookahead && !fired.current.warn.has(id)) { fired.current.warn.add(id); raise("warn", cue); }
     }
   };
+
+  /**
+   * Auto-scroll. `requestAnimationFrame` on purpose: this one is motion, and motion in a tab
+   * nobody is looking at is motion nobody needs. Distance is taken from the frame's own timestamp,
+   * not counted in frames, so a dropped frame costs no ground. The position is accumulated
+   * separately because a fraction of a pixel per frame would otherwise round away to a standstill.
+   */
+  useEffect(() => {
+    const box = scroller.current;
+    if (!playing || !box) return;
+    let position = box.scrollTop;
+    let last = performance.now();
+    let frame = requestAnimationFrame(function step(now) {
+      // A hand on the scrollbar wins: take its position and carry on from there.
+      if (Math.abs(box.scrollTop - position) > 2) position = box.scrollTop;
+      position += speed * (now - last) / 1000;
+      last = now;
+      box.scrollTop = position;
+      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) return setPlaying(false);
+      frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [playing, speed]);
+
+  /**
+   * The clock. `setInterval` and wall time rather than the scroll loop above: a run has to keep
+   * its own length even while the reader is a popup behind another window, where no frame fires.
+   */
+  useEffect(() => {
+    if (!playing) return;
+    const from = Date.now();
+    const id = setInterval(() => setElapsed(accrued.current + Date.now() - from), 200);
+    return () => { clearInterval(id); accrued.current += Date.now() - from; setElapsed(accrued.current); };
+  }, [playing]);
+
+  const rewind = () => {
+    setPlaying(false);
+    accrued.current = 0;
+    setElapsed(0);
+    if (scroller.current) scroller.current.scrollTop = 0;
+    // Back to the top means back to the top: the cues ahead have not happened yet.
+    fired.current = { warn: new Set(), hit: new Set() };
+  };
+
+  // Stepping through the finds. Also runs when the marked-up HTML changes, because replacing the
+  // markup drops the scroll position and the match the operator was looking at with it.
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box) return;
+    for (const el of box.querySelectorAll(".find-hit.current")) el.classList.remove("current");
+    const hit = box.querySelector<HTMLElement>(`[data-find="${at}"]`);
+    if (!hit) return;
+    hit.classList.add("current");
+    hit.scrollIntoView({ block: "center" });
+  }, [found.html, at]);
+
+  const step = (d: number) => setAt(a => (found.hits ? (a + d + found.hits) % found.hits : 0));
 
   const load = async (file: File) => {
     setBusy(true); setError("");
@@ -94,10 +171,45 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
           <Tooltip content="Smaller text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.max(12, s - 2))}><Minus size={14} /></Button></Tooltip>
           <span className="w-10 text-center text-xs tabular-nums text-muted">{size}px</span>
           <Tooltip content="Bigger text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.min(48, s + 2))}><Plus size={14} /></Button></Tooltip>
+          <label className="inline-flex items-center gap-1 text-xs text-muted">
+            Colour
+            <input type="color" aria-label="Text colour" value={colour || "#d8cfc4"} onChange={e => setColour(e.target.value)}
+              className="h-7 w-8 cursor-pointer rounded-lg border border-border bg-transparent p-0.5" />
+          </label>
+          {colour && <Button size="sm" variant="light" onPress={() => setColour("")}>Theme colour</Button>}
           <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addCue}>Alert word</Button>
           {marked.hits > 0 && <span className="text-xs text-muted">{marked.hits} marked</span>}
         </div>
       )}
+
+      {/* Transport and search. Both stay put whether or not the script can be edited here: reading
+          it is the one thing every role does. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" color="primary" variant={playing ? "solid" : "flat"}
+          startContent={playing ? <Pause size={14} /> : <Play size={14} />} onPress={() => setPlaying(p => !p)}>
+          {playing ? "Stop" : "Start"}
+        </Button>
+        <Tooltip content="Back to the top, clock to zero">
+          <Button size="sm" variant="flat" isIconOnly aria-label="Rewind" onPress={rewind}><RotateCcw size={14} /></Button>
+        </Tooltip>
+        <span className="tabular-nums text-sm font-semibold" aria-label="Elapsed">{clock(elapsed)}</span>
+        <label className="flex items-center gap-2 text-xs text-muted">
+          Speed
+          <input type="range" min={10} max={300} step={5} value={speed} onChange={e => setSpeed(Number(e.target.value))} />
+          <span className="w-16 tabular-nums">{speed} px/s</span>
+        </label>
+
+        <div className="ml-auto flex items-center gap-1">
+          <Search size={14} className="text-muted" />
+          <Input className="w-44" size="sm" placeholder="Find in script" value={query} onValueChange={setQuery}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); } }} />
+          <span className="w-14 text-center text-xs tabular-nums text-muted">
+            {found.hits ? `${at + 1}/${found.hits}` : query.trim() ? "none" : ""}
+          </span>
+          <Button size="sm" variant="light" isIconOnly aria-label="Previous match" onPress={() => step(-1)}><ChevronUp size={14} /></Button>
+          <Button size="sm" variant="light" isIconOnly aria-label="Next match" onPress={() => step(1)}><ChevronDown size={14} /></Button>
+        </div>
+      </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -122,13 +234,14 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
       <div className="relative min-h-0 flex-1">
         {/* The reading line. Faint on purpose: a guide, not furniture. */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 z-10 border-t border-accent/25" style={{ top: `${READ_LINE * 100}%` }} />
-        {/* Safe by construction: every path into `doc.html` goes through `clean`, an allowlist that
-            keeps formatting tags and strips every attribute, and it runs again on load. The only
-            thing markKeywords adds is <mark>. */}
+        {/* Safe by construction: every path into `doc.html` goes through `clean`, an allowlist of
+            tags and of attributes by name -- six layout properties, four align values, the classes
+            the importer itself emits -- and it runs again on load. The only things added after that
+            are <mark> and <span class="find-hit">, both built here. */}
         <div ref={scroller} onScroll={check}
           className="script-prose h-full overflow-y-auto rounded-2xl border border-border bg-surface/30 px-5 py-4"
-          style={{ fontSize: size }}
-          dangerouslySetInnerHTML={{ __html: marked.html || "<p>Open a Word or PDF script. The text comes across with its formatting; the page it was printed on does not.</p>" }} />
+          style={{ fontSize: size, color: colour || undefined }}
+          dangerouslySetInnerHTML={{ __html: found.html || "<p>Open a Word or PDF script. The text comes across with the shape the writer gave it; the page it was printed on does not.</p>" }} />
       </div>
 
       {message && <p className="text-center text-sm font-semibold text-muted">{message}</p>}
