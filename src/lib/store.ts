@@ -182,7 +182,7 @@ export function mergeInto(tracks: Track[], sequences: Sequence[], cloud: { track
   return merged;
 }
 
-// A project scopes every read: its own library, its own running orders. No project means the
+// A project scopes every read: its own library, its own sequences. No project means the
 // personal one, which is every row that was here before projects existed.
 export async function hydrateCloud(projectId: string | null = null) { if (!supabase) return null; const { data: { user } } = await supabase.auth.getUser(); if (!user) return null;
   // Row-level security already limits this to rows you own or projects you belong to, so the only

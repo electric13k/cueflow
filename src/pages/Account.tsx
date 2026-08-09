@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "../ui";
 import { AtSign, KeyRound, LogOut, UserRound } from "lucide-react";
-import Page from "../components/Page";
+import Shell from "../components/Shell";
 import { toast } from "../lib/toast";
 import { onAuth, signOut } from "../lib/store";
 import { changePassword, getProfile, saveProfile, sendPasswordReset, usernameFree, usernameProblem, type Profile } from "../lib/account";
@@ -48,18 +48,18 @@ export default function Account() {
     finally { setBusy(false); }
   };
 
-  if (!ready) return <Page width="max-w-2xl"><p className="text-muted">Checking your account…</p></Page>;
+  if (!ready) return <Shell width="max-w-2xl"><p className="text-muted">Checking your account…</p></Shell>;
 
   if (!profile) return (
-    <Page width="max-w-2xl">
+    <Shell width="max-w-2xl">
       <h1 className="text-3xl font-black tracking-tight">Your account</h1>
       <p className="mt-3 text-muted">You are not signed in. Open the Studio and sign in there — an account is optional, and CueFloww works without one.</p>
       <Button className="mt-6" href="/studio" color="primary">Open the Studio</Button>
-    </Page>
+    </Shell>
   );
 
   return (
-    <Page width="max-w-2xl">
+    <Shell width="max-w-2xl">
       <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Account</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{profile.username ? `@${profile.username}` : "Your account"}</h1>
       <p className="mt-2 text-sm text-muted">{profile.email}</p>
@@ -94,6 +94,6 @@ export default function Account() {
         <p className="mt-2 text-sm text-muted">Your library stays on this device. Sign back in to pull down anything saved from another one.</p>
         <Button className="mt-4" variant="bordered" startContent={<LogOut size={16} />} onPress={() => void signOut().then(load)}>Sign out</Button>
       </section>
-    </Page>
+    </Shell>
   );
 }

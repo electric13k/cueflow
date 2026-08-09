@@ -1,28 +1,35 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Check, ChevronDown, ChevronUp, CircleHelp, FolderOpen, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Keyboard, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, Radio, RefreshCw, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
-import Backdrop from "../components/Backdrop";
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import Onboarding from "../components/Onboarding";
 import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import { loadScript, type ScriptDoc } from "../lib/script";
 import { teach } from "../lib/coach";
-import KeybindRow from "../components/KeybindRow";
-import { clashes, defaultBinds, keyActions, loadBinds, saveBinds, type Action } from "../lib/keys";
-import Nav from "../components/Nav";
-import Onboarding from "../components/Onboarding";
-import ShowHost from "../components/ShowHost";
-import { currentProject, listProjects, setCurrentProject, type Project } from "../lib/projects";
-import { SCRIPT_LIMIT, showChannel, updateShow, type Show, type ShowMsg } from "../lib/shows";
+import { CoachHelp } from "../components/Coach";
+import { loadBinds, type Action } from "../lib/keys";
+import Shell from "../components/Shell";
+import SearchBar from "../components/SearchBar";
+import ShowsBoard from "../components/ShowsBoard";
+import ShowManager from "../components/ShowManager";
+import DarkToggle, { WorkSurface } from "../components/DarkToggle";
+import { useSignedIn } from "../components/RequireAuth";
+import { currentProject } from "../lib/projects";
+import { createShow, deleteShow, listShows, SCRIPT_LIMIT, showChannel, updateShow, type Show, type ShowMsg } from "../lib/shows";
+import { loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
 import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
 import { AudioEngine, makeReversedFile } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
 import { moved, useDragList } from "../lib/dragList";
+// Aliased: `SearchPanel` already has a local `search` for the media-source lookup.
+import { search as rank, type Facet, type SortKey } from "../lib/search";
+import { cuePoints } from "../lib/trim";
 import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, searchOpenverse, uniqueTitle, type Hit, type Source } from "../lib/media";
-import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack, type SyncState } from "../lib/store";
+import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack } from "../lib/store";
 import { toast } from "../lib/toast";
 import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual } from "../types";
 
@@ -72,12 +79,14 @@ export default function Studio() {
   const lastPick = useRef(-1); // anchor for shift-click range selection in the library
   const [loop, setLoop] = useState(false);
   const [loopSeq, setLoopSeq] = useState(false);
-  const [binds, setBinds] = useState<Record<Action, string>>(loadBinds);
-  const keybindsModal = useDisclosure();
-  const guideModal = useDisclosure();
+  // Read once. The keys are bound on the Settings page now; this screen only fires them.
+  const [binds] = useState<Record<Action, string>>(loadBinds);
   const [sequenceId, setSequenceId] = useState<string>(session.sequenceId);
   const [cueIndex, setCueIndex] = useState(session.cueIndex);
-  const [tab, setTab] = useState(session.tab);
+  // Two tabs, and the editor is not one of them: an item opens into it. A saved session or a
+  // ?tab=editor link from the workspace therefore opens the item rather than selecting a tab.
+  const [tab, setTab] = useState(session.tab === "editor" ? "library" : session.tab);
+  const [editingId, setEditingId] = useState(session.tab === "editor" ? session.selectedId : "");
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -106,11 +115,78 @@ export default function Studio() {
   // the host panel because the things worth broadcasting -- a cue going out, the stage changing --
   // happen out here, and a panel that is closed must not stop them reaching anyone.
   const [liveShow, setLiveShow] = useState<Show | null>(null);
-  const showModal = useDisclosure();
+  // The manager is a screen, not a dialog, so it is a flag rather than a disclosure. Closing it
+  // leaves `liveShow` alone on purpose: the channel outlives the panel, or a host who shut the
+  // manager would stop hearing the room.
+  const [managing, setManaging] = useState(false);
   const showBus = useRef<{ send: (m: ShowMsg) => void; close: () => void } | null>(null);
   const onShowMsg = useRef<(m: ShowMsg) => void>(() => {});
-  const [projects, setProjects] = useState<Project[]>([]);
-  useEffect(() => { void listProjects().then(setProjects).catch(() => setProjects([])); }, []);
+  // The shows section above the tabs. Shows are an account feature, so signed out there is none.
+  const signedIn = useSignedIn();
+  const [shows, setShows] = useState<Show[]>([]);
+  const [links, setLinks] = useState<LinkMap>(() => loadLinks(project));
+  /**
+   * Whether the shows section is a grid or still the one button, persisted rather than derived.
+   * A load that answers with nothing -- offline, or before the request lands -- is not the same
+   * event as the last show being deleted, and only the second of those is allowed to put the button
+   * back. Derived from `shows.length` it would flicker back to a button on every reload.
+   */
+  const [showsGrid, setShowsGrid] = useState(() => local.get(key("grid:shows"), false));
+  const gridOn = (v: boolean) => { setShowsGrid(v); local.set(key("grid:shows"), v); };
+  /** The script half of the board obeys the same rule; its one card is the whole grid. */
+  const [scriptGrid, setScriptGrid] = useState(() => local.get(key("grid:script"), false));
+  useEffect(() => {
+    const has = !!scriptDoc.html;
+    setScriptGrid(was => { if (was !== has) local.set(key("grid:script"), has); return has; });
+  }, [scriptDoc.html]);
+  useEffect(() => onAuth(email => {
+    if (!email) return setShows([]);
+    void listShows(project).then(list => { setShows(list); if (list.length) gridOn(true); }).catch(() => setShows([]));
+  }), []);
+  const relink = (next: LinkMap) => { setLinks(next); saveLinks(project, next); };
+
+  const addShow = (name: string) => void createShow(name, project, sequenceId || null)
+    .then(made => { setShows(o => [made, ...o]); gridOn(true); teach("show"); })
+    .catch(e => toast("Could not make that show", (e as Error).message, "warn"));
+  const removeShow = (show: Show) => {
+    if (!confirm(`Delete "${show.name}"? The sequences and the script it carries stay where they are.`)) return;
+    void deleteShow(show.id).then(() => {
+      setShows(o => { const left = o.filter(x => x.id !== show.id); if (!left.length) gridOn(false); return left; });
+      relink(withoutShow(links, show.id));
+      if (liveShow?.id === show.id) setLiveShow(null);
+    }).catch(e => toast("Could not delete that show", (e as Error).message, "warn"));
+  };
+  const openShow = (show: Show) => { teach("show"); setLiveShow(show); setManaging(true); };
+  /** Dropped, not opened: the first sequence becomes the show's deck, the rest ride along with it. */
+  const sequenceToShow = (seqId: string, showId: string) => {
+    relink(withSequence(links, showId, seqId));
+    const show = shows.find(s => s.id === showId);
+    if (show && !show.sequenceId) {
+      setShows(o => o.map(s => (s.id === showId ? { ...s, sequenceId: seqId } : s)));
+      void updateShow(showId, { sequence_id: seqId }).catch(e => toast("Saved here only", (e as Error).message, "warn"));
+    }
+    toast("Added to the show", `${sequences.find(s => s.id === seqId)?.name ?? "That sequence"} goes out with ${show?.name ?? "the show"}.`, "success");
+  };
+  const guideModal = useDisclosure(); // no button: it opens itself once per browser, on the first visit
+
+  /**
+   * Library and sequence search live out here rather than inside the panels that render them,
+   * because a drag carries an index and the index has to mean the same row the grid is showing.
+   */
+  const [libQuery, setLibQuery] = useState("");
+  const [libSort, setLibSort] = useState<SortKey>("importance");
+  const [libKind, setLibKind] = useState<string[]>([]);
+  const trackFacet: Facet<Track> = t => ({ text: [t.title], kind: kindOf(t), createdAt: t.createdAt });
+  const shownTracks = rank(tracks, trackFacet, { query: libQuery, filter: { kind: libKind }, sort: libSort });
+  const [seqQuery, setSeqQuery] = useState("");
+  const [seqSort, setSeqSort] = useState<SortKey>("importance");
+  const seqFacet: Facet<Sequence> = s => ({ text: [s.name, ...s.items.map(i => i.label)], kind: "sequence", createdAt: s.createdAt });
+  const shownSequences = rank(sequences, seqFacet, { query: seqQuery, sort: seqSort });
+
+  const scriptToShow = (showId: string) => {
+    relink(withScript(links, showId));
+    toast("Added to the show", `The script goes out with ${shows.find(s => s.id === showId)?.name ?? "the show"}.`, "success");
+  };
   useEffect(() => {
     if (!liveShow) return;
     const channel = showChannel(liveShow.id, m => onShowMsg.current(m));
@@ -127,21 +203,15 @@ export default function Studio() {
   const selectedSequence = sequences.find(s => s.id === sequenceId);
   useEffect(() => { audio.current.loop = loop; }, [loop]);
 
-  const [sync, setSync] = useState<SyncState>({ cloud: false, ok: true });
-  const syncHint = (s: SyncState) =>
-    !s.ok ? `Last save failed: ${s.reason}. Click to pull your account's copy.`
-      : !s.cloud ? s.reason ?? "Saved on this device only."
-        : s.skipped ? `Saved. ${s.skipped} cue${s.skipped > 1 ? "s" : ""} still point at sounds that are not in your account yet.`
-          : "Saved to your account. Click to pull anything a second device added.";
   const lastSyncNote = useRef("");
-  // A failed save used to be indistinguishable from a good one. Report it once per distinct reason,
-  // so a broken sync is visible on the device it happens on instead of at the next show.
+  // Sync is on and has no button: it runs on every change and only speaks up when it fails, once
+  // per distinct reason, so a broken save is visible on the device it happens on rather than at the
+  // next show.
   useEffect(() => {
     // Wait for the typing to stop. Dragging a cue fires this on every frame, and a save per frame is
     // both wasted work and the thing that used to make two of them overlap.
     const timer = setTimeout(() => {
       void persist(tracks, sequences, project).then(state => {
-        setSync(state);
         const note = state.ok ? "" : state.reason ?? "unknown error";
         if (note && note !== lastSyncNote.current) toast("Couldn't save to your account", note, "warn");
         lastSyncNote.current = note;
@@ -150,7 +220,6 @@ export default function Studio() {
     return () => clearTimeout(timer);
   }, [tracks, sequences]);
   useEffect(() => { local.set(key("session"), { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
-  useEffect(() => { saveBinds(binds); }, [binds]);
   const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
   const mergeCloud = () => hydrateCloud(project).then(cloud => {
     if (!cloud) return false;
@@ -294,7 +363,7 @@ export default function Studio() {
   };
 
   /**
-   * What the room is allowed to know: the running order as labels, and the script. No source URLs
+   * What the room is allowed to know: the sequence as labels, and the script. No source URLs
    * for sounds, because a device that only reads cues has no business being able to download them.
    */
   const cueLabels = selectedSequence ? cueNumbers(selectedSequence.items.map(it => kindOf(tracks.find(t => t.id === it.trackId) ?? { kind: "audio" }))) : [];
@@ -347,7 +416,19 @@ export default function Studio() {
   const nudge = (key: keyof Effects, delta: number, min: number, max: number) => { if (!selected) return; updateEffects({ ...selected.effects, [key]: clamp(Number(selected.effects[key]) + delta, min, max) }); };
   // Arms the deck without firing anything: cue 1 waits for the first arrow press, so nothing ever
   // hits the room the moment a window opens.
-  const startSequence = (audience: boolean) => { teach("armed"); if (!selectedSequence?.items.length) return; if (audience) openAudience(); setTab("sequence"); setCueIndex(-1); setStage(null); setArmed(true); audio.current.pause(); setPlaying(false); };
+  // A phone has no arrow keys, so the armed lesson would be teaching a control that is not there:
+  // narrow screens get the docked transport explained instead. One lesson per arming, either way.
+  // `seq` defaults to the open one, and is passed when a sequence is run straight from the rail or
+  // from the show manager: one sequence on its own, in a show or outside one, is the same arming.
+  const startSequence = (audience: boolean, seq = selectedSequence) => {
+    teach(matchMedia("(max-width: 1023px)").matches ? "transport" : "armed");
+    if (!seq?.items.length) return;
+    setSequenceId(seq.id);
+    if (audience) openAudience();
+    setTab("sequence"); setCueIndex(-1); setStage(null); setArmed(true); audio.current.pause(); setPlaying(false);
+  };
+  /** From the manager: leave the show's screen, arm that sequence, put it up in presenter mode. */
+  const runSequence = (seqId: string) => { setManaging(false); startSequence(true, sequences.find(s => s.id === seqId)); };
   // Stand down puts the room back to black and the studio back to a normal editing screen.
   const standDown = () => { setArmed(false); setCueIndex(0); setStage(null); audio.current.pause(); setPlaying(false); };
 
@@ -408,12 +489,28 @@ export default function Studio() {
 
   const addSequence = () => { const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() }; setSequences(o => [...o, seq]); setSequenceId(seq.id); setCueIndex(0); };
   const deleteSequence = (id: string) => { void deleteSequenceEverywhere(id); setSequences(o => o.filter(s => s.id !== id)); if (sequenceId === id) setSequenceId(sequences.find(s => s.id !== id)?.id ?? ""); };
-  const addItem = () => {
-    if (!sequenceId) return;
-    const chosen = (selectedIds.length ? selectedIds.map(id => tracks.find(t => t.id === id)) : [selected]).filter(Boolean) as Track[];
-    if (!chosen.length) return;
-    setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: [...s.items, ...chosen.map(t => ({ id: crypto.randomUUID(), trackId: t.id, label: t.title, effects: cloneEffects(t.effects), ...(isVisual(t) ? { visual: { ...(t.visual ?? defaultVisual()) } } : {}) }))] }));
+  /** One way in for all three: the toolbar's picker, the Add button, and a card dropped on a chip. */
+  const addTracksTo = (seqId: string, ids: string[]) => {
+    const chosen = ids.map(id => tracks.find(t => t.id === id)).filter(Boolean) as Track[];
+    if (!seqId || !chosen.length) return;
+    setSequences(o => o.map(s => s.id !== seqId ? s : { ...s, items: [...s.items, ...chosen.map(t => ({ id: crypto.randomUUID(), trackId: t.id, label: t.title, effects: cloneEffects(t.effects), ...(isVisual(t) ? { visual: { ...(t.visual ?? defaultVisual()) } } : {}) }))] }));
+    toast("Added to the sequence", `${chosen.length} item${chosen.length === 1 ? "" : "s"} into ${sequences.find(s => s.id === seqId)?.name ?? "it"}.`, "success");
   };
+  const addItem = () => addTracksTo(sequenceId, selectedIds.length ? selectedIds : selected ? [selected.id] : []);
+  const openEditor = (id: string) => { setSelectedId(id); setEditingId(id); teach("editor"); };
+  /**
+   * The three drags §10 asks for, all on one screen and all through `useDragList`: a sequence chip
+   * onto a show, a library card onto a sequence chip, and the script onto a show (that last one is
+   * the board's own, since the script card lives there).
+   */
+  const seqDrag = useDragList(() => {}, (i, target) => {
+    if (target.startsWith("show:")) sequenceToShow(shownSequences[i].id, target.slice(5));
+  });
+  const libDrag = useDragList(() => {}, (i, target) => {
+    if (target.startsWith("seq:")) addTracksTo(target.slice(4), [shownTracks[i].id]);
+  });
+  /** A deleted track can still be in `selectedIds`, and a toolbar counting ghosts is a lying toolbar. */
+  const picked = selectedIds.filter(id => tracks.some(t => t.id === id));
   const deleteItem = (itemId: string) => setSequences(o => o.map(s => s.id !== sequenceId ? s : { ...s, items: s.items.filter(i => i.id !== itemId) }));
   const moveItem = (i: number, dir: -1 | 1) => reorder(i, i + dir);
   const reorder = (from: number, to: number) => setSequences(o => o.map(s => {
@@ -427,19 +524,21 @@ export default function Studio() {
 
   const openRename = (kind: "track" | "sequence", id: string, value: string) => { setDraft({ kind, id, value }); renameModal.onOpen(); };
   const commitRename = () => { const { kind, id, value } = draft; const v = value.trim(); if (!v) return; if (kind === "track") setTracks(o => patch(o, id, { title: v })); else setSequences(o => o.map(s => s.id === id ? { ...s, name: v } : s)); };
-  const openAudience = () => window.open(`${location.origin}${import.meta.env.BASE_URL}audience`, "cueflow-audience", "popup,width=1000,height=650");
+  const openAudience = () => { teach("presenter"); window.open(`${location.origin}${import.meta.env.BASE_URL}audience`, "cueflow-audience", "popup,width=1000,height=650"); };
   // Split, popup or its own tab: the same reader either way, so where it lives is only a preference.
   const openScript = (where: "off" | "split" | "popup" | "tab") => {
     setScriptMode(where);
+    if (where !== "off") teach("script");
     if (where === "off" || where === "split") return;
     const url = `${location.origin}${import.meta.env.BASE_URL}script`;
     window.open(url, "cueflow-script", where === "popup" ? "popup,width=560,height=820" : "");
   };
 
   return (
-    <div className="relative min-h-screen">
-      <Backdrop />
-      <Nav />
+    <Shell>
+      {/* The working surface, and the only thing the dark toggle reaches: the sidebar, the nav and
+          the footer around it stay beige, and so does everybody else's device. */}
+      <WorkSurface className="-mx-3 rounded-2xl px-3 py-4">
       <AlertFlash level={flash} />
       {/* The alert's own words, held on screen after the flash has gone: a flash you half-caught
           while looking at the deck is no use if it does not say what it was for. */}
@@ -449,56 +548,24 @@ export default function Studio() {
         </div>
       )}
       {/* Bottom padding clears the fixed player, which stacks taller on phones. */}
-      <div className="mx-auto max-w-7xl px-4 py-6 pb-60 sm:px-6 sm:pb-44 lg:px-8">
+      <div className="pb-52 sm:pb-36">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className={`text-[11px] font-semibold uppercase tracking-[.3em] ${armed ? "text-armed" : "text-accent"}`}>{armed ? (cueIndex < 0 ? "Armed" : "Running") : "Studio"}</p>
-            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">{armed ? (selectedSequence?.name ?? "Cue board") : "Cue board"}</h1>
+            <h1 className="flex items-center gap-1 text-2xl font-black tracking-tight sm:text-3xl">
+              {armed ? (selectedSequence?.name ?? "Cue board") : "Cue board"}
+              <CoachHelp id="studio" />
+            </h1>
           </div>
-          {/* Labels collapse to icons on phones, three full-width buttons do not fit a 375px row. */}
-          <div className="flex flex-wrap gap-2">
-            {/* A native select: three modes, one control, and it opens as a proper picker on a phone. */}
-            <label className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
-              <BookOpen size={16} className="text-muted" aria-hidden />
-              <span className="sr-only">Script reader</span>
-              <select data-coach="script" value={scriptMode} onChange={e => openScript(e.target.value as typeof scriptMode)}
-                className="bg-transparent py-2 pr-1 text-sm outline-none">
-                <option value="off">Script: off</option>
-                <option value="split">Split screen</option>
-                <option value="popup">Popup</option>
-                <option value="tab">New tab</option>
-              </select>
-            </label>
-            {armed ? (
-              <Button variant="bordered" onPress={standDown}>Stand down</Button>
-            ) : (<>
-              {/* Switching project reloads the Studio: the library, the decks and the shows all change. */}
-              <label className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
-                <FolderOpen size={16} className="text-muted" aria-hidden />
-                <span className="sr-only">Project</span>
-                <select value={project ?? ""} className="max-w-36 bg-transparent py-2 pr-1 text-sm outline-none"
-                  onChange={e => { if (e.target.value === "manage") return void location.assign("/projects"); setCurrentProject(e.target.value || null); location.reload(); }}>
-                  <option value="">Personal library</option>
-                  {projects.map(p => <option key={p.id} value={p.id} className="bg-background">{p.name}</option>)}
-                  <option value="manage" className="bg-background">Manage projects…</option>
-                </select>
-              </label>
-              <Tooltip content="Run this deck across every device in the room" placement="bottom">
-                <Button data-coach="show" variant="flat" color={liveShow?.startedAt ? "danger" : "default"} startContent={<Radio size={17} />} onPress={showModal.onOpen}>
-                  <span className="hidden sm:inline">{liveShow ? liveShow.name : "Show"}</span>
-                </Button>
-              </Tooltip>
-              <Tooltip content="Replay the first-time setup guide" placement="bottom"><Button variant="flat" isIconOnly={false} startContent={<CircleHelp size={17} />} onPress={guideModal.onOpen}><span className="hidden sm:inline">Setup guide</span></Button></Tooltip>
-              <Tooltip content="Set the keys for cues, slides and effects" placement="bottom"><Button variant="flat" startContent={<Keyboard size={17} />} onPress={keybindsModal.onOpen}><span className="hidden sm:inline">Keybinds</span></Button></Tooltip>
-              <Tooltip content={syncHint(sync)} placement="bottom">
-                <Button variant="flat" color={sync.ok ? "default" : "danger"} startContent={<RefreshCw size={17} />} onPress={syncNow}>
-                  <span className="hidden sm:inline">{sync.ok ? "Sync" : "Not synced"}</span>
-                </Button>
-              </Tooltip>
-              {/* Sequences has its own "Arm in audience mode", so this would be a second door to the same room. */}
-              {tab !== "sequence" && <Tooltip content="Opens the presenter window, drag it to the mirrored display" placement="bottom"><Button color="primary" variant="flat" startContent={<Monitor size={17} />} onPress={openAudience}><span className="hidden sm:inline">Audience display</span></Button></Tooltip>}
-            </>)}
-          </div>
+          {/* Everything that used to sit here went where it belongs: the shows and the script to the
+              board below, the project switch to the sidebar, the keybinds to Settings, the sync to
+              itself, and the audience display to the Sequences tab's "Arm in audience mode". */}
+          <span className="flex items-center gap-2">
+            {armed && <Button variant="bordered" onPress={standDown}>Stand down</Button>}
+            {/* Dark is a property of this desk, not of the app and not of the show: it darkens the
+                surface below and nothing on anybody else's device. */}
+            <DarkToggle />
+          </span>
         </motion.div>
 
         {/* Armed: an amber frame round the window, red once cues are running. No sound, ever. */}
@@ -510,28 +577,117 @@ export default function Studio() {
               {cueIndex < 0 ? "Deck armed. Nothing has gone out yet." : `Cue ${cueIndex + 1} of ${selectedSequence?.items.length ?? 0} is out.`}
             </span>
             <span className="text-xs text-muted">Press → for the next cue, ← to go back.</span>
-            <span className="ml-auto"><Button size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button></span>
+            <span className="ml-auto flex items-center gap-1">
+              <Button size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button>
+              <CoachHelp id="armed" />
+            </span>
+          </div>
+        )}
+
+        {/* Above the tabs: the shows, and beside them the script. Both go away while a library item
+            is selected -- the toolbar takes their place -- and while a deck is armed. */}
+        {!armed && !editingId && !picked.length && (
+          <ShowsBoard shows={shows} links={links} sequences={sequences} script={scriptDoc.html ? scriptDoc : null}
+            showsGrid={showsGrid} scriptGrid={scriptGrid} busy={!signedIn} over={seqDrag.over}
+            onCreateShow={addShow} onOpenShow={openShow} onDeleteShow={removeShow}
+            onOpenScript={() => openScript(scriptMode === "split" ? "off" : "split")} onScriptToShow={scriptToShow} />
+        )}
+
+        {/* The sequence rail. It is a drop target for library cards and a drag source onto a show,
+            so all three drags land on one screen without opening anything first. */}
+        {!armed && !editingId && (
+          <section className="mt-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted">Sequences</p>
+              <Button size="sm" variant="light" startContent={<Plus size={14} />} onPress={addSequence}>New sequence</Button>
+              <div className="min-w-48 flex-1">
+                <SearchBar query={seqQuery} setQuery={setSeqQuery} sort={seqSort} setSort={setSeqSort} kind={[]} setKind={() => {}} placeholder="Search sequences" />
+              </div>
+            </div>
+            {shownSequences.length === 0 ? (
+              <p className="text-sm text-muted">{sequences.length ? "Nothing matches that." : "No sequences yet. Make one, then drag sounds and slides onto it."}</p>
+            ) : (
+              <ol ref={seqDrag.list} className="flex flex-wrap gap-2">
+                {shownSequences.map((s, i) => (
+                  <li key={s.id} data-drop={`seq:${s.id}`}
+                    className={`flex items-center gap-1 rounded-full border pr-1 transition-colors ${libDrag.over === `seq:${s.id}` ? "border-accent bg-accent/25" : s.id === sequenceId ? "border-accent bg-accent/15" : "border-border bg-surface/50"}`}>
+                    <span role="button" tabIndex={-1} aria-label={`Drag ${s.name} onto a show`}
+                      className="flex min-w-9 cursor-grab touch-pan-y items-center justify-center self-stretch text-muted hover:text-foreground active:cursor-grabbing"
+                      onPointerDown={seqDrag.start(i)} onPointerMove={seqDrag.move} onPointerUp={seqDrag.end} onPointerCancel={seqDrag.end}>
+                      <GripVertical size={13} aria-hidden />
+                    </span>
+                    <button className="py-1.5 text-sm font-semibold" onClick={() => { setSequenceId(s.id); setTab("sequence"); }}>{s.name}</button>
+                    <span className="text-[11px] text-muted">{s.items.length}</span>
+                    {/* A sequence does not need a show to be run: this arms it and opens the
+                        presenter window, in a project, outside any show. */}
+                    <Button isIconOnly size="sm" variant="light" aria-label={`Run ${s.name} in presenter mode`}
+                      title="Run this sequence on its own, in presenter mode" isDisabled={!s.items.length}
+                      onPress={() => startSequence(true, s)}><Play size={13} fill="currentColor" /></Button>
+                    <Button isIconOnly size="sm" variant="light" aria-label={`Rename ${s.name}`} onPress={() => openRename("sequence", s.id, s.name)}><Pencil size={13} /></Button>
+                    <Button isIconOnly size="sm" variant="light" color="danger" aria-label={`Delete ${s.name}`} onPress={() => deleteSequence(s.id)}><Trash2 size={13} /></Button>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        )}
+
+        {/* Selection toolbar. It is the only place the editor is opened from, which is why there is
+            no longer an Editor tab: you open a thing, you do not visit a room. */}
+        {!armed && !editingId && picked.length > 0 && (
+          <div className="glass mt-4 flex flex-wrap items-center gap-2 p-3">
+            <span className="text-sm font-semibold">{picked.length} selected</span>
+            <Button size="sm" variant="flat" startContent={<SlidersHorizontal size={15} />} onPress={() => openEditor(picked[0])}>Edit</Button>
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
+              <span className="sr-only">Add to sequence</span>
+              <select value="" aria-label="Add to sequence" className="max-w-40 bg-transparent py-2 pr-1 text-sm outline-none"
+                onChange={e => { addTracksTo(e.target.value, picked); e.target.value = ""; }}>
+                <option value="">Add to sequence…</option>
+                {sequences.map(s => <option key={s.id} value={s.id} className="bg-background">{s.name}</option>)}
+              </select>
+            </label>
+            <Button size="sm" variant="flat" startContent={<Download size={15} />}
+              onPress={() => picked.forEach(id => { const t = tracks.find(x => x.id === id); if (t && kindOf(t) !== "embed") void downloadAsset(t.url, t.title); })}>Download</Button>
+            <Button size="sm" variant="flat" color="danger" startContent={<Trash2 size={15} />}
+              onPress={() => { if (confirm(`Delete ${picked.length} item${picked.length === 1 ? "" : "s"} everywhere?`)) { picked.forEach(deleteTrack); setSelectedIds([]); } }}>Delete</Button>
+            <Button size="sm" variant="light" className="ml-auto" onPress={() => setSelectedIds([])}>Deselect</Button>
           </div>
         )}
 
         <div className={scriptMode === "split" ? "mt-6 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,30rem)]" : "mt-6"}>
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .05 }} className="min-w-0">
-          {/* Armed, the library and the editor go away: the deck is the only thing that matters and
-              nothing on this screen should invite a stray click during a show. */}
-          <Tabs selectedKey={tab} onSelectionChange={k => { setTab(k as string); teach(k as "library" | "editor" | "sequence"); }} classNames={{ tabList: armed ? "hidden" : "glass-soft" }}>
+          {/* An item opens into the editor and closes back out of it. Two tabs, and neither is it. */}
+          {editingId ? (
+            <div className="space-y-4">
+              <Button size="sm" variant="bordered" startContent={<ArrowLeft size={15} />} onPress={() => setEditingId("")}>Back to the library</Button>
+              <Editor track={tracks.find(t => t.id === editingId)} cues={cuePoints(sequences, editingId)} busy={busy} update={updateEffects} updateVisual={updateVisual} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => { const t = tracks.find(x => x.id === editingId); if (t) openRename("track", t.id, t.title); }} />
+            </div>
+          ) : (
+          /* Armed, the library goes away: the deck is the only thing that matters and nothing on
+             this screen should invite a stray click during a show. */
+          <Tabs selectedKey={tab} onSelectionChange={k => { setTab(k as string); teach(k as "library" | "sequence"); }} classNames={{ tabList: armed ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
-              <Library tracks={tracks} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} onPlay={playTrack} onToggleSelect={toggleSelect} onClearSelection={() => setSelectedIds([])} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onDelete={deleteTrack} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} onAddToSequence={addItem} hasSequence={!!sequenceId} />
-            </Tab>
-            <Tab key="editor" id="editor" title={<span className="flex items-center gap-2"><SlidersHorizontal size={16} />Editor</span>}>
-              <Editor track={selected} busy={busy} update={updateEffects} updateVisual={updateVisual} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => selected && openRename("track", selected.id, selected.title)} />
+              <Library tracks={shownTracks} total={tracks.length} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
-              <Sequences sequences={sequences} sequenceId={sequenceId} selectSequence={setSequenceId} addSequence={addSequence} deleteSequence={deleteSequence} renameSequence={(id: string) => { const s = sequences.find(x => x.id === id); if (s) openRename("sequence", id, s.name); }} tracks={tracks} selectedTrack={selected} selectedCount={selectedIds.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} />
+              <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} />
             </Tab>
           </Tabs>
+          )}
         </motion.div>
         {scriptMode === "split" && (
           <div className="h-[75vh] min-w-0 xl:sticky xl:top-4">
+            {/* Split is where the board opens it; popup and its own tab are still one control away. */}
+            <label className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
+              <span className="sr-only">Where the reader sits</span>
+              <select data-coach="script" value={scriptMode} onChange={e => openScript(e.target.value as typeof scriptMode)}
+                className="w-full bg-transparent py-2 text-sm outline-none">
+                <option value="split">Reader: split screen</option>
+                <option value="popup">Reader: popup window</option>
+                <option value="tab">Reader: new tab</option>
+                <option value="off">Close the reader</option>
+              </select>
+            </label>
             {/* BroadcastChannel never echoes to the window that posted, so this one raises its own. */}
             <ScriptReader doc={scriptDoc} setDoc={setScriptDoc}
               onAlert={(level, message, cue) => { showAlert(level, message); send({ type: "alert", level, message, cue }); }} />
@@ -544,15 +700,19 @@ export default function Studio() {
           is two too many. Visual assets have no transport at all. */}
       {/* A phone has no arrow keys. Armed, the deck gets a thumb-sized transport of its own. */}
       {armed && (
-        <div className="fixed inset-x-0 bottom-0 z-40 flex gap-3 border-t border-white/10 bg-background/90 p-3 backdrop-blur-xl lg:hidden">
-          <Button className="h-14 flex-1 text-base" variant="flat" onPress={() => advance(-1)}>← Back</Button>
-          <Button className="h-14 flex-[2] text-base" color="primary" onPress={() => advance(1)}>
+        // Above the sign-in nudge and anything else that docks itself down here: while a deck is
+        // armed, nothing gets to sit on top of the next-cue button.
+        <div data-coach="transport" className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-3 border-t border-white/10 bg-background/90 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
+          <Button className="h-16 w-24 shrink-0 text-base" variant="flat" onPress={() => advance(-1)}>← Back</Button>
+          {/* The one thing this screen exists to do, so it is the biggest thing on it. */}
+          <Button className="h-16 flex-1 text-lg font-bold" color="primary" onPress={() => advance(1)}>
             {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
           </Button>
+          <CoachHelp id="transport" />
         </div>
       )}
 
-      <AnimatePresence>{selected && !isVisual(selected) && tab !== "editor" && !armed && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+      <AnimatePresence>{selected && !isVisual(selected) && !editingId && !armed && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -562,52 +722,44 @@ export default function Studio() {
         </>)}</ModalContent>
       </Modal>
 
-      <Modal isOpen={showModal.isOpen} onOpenChange={showModal.onOpenChange} placement="center" backdrop="blur">
-        <ModalContent>
-          <ModalHeader>{liveShow ? liveShow.name : "Run a show"}</ModalHeader>
-          <ModalBody>
-            <div className="max-h-[70vh] overflow-auto pr-1">
-              <ShowHost projectId={project} sequenceId={sequenceId} show={liveShow} setShow={setLiveShow}
-                onFlash={text => { showBus.current?.send({ type: "flash", text, from: "host" }); showAlert("warn", text); }} />
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            {liveShow && <Button variant="light" onPress={() => showBus.current?.send(deck())}>Resend the deck</Button>}
-            <Button color="primary" onPress={showModal.onClose}>Done</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      {/* A show is not a dialog over the project screen: opened, it is the screen. */}
+      {managing && liveShow && (
+        <ShowManager show={liveShow} setShow={s => { setLiveShow(s); if (!s) setManaging(false); }}
+          projectId={project} sequences={sequences} tracks={tracks} script={scriptDoc.html ? scriptDoc : null}
+          links={links} stage={stage} onClose={() => setManaging(false)}
+          onFlash={text => { showBus.current?.send({ type: "flash", text, from: "host" }); showAlert("warn", text); }}
+          onResend={() => showBus.current?.send(deck())}
+          onAddSequence={seqId => sequenceToShow(seqId, liveShow.id)} onAddScript={() => scriptToShow(liveShow.id)}
+          onRunSequence={runSequence} onStage={t => show(t)} />
+      )}
 
       <SlideComposer open={slideOpen} onClose={() => setSlideOpen(false)} onCreate={addProcessedFile} />
       <Onboarding control={guideModal} />
-      <KeybindsModal disc={keybindsModal} binds={binds} setBinds={setBinds} />
-    </div>
+      </WorkSurface>
+    </Shell>
   );
 }
 
-function Library({ tracks, selectedId, playingId, selectedIds, busy, onPlay, onToggleSelect, onClearSelection, onAdd, onAddSlide, onDelete, onRename, importAsset, onAddToSequence, hasSequence }: any) {
-  const count = selectedIds.length;
-  const [filter, setFilter] = useState("");
-  const shown: Track[] = filter ? tracks.filter((t: Track) => t.title.toLowerCase().includes(filter.toLowerCase())) : tracks;
+function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onRename, importAsset, query, setQuery, sort, setSort, kind, setKind }: any) {
+  const shown: Track[] = tracks;
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Soundboard and slides</p><h2 className="text-xl font-bold">Click a card to fire it</h2></div>
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Soundboard and slides</p><h2 className="flex items-center gap-1 text-xl font-bold">Click a card to fire it<CoachHelp id="library" /></h2></div>
         <div className="flex flex-wrap gap-2">
-          {count > 0 && <Button variant="light" size="sm" onPress={onClearSelection}>Clear {count}</Button>}
-          <Tooltip content={hasSequence ? "Adds them in the order you picked them" : "Create a sequence first"}><span><Button variant="bordered" startContent={<Plus size={16} />} isDisabled={!hasSequence} onPress={onAddToSequence}>Add {count > 1 ? `${count} ` : ""}to sequence</Button></span></Tooltip>
           <Tooltip content="A blank 16:9 slide you can put a title on"><Button variant="bordered" isDisabled={busy} startContent={<Presentation size={16} />} onPress={onAddSlide}>New slide</Button></Tooltip>
           <Tooltip content="Audio, images and video from this device"><Button data-coach="add" as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept={UPLOAD_ACCEPT} multiple onChange={onAdd} /></Button></Tooltip>
         </div>
       </div>
 
-      <SearchPanel importAsset={importAsset} filter={filter} setFilter={setFilter} />
+      <SearchBar query={query} setQuery={setQuery} sort={sort} setSort={setSort} kinds={["audio", "image", "video", "embed"]} kind={kind} setKind={setKind} placeholder="Search the library" />
+      <SearchPanel importAsset={importAsset} />
 
       {shown.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center rounded-2xl border border-dashed border-default-200 py-16 text-center">
           <Music size={40} className="text-muted" />
-          <p className="mt-3 font-semibold">{tracks.length ? "Nothing matches that" : "Nothing here yet"}</p>
-          <p className="text-sm text-muted">{tracks.length ? "Clear the search to see everything." : "Upload audio, images or video, or search the free libraries above."}</p>
+          <p className="mt-3 font-semibold">{total ? "Nothing matches that" : "Nothing here yet"}</p>
+          <p className="text-sm text-muted">{total ? "Clear the search to see everything." : "Upload audio, images or video, or search the free libraries above."}</p>
         </motion.div>
       ) : (
         <motion.div layout className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -626,14 +778,20 @@ function Library({ tracks, selectedId, playingId, selectedIds, busy, onPlay, onT
                     </span>
                     <p className="min-w-0 flex-1 truncate pt-1.5 font-semibold capitalize leading-tight">{t.title}</p>
                     <div className="flex shrink-0 gap-1">
+                      {/* Same grip, same long-press, same haptic as a cue row: this one carries the
+                          card out of the library and onto a sequence chip. */}
+                      <span role="button" tabIndex={-1} aria-label={`Drag ${t.title} onto a sequence`}
+                        className="flex min-w-9 cursor-grab touch-pan-y items-center justify-center self-stretch text-muted hover:text-foreground active:cursor-grabbing"
+                        onPointerDown={drag.start(i)} onPointerMove={drag.move} onPointerUp={drag.end} onPointerCancel={drag.end}>
+                        <GripVertical size={14} aria-hidden />
+                      </span>
                       <Tooltip content={isChecked ? `Cue ${pick + 1} of the selection, click to drop it` : "Select (shift-click to take a run)"}>
                         <Button isIconOnly size="sm" variant={isChecked ? "solid" : "light"} color={isChecked ? "primary" : "default"} onPress={(e: any) => onToggleSelect(t.id, i, !!e?.shiftKey)}>
                           {isChecked ? <span className="text-xs font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
                         </Button>
                       </Tooltip>
-                      <Tooltip content="Download"><Button isIconOnly size="sm" variant="light" isDisabled={kind === "embed"} onPress={() => void downloadAsset(t.url, t.title)}><Download size={14} /></Button></Tooltip>
+                      <Tooltip content="Open in the editor"><Button isIconOnly size="sm" variant="light" onPress={() => onOpenEditor(t.id)}><SlidersHorizontal size={14} /></Button></Tooltip>
                       <Tooltip content="Rename"><Button isIconOnly size="sm" variant="light" onPress={() => onRename(t.id)}><Pencil size={14} /></Button></Tooltip>
-                      <Tooltip content="Delete everywhere"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => onDelete(t.id)}><Trash2 size={14} /></Button></Tooltip>
                     </div>
                   </div>
                   {t.error
@@ -649,8 +807,9 @@ function Library({ tracks, selectedId, playingId, selectedIds, busy, onPlay, onT
   );
 }
 
+// "My library" is gone: the library has its own search box above this one, and two boxes that both
+// claim to search the library is how they end up disagreeing.
 const SOURCES: { id: Source; label: string }[] = [
-  { id: "library", label: "My library" },
   { id: "archive", label: "Internet Archive" },
   { id: "commons", label: "Wikimedia Commons" },
   { id: "openverse", label: "Openverse (stock audio + images)" },
@@ -658,8 +817,8 @@ const SOURCES: { id: Source; label: string }[] = [
   { id: "url", label: "Paste a link" },
 ];
 
-function SearchPanel({ importAsset, filter, setFilter }: { importAsset: (title: string, url: string) => void; filter: string; setFilter: (v: string) => void }) {
-  const [source, setSource] = useState<Source>("library");
+function SearchPanel({ importAsset }: { importAsset: (title: string, url: string) => void }) {
+  const [source, setSource] = useState<Source>("archive");
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [note, setNote] = useState("");
@@ -668,7 +827,6 @@ function SearchPanel({ importAsset, filter, setFilter }: { importAsset: (title: 
   const run = async () => {
     const query = q.trim();
     setNote("");
-    if (source === "library") return setFilter(query);
     if (!query) return;
     if (source === "myinstants") {
       // Myinstants sits behind Cloudflare, which blocks server-side search from datacenter IPs, so
@@ -694,25 +852,23 @@ function SearchPanel({ importAsset, filter, setFilter }: { importAsset: (title: 
     try { importAsset(hit.title, await resolveHit(hit)); }
     catch (e) { setNote((e as Error).message); }
   };
-  const placeholder = source === "library" ? "Filter your library" : source === "url" ? "Paste a direct media link (.mp3, .wav, .png, .mp4) or a Google Slides link" : source === "myinstants" ? "Search Myinstants (e.g. airhorn, vine boom)" : "Search freely licensed audio";
+  const placeholder = source === "url" ? "Paste a direct media link (.mp3, .wav, .png, .mp4) or a Google Slides link" : source === "myinstants" ? "Search Myinstants (e.g. airhorn, vine boom)" : "Search freely licensed audio";
 
   return (
     <div className="glass-soft space-y-3 p-4">
       <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Find media</p>
       <div className="flex flex-wrap gap-2">
         <select aria-label="Where to search" value={source}
-          onChange={e => { setSource(e.target.value as Source); setHits([]); setNote(""); if (e.target.value !== "library") setFilter(""); }}
+          onChange={e => { setSource(e.target.value as Source); setHits([]); setNote(""); }}
           className="rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent">
           {SOURCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
-        <Input className="min-w-56 flex-1" size="sm" value={q}
-          onValueChange={(v: string) => { setQ(v); if (source === "library") setFilter(v); }}
+        <Input className="min-w-56 flex-1" size="sm" value={q} onValueChange={setQ}
           placeholder={placeholder} onKeyDown={(e: any) => e.key === "Enter" && void run()} />
         <Button size="sm" color="primary" variant="flat" isLoading={loading} endContent={source === "myinstants" ? <ExternalLink size={14} /> : undefined} onPress={() => void run()}>
           {source === "url" ? "Import" : "Search"}
         </Button>
       </div>
-      {source === "library" && filter && <p className="text-xs text-muted">Filtering by “{filter}”. <button className="text-accent underline-offset-2 hover:underline" onClick={() => { setQ(""); setFilter(""); }}>Clear</button></p>}
       {(source === "archive" || source === "commons") && (
         <p className="text-xs text-muted">Public-domain and freely licensed recordings. Imports land in your library under a cleaned-up name; check the licence before you perform anything publicly.</p>
       )}
@@ -735,12 +891,12 @@ function SearchPanel({ importAsset, filter, setFilter }: { importAsset: (title: 
   );
 }
 
-function Editor({ track, busy, update, updateVisual, bakeReverse, onSave, onPreview, onRename }: any) {
+function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, onPreview, onRename }: any) {
   if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Select something in the Library to edit it.</div>;
   const kind = kindOf(track);
   const heading = (
     <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Non-destructive editor</p>
-      <h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button></h2></div>
+      <h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button><CoachHelp id="editor" /></h2></div>
   );
   if (kind !== "audio") return (
     <div className="mt-5 space-y-6">
@@ -750,7 +906,7 @@ function Editor({ track, busy, update, updateVisual, bakeReverse, onSave, onPrev
           ? "An embedded deck. Edit the slides in Google Slides or PowerPoint itself; the transition and caption below are what CueFloww adds when the cue fires."
           : "Framing, colour and timing ride with this asset and are applied when the cue fires, so the original file is never touched. Flatten to a new image if you want a copy with the look baked in."}
       </p>
-      <MediaEditor track={track} onChange={updateVisual} onSave={onSave} />
+      <MediaEditor track={track} cues={cues} onChange={updateVisual} onSave={onSave} />
     </div>
   );
   return (
@@ -768,7 +924,7 @@ function Editor({ track, busy, update, updateVisual, bakeReverse, onSave, onPrev
   );
 }
 
-function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteSequence, renameSequence, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage }: any) {
+function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage }: any) {
   // Which cue is waiting to be paired. Linking is two clicks, so the second one has to know.
   const [linking, setLinking] = useState("");
   const seq = sequences.find((s: Sequence) => s.id === sequenceId);
@@ -782,34 +938,29 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Manual cue deck</p><h2 className="text-xl font-bold">Sequences</h2></div>
-        <Button color="primary" startContent={<Plus size={16} />} onPress={addSequence}>New sequence</Button>
+        {/* The list of sequences is the rail above the tabs, because a library card has to be able to
+            land on one without changing tab. This panel is only ever the one that is open. */}
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Manual cue deck</p><h2 className="flex items-center gap-1 text-xl font-bold">{seq ? seq.name : "Sequences"}<CoachHelp id="sequence" /></h2></div>
       </div>
-      {sequences.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {sequences.map((s: Sequence) => (
-            <div key={s.id} className={`flex items-center gap-1 rounded-full border px-1 pl-3 ${s.id === sequenceId ? "border-accent bg-accent/15" : "border-border bg-surface/50"}`}>
-              <button className="py-1.5 text-sm font-semibold" onClick={() => selectSequence(s.id)}>{s.name}</button>
-              <Button isIconOnly size="sm" variant="light" onPress={() => renameSequence(s.id)}><Pencil size={13} /></Button>
-              <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteSequence(s.id)}><Trash2 size={13} /></Button>
-            </div>
-          ))}
-        </div>
-      )}
       {!seq ? (
-        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Create a sequence, then add sounds and slides from the Library. It never autoplays, drive it with the ← → arrow keys or click a cue.</div>
+        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Pick a sequence in the rail above, or make one. Then add sounds and slides from the Library. It never autoplays, drive it with the ← → arrow keys or click a cue.</div>
       ) : (
         <div className="space-y-3">
           <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
             <Tooltip content="Arms the deck. Nothing plays until you press →"><Button size="sm" color="primary" startContent={<Play size={14} fill="currentColor" />} isDisabled={!seq.items.length} data-coach="arm" onPress={() => startSequence(false)}>Arm</Button></Tooltip>
             <Tooltip content="Opens the presenter window and arms the deck"><Button size="sm" color="secondary" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(true)}>Arm in audience mode</Button></Tooltip>
             <Switch size="sm" isSelected={loopSeq} onValueChange={setLoopSeq}>Loop sequence</Switch>
-            <span className="ml-auto text-xs text-muted">{cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → step every cue, A / D step slides only, W / S zoom"}</span>
+            {/* Off, a grip needs a long press so a thumb can still scroll the deck. On, grips drag
+                the moment you touch them and the list stops scrolling under your finger. */}
+            <Switch size="sm" isSelected={cueDrag.reorder} onValueChange={cueDrag.setReorder}>Reorder mode</Switch>
+            <span className="ml-auto text-xs text-muted">{cueDrag.reorder ? "Drag any grip to move a cue. Scrolling is off while this is on." : cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → step every cue, A / D step slides only, W / S zoom"}</span>
           </div>
 
           {/* What the audience window is showing. Also the whole preview when no window is open. */}
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="order-2 space-y-3 lg:order-1">
+            {/* min-w-0: a grid item's min width is its content by default, and a cue row full of
+                controls is wider than a phone -- without this the whole deck scrolls sideways. */}
+            <div className="order-2 min-w-0 space-y-3 lg:order-1">
               <div className="flex items-center gap-2 text-sm text-muted">
                 <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected items</b>.</> : <>Adds the selected item{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
                 <Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
@@ -825,13 +976,16 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                     // Layout animation is off mid-drag: an animating row reports a moving rectangle,
                     // and the drop target is computed from those rectangles.
                     <motion.li key={item.id} layout={!cueDrag.dragging} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
-                      <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${held ? "border-accent bg-accent/15 shadow-lg" : i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
+                      <div className={`flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5 ${held ? "border-accent bg-accent/15 shadow-lg" : i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
                         {/* A 15px icon is a 15px target. The grip fills the row's height and is wide
                             enough to hit without looking, which is how it actually gets used --
                             negative margins keep the row's own spacing unchanged. */}
+                        {/* touch-action is explicit both ways: pan-y hands a scroll straight back to
+                            the page unless the finger holds still, none claims the gesture outright
+                            once reorder mode is on. */}
                         <span
                           role="button" tabIndex={-1} aria-label={`Reorder ${item.label}`}
-                          className="-my-2.5 -ml-3 flex shrink-0 cursor-grab touch-none items-center self-stretch px-3 py-3 text-muted hover:text-foreground active:cursor-grabbing"
+                          className={`-my-2.5 -ml-3 flex min-w-11 shrink-0 cursor-grab items-center justify-center self-stretch px-3 py-3 text-muted hover:text-foreground active:cursor-grabbing ${cueDrag.reorder ? "touch-none text-accent" : "touch-pan-y"}`}
                           onPointerDown={cueDrag.start(i)} onPointerMove={cueDrag.move}
                           onPointerUp={cueDrag.end} onPointerCancel={cueDrag.end}
                         >
@@ -844,9 +998,11 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                           {item.link && <span className="shrink-0 rounded-md bg-visual/15 px-1.5 font-mono text-[11px] font-bold text-visual" title="Fires together with this cue">+{numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}</span>}
                           <span className="ml-auto hidden shrink-0 text-xs text-muted sm:inline">{track?.title ?? "missing"}</span>
                         </button>
+                        {/* On a phone the transition picker takes its own line under the cue rather
+                            than eating the label down to one letter. */}
                         {kind !== "audio" && (
                           <select aria-label="Transition" value={item.visual?.transition ?? "fade"} onChange={e => setItemTransition(item.id, e.target.value)}
-                            className="shrink-0 rounded-lg border border-border bg-surface/60 px-2 py-1 text-xs capitalize outline-none focus:border-accent">
+                            className="order-last w-full shrink-0 rounded-lg border border-border bg-surface/60 px-2 py-1 text-xs capitalize outline-none focus:border-accent sm:order-none sm:w-auto">
                             {["cut", "fade", "slide", "zoom"].map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
                         )}
@@ -862,8 +1018,12 @@ function Sequences({ sequences, sequenceId, selectSequence, addSequence, deleteS
                               </Button>
                             </Tooltip>
                           )}
-                          <Tooltip content="Move up"><Button isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button></Tooltip>
-                          <Tooltip content="Move down"><Button isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
+                          {/* The chevrons are the mouse's answer to reordering; a thumb has the grip
+                              and they are the two controls a 375px row can least afford. */}
+                          <span className="hidden sm:contents">
+                            <Tooltip content="Move up"><Button isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button></Tooltip>
+                            <Tooltip content="Move down"><Button isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
+                          </span>
                           <Tooltip content="Remove cue"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteItem(item.id)}><Trash2 size={14} /></Button></Tooltip>
                         </div>
                       </div>
@@ -908,8 +1068,10 @@ function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, l
   const [open, setOpen] = useState(false);
   const speed = Number(effects.speed) || 1;
   return (
+    // Docked flush to the bottom edge on a phone -- a floating card wastes the one strip of screen a
+    // thumb reaches without moving the hand. It floats again once there is room.
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
-      className="glass fixed inset-x-2 bottom-4 z-20 mx-auto max-w-[1080px] p-3 sm:inset-x-4 sm:p-4">
+      className="glass fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[1080px] rounded-none p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:inset-x-4 sm:bottom-4 sm:rounded-lg sm:p-4">
       {/* Phones get the title above the transport; there is no room for both on one line. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1">
@@ -948,20 +1110,3 @@ function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, l
   );
 }
 
-function KeybindsModal({ disc, binds, setBinds }: { disc: ReturnType<typeof useDisclosure>; binds: Record<Action, string>; setBinds: (u: (b: Record<Action, string>) => Record<Action, string>) => void }) {
-  return (
-    <Modal isOpen={disc.isOpen} onOpenChange={disc.onOpenChange} placement="center" backdrop="blur" scrollBehavior="inside">
-      <ModalContent>{onClose => (<>
-        <ModalHeader className="flex items-center gap-2"><Keyboard size={18} className="text-accent" />Keybinds</ModalHeader>
-        <ModalBody className="gap-2">
-          <p className="text-xs text-muted">Click a key box, then press a key to bind it. Arrows step every cue; WASD drives whatever is on the stage, so slides move without touching the sound underneath.</p>
-          {keyActions.map(a => <KeybindRow key={a.id} label={a.label} value={binds[a.id]} clash={clashes(binds).has(a.id)} onSet={k => setBinds(b => ({ ...b, [a.id]: k }))} />)}
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="light" onPress={() => setBinds(() => defaultBinds)}>Reset defaults</Button>
-          <Button color="primary" onPress={onClose}>Done</Button>
-        </ModalFooter>
-      </>)}</ModalContent>
-    </Modal>
-  );
-}

@@ -7,11 +7,11 @@ import { codeProblem, newCode } from "./projects";
  * followspot needs the cue list and nothing else, the deputy needs everything but the stage.
  */
 export const PERMS = [
-  { key: "cues", label: "See the cue list", hint: "The running order, and which cue is live." },
+  { key: "cues", label: "See the cue list", hint: "The sequence, and which cue is live." },
   { key: "script", label: "See the script", hint: "The script reader, with their own keyword flashes." },
   { key: "stage", label: "See the stage", hint: "What the audience is looking at right now." },
   { key: "fire", label: "Fire cues", hint: "Can call the next cue for everyone." },
-  { key: "edit", label: "Edit the running order", hint: "Can change cues mid-show." },
+  { key: "edit", label: "Edit the sequence", hint: "Can change cues mid-show." },
   { key: "message", label: "Send messages", hint: "Can flash a line on everyone else's screen." },
 ] as const;
 export type Perm = typeof PERMS[number]["key"];
@@ -131,7 +131,7 @@ export async function refreshTicket(member: string): Promise<Ticket | null> {
  */
 export type DeckCue = { id: string; label: string; number: string; kind: string };
 export type ShowMsg =
-  /** The host, telling the room where it is. `deck` is the whole running order, sent on request. */
+  /** The host, telling the room where it is. `deck` is the whole sequence, sent on request. */
   | { type: "deck"; show: string; cues: DeckCue[]; index: number; script?: string; stage?: { url: string; kind: string; label: string } | null }
   | { type: "cue"; index: number; label: string }
   | { type: "start"; at: string }

@@ -17,12 +17,14 @@ import Settings from "./pages/Settings";
 import Projects from "./pages/Projects";
 import Workspace from "./pages/Workspace";
 import Show from "./pages/Show";
+import RequireAuth from "./components/RequireAuth";
 import UsernamePrompt from "./components/UsernamePrompt";
 import Coach from "./components/Coach";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
-import { applyTheme, getTheme } from "./lib/theme";
+import { applyTheme } from "./lib/theme";
+import { trackGlassPointer } from "./lib/glass";
 
 /** /legal was one page with two anchors; keep old links working now that it is two pages. */
 function LegalRedirect() {
@@ -30,7 +32,11 @@ function LegalRedirect() {
   return <Navigate to={hash === "#privacy" ? "/privacy" : "/terms"} replace />;
 }
 
-applyTheme(getTheme());
+// The page is beige and there is no control left that makes it anything else (§14), so boot it that
+// way rather than off the stored page theme: anyone who set dark back when the toggle was still in
+// the top bar would otherwise come back to a dark app with nothing in the UI to undo it.
+applyTheme("light");
+trackGlassPointer();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {/* BASE_URL is "/" everywhere except GitHub Pages, which serves the app from /<repo>/. */}
@@ -44,9 +50,11 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/contact" element={<Contact />} />
         <Route path="/credits" element={<Credits />} />
         <Route path="/script" element={<Script />} />
-        <Route path="/workspace" element={<Workspace />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/show" element={<Show />} />
+        {/* An account buys a workspace, not the app. Studio, the library and sequences are open to
+            anyone; these three do not render without a session. See plan.md §8. */}
+        <Route path="/workspace" element={<RequireAuth><Workspace /></RequireAuth>} />
+        <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
+        <Route path="/show" element={<RequireAuth><Show /></RequireAuth>} />
         <Route path="/account" element={<Account />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/terms" element={<Terms />} />

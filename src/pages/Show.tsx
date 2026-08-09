@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input } from "../ui";
 import { Lock, Maximize, MessageSquare, Send, Unlock } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
+import DarkToggle from "../components/DarkToggle";
 import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
+import { themeClass, useStudioTheme } from "../lib/theme";
 import {
   forgetTicket, joinShow, refreshTicket, savedTicket, showChannel,
   type DeckCue, type Perm, type ShowMsg, type Ticket,
@@ -57,6 +59,9 @@ function Door({ onIn }: { onIn: (t: Ticket) => void }) {
 }
 
 export default function Show() {
+  // Whatever job you hold, the screen you hold it on is yours: the toggle is on this page for every
+  // role, not just the host, and what it writes never leaves the device.
+  const [theme] = useStudioTheme();
   const [ticket, setTicket] = useState<Ticket | null>(savedTicket);
   const [cues, setCues] = useState<DeckCue[]>([]);
   const [index, setIndex] = useState(-1);
@@ -121,7 +126,7 @@ export default function Show() {
   };
 
   return (
-    <div className="flex h-screen flex-col gap-3 bg-background p-4 text-foreground">
+    <div className={`${themeClass(theme)} flex h-screen flex-col gap-3 bg-background p-4 text-foreground`}>
       <Flash text={flash} />
       <AlertFlash level={null} />
       {started && <div aria-hidden className="live-frame" />}
@@ -141,6 +146,7 @@ export default function Show() {
           {started
             ? <span className="flex items-center gap-1 text-xs text-live"><Lock size={13} />Locked in</span>
             : <span className="flex items-center gap-1 text-xs text-muted"><Unlock size={13} />Not started</span>}
+          <DarkToggle />
           <Button isIconOnly size="sm" variant="light" aria-label="Full screen"
             onPress={() => void document.documentElement.requestFullscreen?.().catch(() => {})}><Maximize size={15} /></Button>
           {!started && <Button size="sm" variant="light" onPress={() => { forgetTicket(); setTicket(null); }}>Leave</Button>}
@@ -149,8 +155,11 @@ export default function Show() {
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
         {can(ticket, "cues") && (
-          <section className="glass min-h-0 overflow-auto p-3">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-muted">Running order</h2>
+          /* Deliberately not `.glass`: this is the running deck during a live show. A bevel that
+             splits colour and a highlight that follows the pointer over a list that is changing
+             under stage light is the one place refraction costs more than it gives. */
+          <section className="glass-soft min-h-0 overflow-auto p-3">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-muted">Sequence</h2>
             {cues.length === 0 && <p className="text-sm text-muted">Waiting for the host to send the deck…</p>}
             <ol className="space-y-1">
               {cues.map((cue, i) => (

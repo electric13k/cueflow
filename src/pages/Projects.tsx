@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "../ui";
 import { FolderOpen, Trash2, UserPlus, Users } from "lucide-react";
-import Page from "../components/Page";
+import Shell from "../components/Shell";
+import { CoachHelp } from "../components/Coach";
+import { teach } from "../lib/coach";
 import { toast } from "../lib/toast";
 import { onAuth } from "../lib/store";
 import {
@@ -22,7 +24,9 @@ export default function Projects() {
   const [busy, setBusy] = useState(false);
   const here = currentProject();
 
-  const load = () => void listProjects().then(p => { setProjects(p); setReady(true); }).catch(e => { toast("Could not load projects", (e as Error).message, "warn"); setReady(true); });
+  // Taught here, not on mount: the control it points at only exists once the page has stopped
+  // saying "Looking up your projects…".
+  const load = () => void listProjects().then(p => { setProjects(p); setReady(true); teach("projects"); }).catch(e => { toast("Could not load projects", (e as Error).message, "warn"); setReady(true); });
   useEffect(() => onAuth(email => { setSignedIn(!!email); if (email) load(); else setReady(true); }), []);
 
   const open = (p: Project) => {
@@ -40,30 +44,33 @@ export default function Projects() {
   /** Switching reloads: the open deck and the library both belong to the project you were in. */
   const switchTo = (id: string | null) => { setCurrentProject(id); location.assign("/studio"); };
 
-  if (!ready) return <Page width="max-w-3xl"><p className="text-muted">Looking up your projects…</p></Page>;
+  if (!ready) return <Shell width="max-w-3xl"><p className="text-muted">Looking up your projects…</p></Shell>;
 
   if (!signedIn) return (
-    <Page width="max-w-3xl">
+    <Shell width="max-w-3xl">
       <h1 className="text-3xl font-black tracking-tight">Projects</h1>
       <p className="mt-3 text-muted">
-        A project is a separate library, a separate set of running orders and its own shows — one per
+        A project is a separate library, a separate set of sequences and its own shows, one per
         production, so last term's assembly is not in the way of this term's play. Sign in to make one.
       </p>
       <Button className="mt-6" href="/studio" color="primary">Open the Studio</Button>
-    </Page>
+    </Shell>
   );
 
   return (
-    <Page width="max-w-3xl">
+    <Shell width="max-w-3xl">
       <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Projects</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">One production, one project</h1>
       <p className="mt-3 text-muted">
-        Each project keeps its own sounds, its own running orders and its own shows. People you add
+        Each project keeps its own sounds, its own sequences and its own shows. People you add
         see all of it; everything outside a project stays yours alone.
       </p>
 
-      <section className="glass mt-8 space-y-3 p-6">
-        <h2 className="flex items-center gap-2 text-lg font-black tracking-tight"><FolderOpen size={18} className="text-accent" />Start one</h2>
+      <section data-coach="projects" className="glass mt-8 space-y-3 p-6">
+        <h2 className="flex items-center gap-2 text-lg font-black tracking-tight">
+          <FolderOpen size={18} className="text-accent" />Start one
+          <CoachHelp id="projects" className="ml-auto" />
+        </h2>
         <div className="flex flex-wrap gap-2">
           <Input className="min-w-48 flex-1" label="Name" value={fresh} onValueChange={setFresh} placeholder="Spring play" />
           <Button className="self-end" color="primary" isLoading={busy}
@@ -131,7 +138,7 @@ export default function Projects() {
                 </div>
 
                 <Button size="sm" variant="light" className="text-live"
-                  onPress={() => { if (confirm(`Delete "${p.name}"? Its sounds and running orders are unfiled, not deleted.`)) void run(() => deleteProject(p.id), "Project deleted."); }}>
+                  onPress={() => { if (confirm(`Delete "${p.name}"? Its sounds and sequences are unfiled, not deleted.`)) void run(() => deleteProject(p.id), "Project deleted."); }}>
                   Delete this project
                 </Button>
               </div>
@@ -139,6 +146,6 @@ export default function Projects() {
           </div>
         ))}
       </section>
-    </Page>
+    </Shell>
   );
 }

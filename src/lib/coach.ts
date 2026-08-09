@@ -24,7 +24,7 @@ export const lessons: Record<string, Lesson> = {
   },
   sequence: {
     id: "sequence",
-    title: "The running order",
+    title: "The sequence",
     body: "Drag cues into the order you will call them. Sound counts 1, 2, 3; anything the room sees counts a, b, c.",
     target: "[data-coach='arm']",
   },
@@ -36,14 +36,38 @@ export const lessons: Record<string, Lesson> = {
   script: {
     id: "script",
     title: "The script",
-    body: "Import it, name the words that matter, and the screen flashes just before each one arrives.",
+    body: "Import it, name the words that matter, and the screen flashes just before each one arrives. Split, popup or its own tab — the same reader either way, so put it where you would put a prompt copy.",
     target: "[data-coach='script']",
   },
   show: {
     id: "show",
     title: "Shows",
-    body: "Hand out a key and the rest of the room joins on their own devices. Silent, no accounts.",
+    body: "Hand out a key and the rest of the room joins on their own devices — silent, no accounts. Joining is the same key on Join a show, and the deck lands on their screen as you fire it.",
     target: "[data-coach='show']",
+  },
+  sidebar: {
+    id: "sidebar",
+    title: "Where things live",
+    body: "Recents, then one workspace per production. Switching workspace swaps the library, the sequences and the shows together.",
+    target: "[data-coach='sidebar']",
+  },
+  projects: {
+    id: "projects",
+    title: "One production, one project",
+    body: "A project is its own library, its own sequences, its own shows. Give someone the code and they work in it with you.",
+    target: "[data-coach='projects']",
+  },
+  presenter: {
+    id: "presenter",
+    title: "The presenter window",
+    body: "This is the window the room sees. Drag it to the projector and leave it there — the board stays on your screen.",
+    target: "[data-coach='presenter']",
+  },
+  transport: {
+    id: "transport",
+    title: "Your thumb is the arrow key",
+    body: "No arrow keys on a phone, so armed decks dock this bar. The wide button fires the next cue; Back steps one in.",
+    target: "[data-coach='transport']",
   },
 };
 
@@ -55,6 +79,12 @@ export function markLearned(id: string) {
   if (!all.includes(id)) localStorage.setItem(KEY, JSON.stringify([...all, id]));
 }
 export const forgetLessons = () => localStorage.removeItem(KEY);
+
+/** Un-learn one lesson and give it again. Every other lesson stays learned. */
+export function replay(id: keyof typeof lessons) {
+  localStorage.setItem(KEY, JSON.stringify(taught().filter(x => x !== id)));
+  teach(id);
+}
 
 /** Ask for a lesson. Silently does nothing if it has already been given. */
 export function teach(id: keyof typeof lessons) {
