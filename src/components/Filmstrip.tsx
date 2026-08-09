@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { nudgeEdge, placeEdge } from "../lib/trim";
 
 const SHOTS = 10;
+/** How close a dragged handle has to come to a cue point before it sticks, in pixels of bar. */
+const SNAP_PX = 8;
 
 /**
  * A thumbnail strip with draggable in/out handles, the way OpenCut (opencut.app) and every other
@@ -11,8 +14,10 @@ const SHOTS = 10;
  * A cross-origin file without CORS taints the canvas, and reading it back throws. That is not worth
  * failing over -- the handles still work against a plain bar, so the strip just stays empty.
  */
-export default function Filmstrip({ url, duration, trimIn, trimOut, onChange }: {
+export default function Filmstrip({ url, duration, trimIn, trimOut, cues = [], onChange }: {
   url: string; duration: number; trimIn: number; trimOut: number;
+  /** Trim edges other cues already use on this file; a dragged handle sticks to them. */
+  cues?: number[];
   onChange: (patch: { trimIn?: number; trimOut?: number }) => void;
 }) {
   const [shots, setShots] = useState<string[]>([]);
@@ -48,8 +53,16 @@ export default function Filmstrip({ url, duration, trimIn, trimOut, onChange }: 
     const box = bar.current?.getBoundingClientRect();
     if (!box) return;
     const t = Math.max(0, Math.min(1, (clientX - box.left) / box.width)) * duration;
-    // Keep at least a quarter second of video, or the cue plays nothing at all.
-    onChange(edge === "trimIn" ? { trimIn: Math.min(t, end - .25) } : { trimOut: Math.max(t, trimIn + .25) });
+    onChange(placeEdge(edge, t, { duration, trimIn, trimOut, points: cues, tolerance: SNAP_PX / box.width * duration }));
+  };
+
+  // A focused handle steps a frame at a time, the way every timeline editor spells it. Stopped
+  // before it reaches the window, or a rebound "," would also fire a cue.
+  const nudge = (edge: "trimIn" | "trimOut") => (e: React.KeyboardEvent) => {
+    const dir = e.key === "," ? -1 : e.key === "." ? 1 : 0;
+    if (!dir) return;
+    e.preventDefault(); e.stopPropagation();
+    onChange(nudgeEdge(edge, dir as -1 | 1, { duration, trimIn, trimOut }));
   };
 
   const grab = (edge: "trimIn" | "trimOut") => (e: React.PointerEvent) => {
@@ -72,10 +85,13 @@ export default function Filmstrip({ url, duration, trimIn, trimOut, onChange }: 
         <div className="absolute inset-y-0 left-0 bg-black/70" style={{ width: pct(trimIn) }} />
         <div className="absolute inset-y-0 right-0 bg-black/70" style={{ left: pct(end) }} />
         <div className="pointer-events-none absolute inset-y-0 border-x-2 border-accent" style={{ left: pct(trimIn), right: `calc(100% - ${pct(end)})` }} />
+        {/* Where other cues already cut this file. Shown, or a handle sticking looks like a fault. */}
+        {cues.map(t => <span key={t} className="pointer-events-none absolute inset-y-0 w-px bg-armed/80" style={{ left: pct(t) }} />)}
         {(["trimIn", "trimOut"] as const).map(edge => (
           <button key={edge} type="button" aria-label={edge === "trimIn" ? "Start of clip" : "End of clip"}
-            onPointerDown={grab(edge)}
-            className="absolute inset-y-0 -ml-3 w-6 cursor-ew-resize touch-none"
+            title="Drag to trim. With the handle focused, , and . move it one frame."
+            onPointerDown={grab(edge)} onKeyDown={nudge(edge)}
+            className="absolute inset-y-0 -ml-[22px] w-11 cursor-ew-resize touch-none"
             style={{ left: pct(edge === "trimIn" ? trimIn : end) }}>
             <span className="mx-auto block h-full w-1.5 rounded-full bg-accent shadow" />
           </button>
@@ -86,6 +102,7 @@ export default function Filmstrip({ url, duration, trimIn, trimOut, onChange }: 
         <span>{(end - trimIn).toFixed(2)}s on screen</span>
         <span>{end.toFixed(2)}s</span>
       </div>
+      <p className="text-[11px] text-muted">Pick up a handle and nudge it a frame with <kbd>,</kbd> and <kbd>.</kbd>{cues.length > 0 && " — it sticks to where other cues cut this file."}</p>
     </div>
   );
 }

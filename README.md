@@ -17,7 +17,7 @@ School and community productions run on whatever is to hand: a laptop with a med
 scrubbing a timeline in the dark, a slide deck in another window and a phone with the script on it.
 Four things to watch, four things to get wrong.
 
-A professional desk solves this by holding the running order and letting one person call it. That is
+A professional desk solves this by holding the sequence and letting one person call it. That is
 the only part CueFloww copies. It keeps the list; you keep the timing.
 
 ## What it does
@@ -41,7 +41,7 @@ then red as it lands. Never a sound — you are standing a few feet from an audi
 phones. No accounts. Each job's key decides what that person sees and can do; the show password gets
 you in as a collaborator. Messages between devices flash on screen and are silent by design.
 
-**Projects.** A separate library, running orders, script and shows per production, with collaborators
+**Projects.** A separate library, sequences, script and shows per production, with collaborators
 added by username or email.
 
 ## Running it yourself

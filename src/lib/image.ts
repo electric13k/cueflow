@@ -1,4 +1,4 @@
-import type { Visual } from "../types";
+import { defaultVisual, type Visual } from "../types";
 
 /**
  * Raster work for the picture and slide editors. Everything happens on a canvas in the browser; no
@@ -17,6 +17,74 @@ export const tempAlpha = (temp: number) => Math.min(Math.abs(temp), 100) / 260;
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export const fullRect = (): Rect => ({ x: 0, y: 0, w: 1, h: 1 });
+
+// --- The adjustment stack ------------------------------------------------------------------------
+
+export type Ctl = { key: keyof Visual; label: string; min: number; max: number; step: number; suffix?: string; decimals?: number };
+/** One panel of the stack. `also` is a value the module owns that has no slider, e.g. the mirror flag. */
+export type ImageModule = {
+  id: string; label: string; hint: string;
+  pane: "geometry" | "tone";
+  ctl: Ctl[]; also?: (keyof Visual)[];
+};
+
+/**
+ * The order is fixed and it is the point. darktable's pixelpipe runs geometry, then exposure, then
+ * the curve, then colour, then the local effects, and it does not let you shuffle them, because an
+ * adjustment only reads true when the ones it depends on have already happened: set the white
+ * balance before the exposure and the exposure stops meaning anything. Krita's split is the other
+ * half -- what changes the frame is not what changes the pixels, so they are two panes, not one
+ * list. Behaviour only; no code from either project is here. Credit to darktable and Krita.
+ */
+export const MODULES: ImageModule[] = [
+  { id: "orientation", label: "Orientation", hint: "turn and mirror", pane: "geometry", also: ["flipH"],
+    ctl: [{ key: "rotate", label: "Rotate", min: 0, max: 359, step: 1, suffix: "°", decimals: 0 }] },
+  { id: "framing", label: "Framing", hint: "scale inside the frame", pane: "geometry",
+    ctl: [{ key: "zoom", label: "Zoom", min: .5, max: 3, step: .05, suffix: "x" }] },
+  { id: "exposure", label: "Exposure", hint: "overall light", pane: "tone",
+    ctl: [{ key: "brightness", label: "Exposure", min: 0, max: 2, step: .05 }] },
+  { id: "curves", label: "Curves", hint: "shadow-to-highlight spread", pane: "tone",
+    ctl: [{ key: "contrast", label: "Contrast", min: 0, max: 2, step: .05 }] },
+  { id: "colour", label: "Colour", hint: "white balance and strength", pane: "tone",
+    ctl: [
+      { key: "temp", label: "Warmth", min: -100, max: 100, step: 1, decimals: 0 },
+      { key: "saturate", label: "Saturation", min: 0, max: 3, step: .05 },
+    ] },
+  { id: "effects", label: "Local effects", hint: "applied last, over everything", pane: "tone",
+    ctl: [
+      { key: "vignette", label: "Vignette", min: 0, max: 1, step: .02 },
+      { key: "blur", label: "Blur", min: 0, max: 20, step: .5, suffix: "px", decimals: 0 },
+    ] },
+];
+
+const NEUTRAL = defaultVisual();
+export const moduleKeys = (m: ImageModule): (keyof Visual)[] => [...m.ctl.map(c => c.key), ...(m.also ?? [])];
+const pick = (v: Visual, keys: (keyof Visual)[]) =>
+  Object.fromEntries(keys.map(k => [k, v[k]])) as Partial<Visual>;
+
+/** Is this module doing anything? Anything away from the default counts, and drives the reset button. */
+export const moduleTouched = (v: Visual, m: ImageModule) =>
+  moduleKeys(m).some(k => (v[k] ?? NEUTRAL[k]) !== NEUTRAL[k]);
+
+/** Per-module reset: this panel back to default, every other panel untouched. */
+export const resetModule = (v: Visual, m: ImageModule): Visual => ({ ...v, ...pick(NEUTRAL, moduleKeys(m)) });
+
+/**
+ * Switching a module off has to mean "bypass", not "forget": the values come back when you switch it
+ * on again. Keeping them in a stash rather than in the look means what is saved is always what is on
+ * screen, so nothing downstream -- stage, flatten, the presenter window -- needs to know the stack
+ * exists.
+ */
+export type Bypassed = Record<string, Partial<Visual>>;
+export function toggleModule(v: Visual, m: ImageModule, off: Bypassed): [Visual, Bypassed] {
+  const stashed = off[m.id];
+  if (stashed) {
+    const rest = { ...off };
+    delete rest[m.id];
+    return [{ ...v, ...stashed }, rest];
+  }
+  return [resetModule(v, m), { ...off, [m.id]: pick(v, moduleKeys(m)) }];
+}
 
 const load = async (url: string) => {
   const img = new Image();

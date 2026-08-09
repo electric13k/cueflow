@@ -56,13 +56,22 @@ export default function CropBox({ url, onCancel, onApply }: {
     setRect({ x, y, w: Math.max(.02, w), h: Math.max(.02, h) });
   };
 
-  const start = (e: React.PointerEvent) => {
-    e.preventDefault();
-    from.current = at(e);
+  const track = () => {
     const move = (ev: PointerEvent) => draw(ev);
     const stop = () => { from.current = null; window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", stop);
+  };
+  const start = (e: React.PointerEvent) => { e.preventDefault(); from.current = at(e); track(); };
+  /**
+   * Dragging a corner is drawing the same box from the corner opposite it, so the whole resize is
+   * the anchor swap and nothing else. 44 px of hit area, which is a fingertip -- the visible ring is
+   * a fifth of that, because a target you can hit and a target you can see are different sizes.
+   */
+  const corner = (ax: 0 | 1, ay: 0 | 1) => (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    from.current = { x: rect.x + (1 - ax) * rect.w, y: rect.y + (1 - ay) * rect.h };
+    track();
   };
 
   const box = { left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` };
@@ -81,6 +90,13 @@ export default function CropBox({ url, onCancel, onApply }: {
             {Array.from({ length: 9 }, (_, i) => <div key={i} className="border border-white/20" />)}
           </div>
         </div>
+        {([[0, 0], [1, 0], [0, 1], [1, 1]] as const).map(([ax, ay]) => (
+          <button key={`${ax}${ay}`} type="button" aria-label="Resize the crop" onPointerDown={corner(ax, ay)}
+            className="absolute h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-none"
+            style={{ left: `${(rect.x + ax * rect.w) * 100}%`, top: `${(rect.y + ay * rect.h) * 100}%` }}>
+            <span className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-background/80" />
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -89,7 +105,7 @@ export default function CropBox({ url, onCancel, onApply }: {
           <Button key={r.label} size="sm" variant={ratio === r.value ? "solid" : "flat"} color={ratio === r.value ? "primary" : "default"}
             onPress={() => setRatio(r.value)}>{r.label}</Button>
         ))}
-        <span className="text-xs text-muted">Drag across the picture to set the frame.</span>
+        <span className="text-xs text-muted">Drag across the picture to set the frame, or drag a corner.</span>
         <span className="ml-auto flex gap-2">
           <Button size="sm" variant="light" startContent={<X size={14} />} onPress={onCancel}>Cancel</Button>
           <Button size="sm" color="primary" startContent={<Check size={14} />} onPress={() => onApply(rect)}>Crop to new image</Button>
