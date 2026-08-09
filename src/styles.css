@@ -36,22 +36,34 @@
    every component at once. Same layer + selector as HeroUI's own dark theme, declared after
    it, so these win. */
 @layer theme {
-  /* Light mode is foolscap: the script on the desk before the house goes in. */
-  :root:not(.dark) {
-    --accent: #6E2029;
-    --accent-foreground: #F7F2E7;
+  /* Foolscap is the app: the script on the desk before the house goes in. Beige page, burgundy
+     curtain, olive crew. This is the default and it is unconditional -- there is no page-wide mode
+     to be in any more, so nothing has to opt into it. */
+  :root {
+    --accent: #6E2029;              /* burgundy */
+    --accent-foreground: #FBF6EC;
     --accent-hover: #8A2B35;
     --focus: #6E2029;
-    --background: #EFE7D8;
-    --foreground: #241F1C;
+    --background: #F3E9D8;          /* beige */
+    --foreground: #2B2420;          /* warm ink, never a cold grey */
     --cue-curtain: #6E2029;
-    --cue-foolscap: #EFE7D8;
-    --cue-audio: #4E5B39;   /* olive: the crew's colour, gaffer and flight case */
-    --cue-visual: #9C5A34;  /* rust: lamp on skin */
+    --cue-foolscap: #FBF6EC;        /* the lit paper: the glow the backdrop washes with */
+    --cue-audio: #46583A;   /* olive: the crew's colour, gaffer and flight case */
+    --cue-visual: #8C4A2F;  /* rust: lamp on skin */
     --cue-armed: #8A6A2A;   /* brass */
     --cue-live: #A32330;    /* crimson */
-    --cue-ready: #4E5B39;
+    --cue-ready: #46583A;
   }
+  /**
+   * Dark, as a scope rather than a mode.
+   *
+   * Custom properties inherit, so `.theme-dark` on *any* container re-themes everything inside it
+   * and leaves the rest of the page beige. That is what lets the Studio and the Show run dark for a
+   * host standing in a blackout while the marketing pages and the workspace stay on paper. On
+   * <html> it still themes the whole document; `.dark` and `[data-theme]` are the aliases Tailwind's
+   * `dark:` variants and HeroUI read, and they only ever land on <html>.
+   */
+  .theme-dark,
   .dark,
   [data-theme="dark"] {
     --accent: #C9737C;
@@ -81,21 +93,50 @@
     --glass-tint: 36, 31, 28;
     --glass-face: rgba(255, 252, 245, .78);
     --glass-face-hover: rgba(255, 252, 245, .94);
+    /* No blur available: the panel becomes a card, so the face has to carry the page on its own. */
+    --glass-solid: #F7F2E7;
+    /* The two halves of the split edge and the highlight that rides on it. Warm is the brass rail,
+       cool is the crew's olive -- a prism splits the light that is in the room, and there is no
+       blue anywhere in this house. */
+    --prism-warm: color-mix(in srgb, var(--cue-visual) 62%, transparent);
+    --prism-cool: color-mix(in srgb, var(--cue-audio) 52%, transparent);
+    --glass-specular: rgba(255, 255, 255, .85);
   }
-  .dark {
+  .theme-dark, .dark {
     --glass-tint: 239, 231, 216;
     --glass-face: rgba(239, 231, 216, .045);
     --glass-face-hover: rgba(239, 231, 216, .075);
+    --glass-solid: #241F1C;
+    --prism-warm: color-mix(in srgb, var(--cue-armed) 85%, transparent);
+    --prism-cool: color-mix(in srgb, var(--cue-audio) 70%, transparent);
+    --glass-specular: rgba(255, 250, 240, .16);
   }
   body {
     @apply m-0 min-h-screen bg-background text-foreground font-sans antialiased;
-    /* Two washes, curtain and olive, and a paper grain over the top. No glow: a house at half is
-       lit from the sides, and nothing in a theatre emits its own light except the lanterns. */
+    /* The beige wash: house glow off the top, curtain in the upper corner, olive off the floor.
+       Backdrop.tsx paints the same three over the top in WebGL; this is what a machine with no GL
+       context gets, and it has to stand on its own. */
     background-image:
-      radial-gradient(60rem 40rem at 88% -14%, color-mix(in srgb, var(--cue-curtain) 26%, transparent), transparent 64%),
-      radial-gradient(48rem 36rem at 2% 110%, color-mix(in srgb, var(--cue-audio) 14%, transparent), transparent 64%);
+      radial-gradient(70rem 46rem at 50% -18%, color-mix(in srgb, var(--cue-foolscap) 85%, transparent), transparent 68%),
+      radial-gradient(56rem 38rem at 90% -8%, color-mix(in srgb, var(--cue-curtain) 13%, transparent), transparent 62%),
+      radial-gradient(48rem 36rem at 4% 108%, color-mix(in srgb, var(--cue-audio) 12%, transparent), transparent 64%);
     background-attachment: fixed;
   }
+
+  /**
+   * Stage output is not a theme.
+   *
+   * The audience window and the presenter preview are black because a bright screen behind a
+   * performance is a bug. So this is structural: a literal, keyed off an attribute the Stage
+   * component sets on itself, at a specificity no theme scope competes with. There is no token in
+   * this rule, which means no future palette change and no `.theme-dark` wrapper anywhere above it
+   * can brighten what the room sees.
+   */
+  [data-stage] { background: #000 !important; color-scheme: dark; }
+  /* The one alternative, and it is the same kind of thing: a literal, not a token. A house holding
+     an empty screen sometimes wants white -- a projector cannot be focused or lined up on black --
+     and `Stage` only ever asks for it while nothing is up. */
+  [data-stage="white"] { background: #FFF !important; color-scheme: light; }
   h1, h2, h3 { @apply font-display; letter-spacing: -.015em; }
   /* Bodoni's thin strokes shatter at small sizes, so the display face is for headings only and
      everything under ~20px falls back to the body serif. */
@@ -150,7 +191,8 @@
   }
 
   /* An imported script keeps the shape the writer gave it and loses the paper: no white page, no
-     margins, no drop shadow. Only the structure survives, in the site's own colours. */
+     margins, no drop shadow. The structure survives, and so does the shape -- centring,
+     indentation, the named styles Word calls Character and Dialogue -- in the site's own colours. */
   .script-prose { line-height: 1.7; }
   .script-prose p { margin: 0 0 .85em; }
   .script-prose h1, .script-prose h2, .script-prose h3, .script-prose h4 {
@@ -172,6 +214,28 @@
     box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--cue-armed) 60%, transparent);
   }
 
+  /* The shape of a script, however it was written. Word's own paragraph styles come across as the
+     first five; centring and indentation applied by hand come across as the rest. A page a class
+     never reaches still keeps its `style` and `align`, which the importer allows by property name. */
+  .script-prose .script-scene { font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin: 1.4em 0 .5em; }
+  .script-prose .script-character { text-align: center; font-weight: 700; letter-spacing: .06em; margin: 1.1em 0 .1em; }
+  .script-prose .script-parenthetical { margin: 0 0 .15em 3.5em; font-style: italic; }
+  .script-prose .script-dialogue { margin: 0 0 .85em 2em; }
+  .script-prose .script-transition { text-align: right; font-weight: 600; letter-spacing: .08em; margin: 1em 0 .85em; }
+  .script-prose .script-center { text-align: center; }
+  .script-prose .script-right { text-align: right; }
+  .script-prose .script-indent-1 { margin-left: 2em; }
+  .script-prose .script-indent-2 { margin-left: 4em; }
+  .script-prose .script-indent-3 { margin-left: 6em; }
+
+  /* Find in script. Every match is tinted; the one you are standing on is the only one outlined,
+     because the whole point is telling it apart from the others at a glance. */
+  .script-prose .find-hit { background: color-mix(in srgb, var(--cue-visual) 20%, transparent); border-radius: .2rem; }
+  .script-prose .find-hit.current {
+    background: color-mix(in srgb, var(--cue-visual) 48%, transparent);
+    box-shadow: 0 0 0 1px var(--cue-visual);
+  }
+
   /* Silent alerts. A cue word coming up is amber, arriving is red, and neither makes a sound --
      this is read by someone standing in the dark a few feet from an audience. */
   @keyframes flash-once { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
@@ -187,13 +251,74 @@
     .flash-message { animation: none; }
   }
 
-  /* Liquid glass: translucent, blurred, inner top highlight + soft outer shadow. */
-  /* Card, not glass. A 24px radius and a heavy blur is the house style of every SaaS dashboard;
-     paper has a corner you could cut yourself on and an edge you can see. */
-  .glass {
-    @apply rounded-lg border shadow-glass backdrop-blur-md;
+  /**
+   * Liquid glass, as a prism rather than a frost.
+   *
+   * A blur alone is frosted glass -- it scatters what is behind the panel and stops. Refraction is
+   * light bending through something solid, and the tell is the edge: a real bevel splits the beam,
+   * so one rim runs warm and the opposite rim runs cool. Three layers, all of them CSS:
+   *
+   *   1. `backdrop-filter: blur() saturate()` -- the only way to sample what is behind an element
+   *      without re-rendering the scene into a texture. Saturation over 1 is what stops a blur from
+   *      reading as grey gauze.
+   *   2. `::before` -- an inset ring painted by two conic gradients set a few degrees apart, so
+   *      warm and cool never line up and the edge carries a split instead of a white hairline.
+   *      Masked to a ring with `mask-composite`, radius inherited so it follows any corner.
+   *   3. `::after` -- one narrow specular highlight, placed from the pointer. `--gx`/`--gy` land on
+   *      the root element from a single throttled document listener (src/lib/glass.ts) in viewport
+   *      coordinates, and `background-attachment: fixed` makes the viewport the positioning area,
+   *      so every panel resolves the same two numbers with no per-element script and nothing
+   *      measured. One light source, wherever your hand is.
+   *
+   * Nothing here animates or renders per frame: the sweep moves only while the pointer does, and it
+   * moves by a custom-property write the compositor picks up on the next paint it was doing anyway.
+   *
+   * Radius stays small. A 24px corner and a heavy blur is the house style of every SaaS dashboard;
+   * paper has a corner you could cut yourself on and an edge you can see.
+   */
+  .glass, .modal__dialog {
+    @apply border shadow-glass;
+    position: relative;
     background: var(--glass-face);
     border-color: rgba(var(--glass-tint), .16);
+    /* Unprefixed only: Lightning CSS adds `-webkit-` from the build targets, and writing the
+       prefixed form here makes it drop the plain one, which is the only one Firefox reads. */
+    backdrop-filter: blur(16px) saturate(1.7);
+    --sweep-x: var(--gx, 50vw);
+    --sweep-y: var(--gy, 0px);
+  }
+  .glass { @apply rounded-lg; }
+
+  .glass::before, .modal__dialog::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    border-radius: inherit;
+    padding: 1.25px;
+    background:
+      conic-gradient(from 196deg, var(--prism-cool), transparent 16%, transparent 42%, var(--prism-cool) 50%, transparent 68%, transparent 94%, var(--prism-cool)),
+      conic-gradient(from 184deg, var(--prism-warm), transparent 18%, transparent 44%, var(--prism-warm) 52%, transparent 70%, transparent 96%, var(--prism-warm));
+    /* Paint the border box, punch out the padding box: what survives is the ring. */
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  .glass::after, .modal__dialog::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    border-radius: inherit;
+    background-image: radial-gradient(26rem 9rem at var(--sweep-x) var(--sweep-y),
+      var(--glass-specular), color-mix(in srgb, var(--glass-specular) 30%, transparent) 34%, transparent 68%);
+    background-attachment: fixed;
+  }
+  /* Someone who asked for less motion still gets the bevel and the highlight -- the highlight just
+     stops following anything. Rest position is the top centre of the viewport, which is where a
+     house light would be. */
+  @media (prefers-reduced-motion: reduce) {
+    .glass, .modal__dialog { --sweep-x: 50vw; --sweep-y: 0px; }
+  }
+  /* No backdrop-filter: sampling the page is off the table, so the panel stops pretending to be
+     transparent and becomes a solid card. The bevel and the highlight cost nothing and stay. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass, .modal__dialog { background: var(--glass-solid); }
   }
   /**
    * The prompt book's margin: a hairline down the left with the cue number pencilled beside it.
@@ -219,34 +344,62 @@
     border-color: rgba(var(--glass-tint), .12);
   }
 
-  /* ponytail: the app writes border-white/10 and friends inline in ~20 places. Retinting those
-     utilities in light mode is a far smaller diff than theming every call site, and it keeps the
-     dark build byte-identical. Drop this if the classes ever move behind a token. */
-  :root:not(.dark) {
-    .border-white\/10 { border-color: rgba(15, 23, 42, .12); }
-    .border-white\/15 { border-color: rgba(15, 23, 42, .16); }
-    .border-white\/25 { border-color: rgba(15, 23, 42, .26); }
-    .bg-white\/\[\.03\], .bg-white\/5 { background-color: rgba(15, 23, 42, .035); }
-    .bg-white\/\[\.045\] { background-color: rgba(255, 255, 255, .72); }
-    .bg-white\/\[\.07\] { background-color: rgba(255, 255, 255, .92); }
-    .bg-white\/10 { background-color: rgba(15, 23, 42, .08); }
-    .bg-white\/15 { background-color: rgba(15, 23, 42, .12); }
-    .bg-white\/25 { background-color: rgba(15, 23, 42, .2); }
-  }
-
   /* HeroUI v3 paints the slider thumb the same accent colour as the fill, so it disappears the
      moment it sits on filled track. Give it a light face and a ring. */
+  /* A slider claims the horizontal drag. Without saying so, a thumb dragged on a phone scrolls the
+     page out from under itself and the value never moves. */
+  .slider__track, .slider__thumb, [role="slider"] { touch-action: none; }
   .slider__track { background: rgba(var(--glass-tint), .14); }
   .slider__thumb {
-    background: #f8fafc;
+    background: var(--cue-foolscap);
     border: 2px solid var(--accent);
-    box-shadow: 0 2px 10px rgba(2, 6, 23, .65);
+    box-shadow: 0 2px 10px rgba(36, 31, 28, .65);
   }
   .slider__thumb[data-dragging], .slider__thumb[data-focus-visible] { background: #fff; transform: scale(1.06); }
 }
 
-/* Slim, on-brand scrollbar */
-* { scrollbar-width: thin; scrollbar-color: rgba(34, 211, 238, .35) transparent; }
+/**
+ * ponytail: the app writes border-white/10 and friends inline in ~20 places. Retinting those
+ * utilities is a far smaller diff than theming every call site. Drop this if the classes ever move
+ * behind a token.
+ *
+ * Unlayered, and that is the whole trick. These were inside `@layer components` before, where
+ * Tailwind's own `utilities` layer outranks them no matter how specific they are -- so on a beige
+ * page every one of these borders stayed white-on-cream and invisible. Unlayered rules beat every
+ * layer, which is what makes them land.
+ *
+ * Two blocks rather than a `:not()`, so the dark restore is a scope like everything else: the page
+ * retint hangs off `html` (0,1,1), the restore off `.theme-dark` (0,2,0), and a dark subtree wins
+ * on specificity rather than on source order. Without the restore, the same borders are
+ * ink-on-ink and invisible the moment a container goes dark.
+ */
+html {
+  .border-white\/10 { border-color: rgba(43, 36, 32, .13); }
+  .border-white\/15 { border-color: rgba(43, 36, 32, .17); }
+  .border-white\/25 { border-color: rgba(43, 36, 32, .27); }
+  .bg-white\/\[\.03\], .bg-white\/5 { background-color: rgba(43, 36, 32, .035); }
+  .bg-white\/\[\.045\] { background-color: rgba(255, 253, 247, .72); }
+  .bg-white\/\[\.07\] { background-color: rgba(255, 253, 247, .92); }
+  .bg-white\/10 { background-color: rgba(43, 36, 32, .08); }
+  .bg-white\/15 { background-color: rgba(43, 36, 32, .12); }
+  .bg-white\/25 { background-color: rgba(43, 36, 32, .2); }
+}
+.theme-dark {
+  .border-white\/10 { border-color: rgba(255, 255, 255, .1); }
+  .border-white\/15 { border-color: rgba(255, 255, 255, .15); }
+  .border-white\/25 { border-color: rgba(255, 255, 255, .25); }
+  .bg-white\/\[\.03\] { background-color: rgba(255, 255, 255, .03); }
+  .bg-white\/5 { background-color: rgba(255, 255, 255, .05); }
+  .bg-white\/\[\.045\] { background-color: rgba(255, 255, 255, .045); }
+  .bg-white\/\[\.07\] { background-color: rgba(255, 255, 255, .07); }
+  .bg-white\/10 { background-color: rgba(255, 255, 255, .1); }
+  .bg-white\/15 { background-color: rgba(255, 255, 255, .15); }
+  .bg-white\/25 { background-color: rgba(255, 255, 255, .25); }
+}
+
+/* Slim, on-brand scrollbar. Driven off the tint token so it follows a scope like everything else,
+   and so the last cyan in the stylesheet is gone. */
+* { scrollbar-width: thin; scrollbar-color: rgba(var(--glass-tint), .3) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, .3); border-radius: 9999px; }
-*::-webkit-scrollbar-thumb:hover { background: rgba(34, 211, 238, .5); }
+*::-webkit-scrollbar-thumb { background: rgba(var(--glass-tint), .26); border-radius: 9999px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(var(--glass-tint), .44); }

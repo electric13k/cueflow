@@ -1,6 +1,8 @@
-import { motion, useReducedMotion } from "framer-motion";
+import { useRef } from "react";
+import { motion } from "framer-motion";
 import { ArrowRight, Cloud, Film, Image, Keyboard, ListMusic, Monitor, Presentation, Radio, Search, SlidersHorizontal, Zap } from "lucide-react";
 import Page from "../components/Page";
+import { useReveal } from "../lib/motion";
 import { Button } from "../ui";
 
 /**
@@ -42,26 +44,27 @@ const groups = [
 ];
 
 export default function Features() {
-  const still = useReducedMotion();
+  const root = useRef<HTMLDivElement>(null);
+  useReveal(root);
   return (
     <Page>
+      <div ref={root}>
       <motion.p {...rise()} className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Features</motion.p>
       <motion.h1 {...rise(.05)} className="mt-3 max-w-3xl text-5xl font-bold leading-[1.02] sm:text-6xl">
         Everything a show needs. <span className="italic text-accent">Nothing it doesn't.</span>
       </motion.h1>
 
-      {groups.map((g, gi) => (
+      {groups.map(g => (
         <section key={g.title} className="mt-16">
           <motion.h2 {...rise()} className="font-mono text-xs uppercase tracking-[.3em] text-muted">{g.title}</motion.h2>
           <ul className="mt-5 divide-y divide-white/10 border-y border-white/10">
-            {g.items.map((f, i) => (
-              <motion.li key={f.title} {...rise(i * .05 + gi * .02)}
-                whileHover={still ? undefined : { x: 6 }}
-                className="flex items-baseline gap-4 py-4 transition-colors hover:text-foreground">
+            {g.items.map(f => (
+              <li key={f.title} data-reveal
+                className="flex items-baseline gap-4 py-4 transition hover:text-foreground motion-safe:hover:translate-x-1.5">
                 <f.icon size={18} className="shrink-0 translate-y-0.5 text-accent" aria-hidden />
                 <h3 className="w-48 shrink-0 text-lg font-bold">{f.title}</h3>
                 <p className="text-muted">{f.body}</p>
-              </motion.li>
+              </li>
             ))}
           </ul>
         </section>
@@ -71,6 +74,7 @@ export default function Features() {
         <h2 className="text-3xl font-bold">Build a deck in five minutes.</h2>
         <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-semibold">Open the Studio</Button>
       </motion.div>
+      </div>
     </Page>
   );
 }

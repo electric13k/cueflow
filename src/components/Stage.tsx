@@ -34,7 +34,7 @@ export const visualStyle = (v: Visual): CSSProperties => ({
  * runs (a throttled window, reduced motion, a stalled frame loop) the slide is simply on screen,
  * where a JS tween starting at opacity 0 would leave the room staring at black.
  */
-export default function Stage({ stage, className = "" }: { stage: StageState; className?: string }) {
+export default function Stage({ stage, className = "", blank = "black" }: { stage: StageState; className?: string; blank?: "black" | "white" }) {
   const video = useRef<HTMLVideoElement>(null);
 
   // Trim is non-destructive: start at trimIn, and stop (or loop) at trimOut.
@@ -58,9 +58,13 @@ export default function Stage({ stage, className = "" }: { stage: StageState; cl
     return () => el.removeEventListener("timeupdate", watch);
   }, [stage?.url, stage?.n]);
 
-  if (!stage) return <div className={`bg-black ${className}`} />;
+  // `data-stage` is the structural guarantee, not a token: styles.css pins it to literal black, so
+  // no theme -- page-wide or a `.theme-dark` scope somewhere above it -- can brighten stage output.
+  // `blank` picks which literal an empty stage holds, and only an empty one: the moment a cue is up
+  // the value is "black" again, so nothing can put a white field behind a performance.
+  if (!stage) return <div data-stage={blank} className={className} />;
   return (
-    <div className={`relative overflow-hidden bg-black ${className}`}>
+    <div data-stage="black" className={`relative overflow-hidden ${className}`}>
       {/* Keyed on the cue so firing the same slide twice replays its transition. */}
       <div key={`${stage.url}:${stage.n}`} className={`absolute inset-0 cue-${stage.visual.transition}`}>
         {stage.kind === "image" && <img src={stage.url} alt={stage.label} className="h-full w-full" style={visualStyle(stage.visual)} />}

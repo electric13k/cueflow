@@ -1,14 +1,30 @@
-import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Button, Tooltip } from "../ui";
-import { Github, Moon, Music, Sun } from "lucide-react";
+import { Button } from "../ui";
+import { Github, Music } from "lucide-react";
 import AuthButton from "./AuthButton";
-import { applyTheme, getTheme } from "../lib/theme";
+import { useSignedIn } from "./RequireAuth";
 
-export default function Nav() {
+/**
+ * Logo, Home, Features, one working destination, the account control, GitHub.
+ *
+ * The bar is for arriving; the sidebar is for working. It carries exactly one working destination,
+ * and which one that is depends on who is looking: signed out it is the **Studio**, because that is
+ * the whole app a visitor is entitled to, and signed in it is the **Workspace**. Inside the Shell it
+ * carries neither, because the sidebar already owns them.
+ *
+ * That rule supersedes the old "exactly seven items" one (plan.md §3.3): a fixed count could not
+ * survive an item that appears for some people and not others, and it left Nav and Shell
+ * contradicting each other in the code.
+ *
+ * No theme toggle. The page is beige, full stop. Dark is a scope, not a mode, and it belongs to the
+ * Studio and the Show where someone is working in a dark room, not to the top of a marketing page.
+ */
+export default function Nav({ inShell }: { inShell?: boolean }) {
   const { pathname } = useLocation();
-  const [theme, setTheme] = useState(getTheme);
-  const flip = () => { const next = theme === "dark" ? "light" : "dark"; applyTheme(next); setTheme(next); };
+  const signedIn = useSignedIn();
+  // Pending reads as signed out: the Studio is a live link for everyone, so the worst case is a
+  // label that settles a beat later, not a link that goes nowhere.
+  const work = signedIn ? { to: "/workspace", label: "Workspace" } : { to: "/studio", label: "Studio" };
   const link = (to: string) => ({ variant: pathname === to ? "flat" : "light", color: pathname === to ? "primary" : "default" } as const);
   return (
     <nav className="sticky top-0 z-30 border-b border-white/10 bg-background/60 backdrop-blur-2xl">
@@ -19,14 +35,9 @@ export default function Nav() {
         </Link>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
           <Button href="/" size="sm" {...link("/")}>Home</Button>
-          <Button href="/workspace" size="sm" {...link("/workspace")}>Workspace</Button>
-          <Button href="/studio" size="sm" {...link("/studio")}>Studio</Button>
-          <Button href="/features" size="sm" {...link("/features")} className="hidden md:inline-flex">Features</Button>
-          <Button href="/tutorial" size="sm" {...link("/tutorial")} className="hidden sm:inline-flex">Tutorial</Button>
-          <Button href="/contact" size="sm" {...link("/contact")} className="hidden lg:inline-flex">Contact</Button>
-          <Tooltip content={theme === "dark" ? "Switch to light" : "Switch to dark"}>
-            <Button size="sm" variant="light" isIconOnly aria-label="Toggle colour theme" onPress={flip}>{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</Button>
-          </Tooltip>
+          <Button href="/features" size="sm" {...link("/features")} className="hidden sm:inline-flex">Features</Button>
+          {/* Inside the Shell the sidebar already owns this, so the bar does not repeat it. */}
+          {!inShell && <Button href={work.to} size="sm" {...link(work.to)}>{work.label}</Button>}
           <AuthButton />
           {/* Repo link is a nicety, drop it before the nav starts wrapping on phones. */}
           <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub" className="hidden sm:inline-flex"><Github size={17} /></Button>

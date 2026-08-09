@@ -26,7 +26,7 @@ export default function ScreenCard({ shot, alt, title, body, points, fit = "cove
           </span>
         </span>
         <span
-          className="glass absolute inset-0 flex flex-col justify-center gap-3 border-accent/25 bg-gradient-to-br from-accent/15 to-secondary/10 p-6"
+          className="glass absolute inset-0 flex flex-col justify-center gap-3 border-accent/25 p-6"
           style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
         >
           <h3 className="text-xl font-black tracking-tight">{title}</h3>

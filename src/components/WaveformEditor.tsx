@@ -1,13 +1,18 @@
 import { type KeyboardEvent, type PointerEvent, type WheelEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Slider, Spinner, Switch, Tooltip } from "../ui";
 import {
-  ClipboardPaste, Copy, Crop, Layers, Maximize2, Pause, Play, Repeat, RotateCcw, Save, Scissors,
-  SignalHigh, Split, TrendingDown, TrendingUp, Undo2, Redo2, Volume1, Volume2, VolumeX, Wand2, ZoomIn, ZoomOut,
+  Check, ClipboardPaste, Copy, Crop, Layers, Maximize2, Pause, Play, Repeat, RotateCcw, Save, Scissors,
+  SignalHigh, Spline, Split, TrendingDown, TrendingUp, Undo2, Redo2, Volume1, Volume2, VolumeX, Wand2, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import {
   bufferToWavFile, decodeAudioUrl, fadeRange, gainRange, insertBuffer, mixBuffer, normalizeRange,
   peaks, pickChannels, processBuffer, removeRange, reverseRange, silenceRange, sliceBuffer, toStereo,
 } from "../lib/audio";
+import {
+  addPoint, applyEnvelope, commit, ENV_MAX, envelopeGain, flatEnvelope, movePoint,
+  redo as redoStack, stack, undo as undoStack, type EnvPoint, type Stack,
+} from "../lib/audioEdit";
+import { useThemeSignal } from "../lib/theme";
 
 type Chan = { gain: number; mute: boolean };
 type Sel = { start: number; end: number; channel: number | null }; // channel null = every channel
@@ -17,17 +22,33 @@ const fmt = (s: number) => `${s.toFixed(2)}s`;
 /** Ruler labels: sub-second zoom wants decimals, a whole song wants m:ss. */
 const stamp = (s: number, step: number) =>
   step < 1 ? `${s.toFixed(2)}s` : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-const RULER = 18;
+const RULER = 18;                       // px reserved at the top of the canvas for the time ruler
 /**
- * A canvas gets no CSS, so the palette has to be read out of the document and handed to it -- and
- * re-read on every draw, because the theme toggle changes what these resolve to.
+ * A canvas gets no CSS, so the palette has to be read out of the document and handed to it, and
+ * re-read on every draw because a theme change moves what these resolve to.
+ *
+ * Read off the *canvas element*, not off <html>: custom properties inherit, so a `.theme-dark`
+ * wrapper around the editor re-themes the canvas exactly the way it re-themes the DOM around it.
+ * Ink is derived from `--foreground` for the same reason, rather than sniffing a class, which only
+ * ever knew about the page-wide theme.
+ *
+ * One getComputedStyle per draw; the repaint itself is driven by useThemeSignal() in the deps of
+ * the draw effect.
  */
 const MONO = `"Courier Prime", ui-monospace, monospace`;
-const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
-const ink = (alpha: number) => {
-  const on = document.documentElement.classList.contains("dark");
-  return `rgba(${on ? "239,231,216" : "36,31,28"}, ${alpha})`;
-};                       // px reserved at the top of the canvas for the time ruler
+/** "#EFE7D8" -> "239,231,216". Anything that is not a hex falls back rather than painting nothing. */
+function triplet(v: string, fallback: string) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(v);
+  if (!m) return fallback;
+  const h = m[1].length === 3 ? m[1].replace(/./g, c => c + c) : m[1];
+  return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).join(",");
+}
+function palette(el: Element) {
+  const cs = getComputedStyle(el);
+  const token = (name: string) => cs.getPropertyValue(name).trim() || "#888";
+  const fg = triplet(token("--foreground"), "36,31,28");
+  return { token, ink: (alpha: number) => `rgba(${fg}, ${alpha})` };
+}
 const TICKS = [.01, .02, .05, .1, .25, .5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
 const DB3 = Math.SQRT2;                 // +3 dB, the step every mixer uses
 
@@ -42,9 +63,14 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   onPreview?: (url: string) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [buffer, setBuffer] = useState<AudioBuffer | null>(null); // the working copy, edits land here
-  const [history, setHistory] = useState<AudioBuffer[]>([]);
-  const [future, setFuture] = useState<AudioBuffer[]>([]);        // undone edits, waiting for redo
+  const theme = useThemeSignal(); // changes when the palette does; the draw effect depends on it
+  const [hist, setHist] = useState<Stack<AudioBuffer> | null>(null); // the working copy and its undo history
+  /** An effect lands here first: drawn, played and handed to the transport, but not yet in the history. */
+  const [pending, setPending] = useState<{ steps: string[]; buffer: AudioBuffer } | null>(null);
+  const [env, setEnv] = useState<EnvPoint[] | null>(null); // gain over time; null = the tool is off
+  const committed = hist?.present ?? null;
+  // Everything downstream -- draw, play, save -- reads this, so a staged effect previews itself.
+  const buffer = pending?.buffer ?? committed;
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [sel, setSel] = useState<Sel | null>(null);
@@ -61,13 +87,15 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   const previewUrl = useRef(""); // blob URL currently handed to the main player
   const original = useRef<AudioBuffer | null>(null); // untouched decode, for A/B against the edit
   const drag = useRef<{ from: number; channel: number | null; moved: boolean } | null>(null);
+  // A touch drag on the waveform pans the window rather than selecting; the region has handles.
+  const panning = useRef<{ x: number; time: number; start: number; end: number; moved: boolean } | null>(null);
 
   useEffect(() => {
-    let alive = true; setLoading(true); setErr(""); setSel(null); setBuffer(null); setHistory([]); setFuture([]); setCursor(0);
+    let alive = true; setLoading(true); setErr(""); setSel(null); setHist(null); setPending(null); setEnv(null); setCursor(0);
     decodeAudioUrl(track.url)
       .then(b => {
         if (!alive) return;
-        original.current = b; setBuffer(b); setView({ start: 0, end: b.duration });
+        original.current = b; setHist(stack(b)); setView({ start: 0, end: b.duration });
         setChan(Array.from({ length: b.numberOfChannels }, () => ({ gain: 1, mute: false })));
       })
       .catch(e => alive && setErr((e as Error).message))
@@ -113,6 +141,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   // Draw: a time ruler, one stacked lane per channel, the selection, the cursor and the playhead.
   useEffect(() => {
     const cv = canvas.current, b = buffer; if (!cv || !b || width < 2) return;
+    const { token, ink } = palette(cv);
     const dpr = Math.min(devicePixelRatio || 1, 2), W = width, H = cv.clientHeight;
     cv.width = W * dpr; cv.height = H * dpr;
     const g = cv.getContext("2d")!; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -160,8 +189,8 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       }
       g.font = `600 11px ${MONO}`;
       const name = mono ? "Mono mix" : labels[lane] ?? `Ch ${lane + 1}`, w = g.measureText(name).width;
-      g.fillStyle = "rgba(2,6,23,.72)"; g.fillRect(8, top + 8, w + 14, 18);
-      g.fillStyle = "rgba(226,232,240,.92)"; g.fillText(name, 15, top + 17);
+      g.fillStyle = token("--background"); g.fillRect(8, top + 8, w + 14, 18);
+      g.fillStyle = ink(.92); g.fillText(name, 15, top + 17);
       g.strokeStyle = ink(.1); g.beginPath(); g.moveTo(0, top + laneH); g.lineTo(W, top + laneH); g.stroke();
     }
 
@@ -172,29 +201,57 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       g.fillStyle = ink(.16); g.fillRect(x0, laneTop, x1 - x0, laneBot - laneTop);
       g.strokeStyle = token("--cue-visual"); g.strokeRect(x0 + .5, laneTop + .5, x1 - x0 - 1, laneBot - laneTop - 1);
     }
-    for (const [t, colour] of [[cursor, "rgba(226,232,240,.55)"], [head, "rgba(52,211,153,.95)"]] as const) {
+    // Gain envelope: unity as a dashed rule so you can see which side of 1x you are on, then the curve.
+    if (env) {
+      const yOf = (v: number) => H - (v / ENV_MAX) * (H - RULER);
+      g.setLineDash([4, 4]); g.strokeStyle = ink(.2);
+      g.beginPath(); g.moveTo(0, yOf(1)); g.lineTo(W, yOf(1)); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = token("--cue-curtain"); g.lineWidth = 2; g.beginPath();
+      for (let x = 0; x <= W; x++) { const y = yOf(envelopeGain(env, tOf(x))); x ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke(); g.lineWidth = 1;
+    }
+    for (const [t, colour] of [[cursor, ink(.55)], [head, token("--cue-live")]] as const) {
       if (t == null || t < view.start || t > view.end) continue;
       const x = Math.round(xOf(t)) + .5;
       g.strokeStyle = colour; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, RULER); g.lineTo(x, H); g.stroke(); g.lineWidth = 1;
     }
-  }, [wave, sel, chan, mono, view, width, head, cursor, labels, buffer, xOf, span]);
+    // `theme` is not read in here on purpose: it is the signal that the tokens above changed value.
+  }, [wave, sel, chan, mono, view, width, head, cursor, labels, buffer, xOf, tOf, span, env, theme]);
 
   // --- pointer ------------------------------------------------------------
   const geom = (e: PointerEvent) => {
     const cv = canvas.current!, r = cv.getBoundingClientRect(), b = buffer!;
     const time = clamp(tOf(e.clientX - r.left), 0, b.duration);
     const y = e.clientY - r.top - RULER, laneH = (r.height - RULER) / (mono ? 1 : b.numberOfChannels);
-    return { time, lane: clamp(Math.floor(y / laneH), 0, b.numberOfChannels - 1) };
+    return {
+      time, lane: clamp(Math.floor(y / laneH), 0, b.numberOfChannels - 1),
+      gain: clamp(ENV_MAX * (1 - y / Math.max(1, r.height - RULER)), 0, ENV_MAX),
+    };
   };
   const down = (e: PointerEvent) => {
     if (!buffer) return;
-    const { time, lane } = geom(e);
+    const { time, lane, gain } = geom(e);
+    // With the envelope tool up the canvas places points instead of selecting, the way a tool mode works.
+    if (env) { e.preventDefault(); setEnv(pts => pts && addPoint(pts, { t: time, g: gain })); return; }
+    // Capture keeps the moves coming once the finger leaves the canvas; a browser that refuses it
+    // (an already-released pointer) must not take the gesture down with it.
+    try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch { /* not captured */ }
+    // A fingertip cannot place a 5 ms edge, so a finger on the waveform pans the view and the region
+    // is set with the two handles instead. A mouse keeps drag-to-select.
+    if (e.pointerType === "touch") { panning.current = { x: e.clientX, time, start: view.start, end: view.end, moved: false }; return; }
     // Shift (or Alt) narrows the selection to the lane you started in; a plain drag spans both.
     const channel = (e.shiftKey || e.altKey) && buffer.numberOfChannels > 1 && !mono ? lane : null;
     drag.current = { from: time, channel, moved: false };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
   const move = (e: PointerEvent) => {
+    const p = panning.current;
+    if (p) {
+      const dx = e.clientX - p.x;
+      if (Math.abs(dx) > 3) p.moved = true;
+      const by = (dx / Math.max(1, width)) * (p.end - p.start);
+      window_(p.start - by, p.end - by);
+      return;
+    }
     const d = drag.current; if (!d || !buffer) return;
     const { time } = geom(e);
     if (!d.moved && Math.abs(time - d.from) * (width / span) < 3) return; // a click is not a 1px drag
@@ -202,11 +259,58 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
     setSel({ start: Math.min(d.from, time), end: Math.max(d.from, time), channel: d.channel });
   };
   const up = () => {
+    const p = panning.current; panning.current = null;
+    if (p) { if (!p.moved) { setCursor(p.time); setSel(null); } return; } // a tap parks the playhead
     const d = drag.current; drag.current = null;
     if (!d) return;
     if (!d.moved) { setCursor(d.from); setSel(null); return; } // plain click parks the playhead
     setSel(s => (s && s.end - s.start < 0.005 ? null : s));
   };
+  /**
+   * The two region handles. 44 px of hit area either side of a 2 px line, because that is the size
+   * of the thing actually doing the pointing, and each edge clamps against the other rather than
+   * flipping past it -- a handle you drag through the region should stop, not swap identities.
+   */
+  const grabbed = useRef<"start" | "end" | null>(null);
+  const grabHandle = (which: "start" | "end") => (e: PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    grabbed.current = which;
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* not captured */ }
+  };
+  const moveHandle = (e: PointerEvent) => {
+    if (!grabbed.current || !buffer) return;
+    const r = canvas.current!.getBoundingClientRect();
+    const t = clamp(tOf(e.clientX - r.left), 0, buffer.duration);
+    setSel(s => !s ? s : grabbed.current === "start"
+      ? { ...s, start: Math.min(t, s.end - .005) }
+      : { ...s, end: Math.max(t, s.start + .005) });
+  };
+  const dropHandle = () => { grabbed.current = null; };
+
+  /**
+   * Envelope points. Same 44 px-ish dots and the same pointer capture as the region handles, but
+   * they move in two axes: across for time, up for gain, 1x at the middle of the lane stack.
+   */
+  const held = useRef<number | null>(null);
+  const envY = (v: number, h: number) => h - (v / ENV_MAX) * (h - RULER);
+  const grabPoint = (i: number) => (e: PointerEvent) => {
+    e.preventDefault(); e.stopPropagation(); held.current = i;
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* not captured */ }
+  };
+  const dragPoint = (e: PointerEvent) => {
+    const i = held.current; if (i == null || !buffer) return;
+    const r = canvas.current!.getBoundingClientRect();
+    const t = clamp(tOf(e.clientX - r.left), 0, buffer.duration);
+    const v = clamp(ENV_MAX * (1 - (e.clientY - r.top - RULER) / Math.max(1, r.height - RULER)), 0, ENV_MAX);
+    setEnv(pts => pts && movePoint(pts, i, t, v));
+  };
+  const dropPoint = () => { held.current = null; };
+  /** The two ends stay, or the envelope would stop covering the clip. */
+  const removePoint = (i: number) => setEnv(pts => (pts && i > 0 && i < pts.length - 1 ? pts.filter((_, j) => j !== i) : pts));
+  const envelope = () => setEnv(e => (e ? null : flatEnvelope(buffer!.duration)));
+  const previewEnv = () => { if (env) { stage("gain envelope", applyEnvelope(buffer!, env)); setEnv(null); } };
+  /** Puts a region on the middle of what you are looking at, to be trimmed with the handles. */
+  const markRegion = () => setSel({ start: view.start + span * .25, end: view.end - span * .25, channel: null });
   /** Wheel zooms around the pointer, the way every waveform editor does; shift-wheel scrolls. */
   const wheel = (e: WheelEvent) => {
     if (!buffer) return;
@@ -234,20 +338,23 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   const zoomed = buffer ? span < buffer.duration - 1e-6 : false;
 
   // --- edits --------------------------------------------------------------
+  /** Commits a buffer: one history step, and whatever was staged is now owned. */
   const apply = (next: AudioBuffer) => {
-    stop(); setHistory(h => [...h.slice(-19), buffer!]); setFuture([]); setBuffer(next);
+    stop(); setPending(null); setHist(h => (h ? commit(h, next) : stack(next)));
     if (next.duration < view.end) setView(v => ({ start: Math.min(v.start, next.duration), end: next.duration }));
   };
-  const undo = () => setHistory(h => {
-    if (!h.length) return h;
-    stop(); setFuture(f => [buffer!, ...f].slice(0, 20)); setBuffer(h[h.length - 1]); setSel(null);
-    return h.slice(0, -1);
-  });
-  const redo = () => setFuture(f => {
-    if (!f.length) return f;
-    stop(); setHistory(h => [...h.slice(-19), buffer!]); setBuffer(f[0]); setSel(null);
-    return f.slice(1);
-  });
+  /**
+   * An effect you can hear before you own it. Staged on top of what is already on screen, so a
+   * fade and a normalise preview together, and the whole run commits as one undo step.
+   */
+  const stage = (label: string, next: AudioBuffer) => {
+    stop(); setPending(p => ({ steps: [...(p?.steps ?? []), label], buffer: next }));
+  };
+  const keep = () => { if (pending) apply(pending.buffer); };
+  const drop = () => { stop(); setPending(null); };
+  const undo = () => { stop(); setSel(null); setPending(null); setHist(h => h && undoStack(h)); };
+  const redo = () => { stop(); setSel(null); setPending(null); setHist(h => h && redoStack(h)); };
+  const canUndo = !!hist?.past.length, canRedo = !!hist?.future.length;
 
   /** Edits with no selection act on the whole clip, which is what every editor does. */
   const scope = () => ({ start: sel?.start ?? 0, end: sel?.end ?? buffer!.duration, channels: sel?.channel == null ? undefined : [sel.channel] });
@@ -260,16 +367,17 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   const cut = () => { if (!sel) return; copy(); apply(removeRange(buffer!, sel.start, sel.end)); setCursor(sel.start); setSel(null); };
   const paste = () => { if (!clipboard) return; apply(insertBuffer(buffer!, sel ? sel.start : cursor, clipboard)); setSel(null); };
   const merge = () => { if (!clipboard) return; apply(mixBuffer(buffer!, sel ? sel.start : cursor, clipboard)); setSel(null); };
-  const silence = () => { const s = scope(); apply(silenceRange(buffer!, s.start, s.end, s.channels)); };
-  const fade = (dir: "in" | "out") => { const s = scope(); apply(fadeRange(buffer!, s.start, s.end, dir, s.channels)); };
-  const normalize = () => { const s = scope(); apply(normalizeRange(buffer!, s.start, s.end, .99, s.channels)); };
-  const louder = (up: boolean) => { const s = scope(); apply(gainRange(buffer!, s.start, s.end, up ? DB3 : 1 / DB3, s.channels)); };
-  const reverse = () => { const s = scope(); apply(reverseRange(buffer!, s.start, s.end, s.channels)); };
+  // Effects stage rather than commit: you hear them first, then Apply or Cancel.
+  const silence = () => { const s = scope(); stage("silence", silenceRange(buffer!, s.start, s.end, s.channels)); };
+  const fade = (dir: "in" | "out") => { const s = scope(); stage(`fade ${dir}`, fadeRange(buffer!, s.start, s.end, dir, s.channels)); };
+  const normalize = () => { const s = scope(); stage("normalise", normalizeRange(buffer!, s.start, s.end, .99, s.channels)); };
+  const louder = (up: boolean) => { const s = scope(); stage(up ? "+3 dB" : "−3 dB", gainRange(buffer!, s.start, s.end, up ? DB3 : 1 / DB3, s.channels)); };
+  const reverse = () => { const s = scope(); stage("reverse", reverseRange(buffer!, s.start, s.end, s.channels)); };
   const trim = () => { if (!sel) return; apply(sliceBuffer(buffer!, sel.start, sel.end)); setSel(null); setCursor(0); setView({ start: 0, end: sel.end - sel.start }); };
 
   const gains = () => chan.map(c => (c.mute ? 0 : c.gain));
   const buildOutput = () => processBuffer(buffer!, { gains: gains(), mono });
-  const dirty = history.length > 0 || mono || chan.some(c => c.mute || c.gain !== 1);
+  const dirty = canUndo || !!pending || mono || chan.some(c => c.mute || c.gain !== 1);
 
   // Hand the working buffer to the main transport as a WAV blob, so the player at the bottom plays
   // the edit instead of the original file, no save needed. Debounced: a gain drag re-encodes.
@@ -324,7 +432,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   const save = async () => {
     setSaving(true);
     try {
-      const edited = history.length > 0;
+      const edited = canUndo || !!pending;
       const suffix = edited ? " (edit)" : mono ? " (mono)" : " (copy)";
       const title = `${track.title}${suffix}`;
       await onSave(bufferToWavFile(buildOutput(), title), title);
@@ -352,7 +460,8 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
     else if (mod && e.key.toLowerCase() === "x") { hit(); cut(); }
     else if (mod && e.key.toLowerCase() === "a") { hit(); setSel({ start: 0, end: buffer.duration, channel: null }); }
     else if (e.key === "Delete" || e.key === "Backspace") { hit(); cut(); }
-    else if (e.key === "Escape") { hit(); setSel(null); }
+    else if (e.key === "Enter" && pending) { hit(); keep(); }
+    else if (e.key === "Escape") { hit(); if (pending) drop(); else setSel(null); }
     else if (e.key === "+" || e.key === "=") { hit(); zoomAt(cursor, .6); }
     else if (e.key === "-") { hit(); zoomAt(cursor, 1.6); }
     else if (e.key === "0") { hit(); fit(); }
@@ -364,11 +473,13 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
 
   const stereo = buffer.numberOfChannels > 1;
   const act = sel ? "selection" : "whole clip";
+  const canvasH = canvas.current?.clientHeight || 192; // h-48, until the ref lands on the first paint
   return (
     <div className="glass-soft space-y-4 p-4 outline-none" tabIndex={0} onKeyDown={keys}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold">
-          Waveform, drag to select{stereo && !mono ? ", shift-drag for one channel" : ""}, click to park the playhead
+          Waveform, drag to select{stereo && !mono ? ", shift-drag for one channel" : ""}, click to park the playhead.
+          <span className="font-normal text-muted"> By touch: drag to pan, “Mark region” then move the handles.</span>
         </p>
         <p className="text-xs text-muted">
           {stereo ? (buffer.numberOfChannels === 2 ? "Stereo" : `${buffer.numberOfChannels}ch`) : "Mono"} • {fmt(buffer.duration)}
@@ -377,19 +488,70 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
         </p>
       </div>
 
-      <canvas
-        ref={canvas} onPointerDown={down} onPointerMove={move} onPointerUp={up} onWheel={wheel}
-        className="h-48 w-full cursor-crosshair touch-none rounded-xl border border-white/10 bg-black/30"
-      />
+      {/* touch-none on both: the canvas does its own panning and the handles their own dragging, so
+          the browser must not be guessing at either one. */}
+      <div className="relative">
+        <canvas
+          ref={canvas} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onWheel={wheel}
+          className="h-48 w-full cursor-crosshair touch-none rounded-xl border border-white/10 bg-black/30"
+        />
+        {sel && width > 2 && (["start", "end"] as const).map(which => {
+          const x = xOf(sel[which]);
+          if (x < -22 || x > width + 22) return null; // scrolled out of the window
+          return (
+            <button key={which} type="button" aria-label={`${which === "start" ? "Start" : "End"} of the region`}
+              onPointerDown={grabHandle(which)} onPointerMove={moveHandle} onPointerUp={dropHandle} onPointerCancel={dropHandle}
+              className="absolute bottom-0 w-11 -translate-x-1/2 cursor-ew-resize touch-none"
+              style={{ left: x, top: RULER }}>
+              <span className="mx-auto block h-full w-0.5 bg-visual" />
+              <span className="absolute inset-x-0 top-0 mx-auto h-6 w-6 rounded-full border-2 border-visual bg-background/90" />
+            </button>
+          );
+        })}
+        {env && width > 2 && env.map((p, i) => {
+          const x = xOf(p.t);
+          if (x < -14 || x > width + 14) return null; // scrolled out of the window
+          return (
+            <button key={i} type="button" aria-label={`Gain point at ${fmt(p.t)}, ${p.g.toFixed(2)}x`}
+              onPointerDown={grabPoint(i)} onPointerMove={dragPoint} onPointerUp={dropPoint} onPointerCancel={dropPoint}
+              onContextMenu={e => { e.preventDefault(); removePoint(i); }}
+              className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border-2 border-curtain bg-background/90"
+              style={{ left: x, top: envY(p.g, canvasH) }} />
+          );
+        })}
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted">Zoom</span>
         <Button isIconOnly size="sm" variant="bordered" aria-label="Zoom in" onPress={() => zoomAt(cursor, .6)}><ZoomIn size={14} /></Button>
         <Button isIconOnly size="sm" variant="bordered" aria-label="Zoom out" isDisabled={!zoomed} onPress={() => zoomAt(cursor, 1.6)}><ZoomOut size={14} /></Button>
         <Button size="sm" variant="bordered" isDisabled={!sel} startContent={<Maximize2 size={13} />} onPress={zoomSel}>To selection</Button>
+        {/* The only way onto the waveform without a mouse: put a region on screen, then trim it. */}
+        <Button size="sm" variant={sel ? "light" : "bordered"} startContent={<Crop size={13} />} onPress={markRegion}>Mark region</Button>
         <Button size="sm" variant="light" isDisabled={!zoomed} onPress={fit}>Fit whole clip</Button>
+        <Button size="sm" variant={env ? "light" : "bordered"} startContent={<Spline size={13} />} onPress={envelope}>
+          {env ? "Close envelope" : "Gain envelope"}
+        </Button>
         <span className="text-muted">Wheel zooms, shift-wheel scrolls</span>
       </div>
+
+      {env && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-curtain/40 bg-curtain/10 p-2 text-xs">
+          <span className="font-semibold">Gain over time</span>
+          <span className="text-muted">Drag a dot, click the lane to add one, right-click a dot to drop it. The dashed line is 1x.</span>
+          <Button size="sm" variant="bordered" startContent={<Play size={13} />} onPress={previewEnv}>Preview envelope</Button>
+          <Button size="sm" variant="light" onPress={() => setEnv(flatEnvelope(buffer.duration))}>Flatten</Button>
+        </div>
+      )}
+
+      {pending && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-visual/40 bg-visual/10 p-2 text-xs">
+          <span className="font-semibold">Previewing: {pending.steps.join(" → ")}</span>
+          <span className="text-muted">Play hears it, nothing is committed until you apply.</span>
+          <Button size="sm" color="primary" variant="flat" startContent={<Check size={14} />} onPress={keep}>Apply</Button>
+          <Button size="sm" variant="light" startContent={<X size={14} />} onPress={drop}>Cancel</Button>
+        </div>
+      )}
 
       {sel && stereo && !mono && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -419,8 +581,8 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
             <Button size="sm" variant="light" startContent={<RotateCcw size={14} />} onPress={() => previewOut("original")}>Play original</Button>
           </Tooltip>
         )}
-        <Button size="sm" variant="light" isDisabled={!history.length} startContent={<Undo2 size={14} />} onPress={undo}>Undo</Button>
-        <Button size="sm" variant="light" isDisabled={!future.length} startContent={<Redo2 size={14} />} onPress={redo}>Redo</Button>
+        <Button size="sm" variant="light" isDisabled={!canUndo} startContent={<Undo2 size={14} />} onPress={undo}>Undo</Button>
+        <Button size="sm" variant="light" isDisabled={!canRedo} startContent={<Redo2 size={14} />} onPress={redo}>Redo</Button>
         {sel && <Button size="sm" variant="light" onPress={() => setSel(null)}>Clear selection</Button>}
       </div>
 
@@ -486,7 +648,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-        <Button color="primary" isLoading={saving} startContent={history.length ? <Crop size={16} /> : <Save size={16} />} onPress={save}>Save as new sound</Button>
+        <Button color="primary" isLoading={saving} startContent={canUndo ? <Crop size={16} /> : <Save size={16} />} onPress={save}>Save as new sound</Button>
         <span className="text-xs text-muted">
           {dirty ? "Play already plays what you have. Saving renders a new cloud-backed WAV; the original is untouched." : "Renders a new cloud-backed WAV; the original is untouched."}
         </span>

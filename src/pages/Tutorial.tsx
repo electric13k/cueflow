@@ -1,6 +1,8 @@
+import { useRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, RotateCcw } from "lucide-react";
 import Page from "../components/Page";
+import { useReveal } from "../lib/motion";
 import ScreenCard, { type Screen } from "../components/ScreenCard";
 import { Button } from "../ui";
 import { forgetLessons } from "../lib/coach";
@@ -52,8 +54,11 @@ const keys = [
 ];
 
 export default function Tutorial() {
+  const root = useRef<HTMLDivElement>(null);
+  useReveal(root);
   return (
     <Page>
+      <div ref={root}>
       <motion.p {...rise()} className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Tutorial</motion.p>
       <motion.h1 {...rise(.05)} className="mt-3 max-w-3xl text-5xl font-bold leading-[1.02] sm:text-6xl">
         Library, deck, <span className="italic text-accent">go.</span>
@@ -74,11 +79,11 @@ export default function Tutorial() {
       <section className="mt-16">
         <motion.h2 {...rise()} className="font-mono text-xs uppercase tracking-[.3em] text-muted">The keys</motion.h2>
         <ul className="mt-5 divide-y divide-white/10 border-y border-white/10">
-          {keys.map((k, i) => (
-            <motion.li key={k.k} {...rise(i * .05)} className="flex items-baseline gap-5 py-4">
+          {keys.map(k => (
+            <li key={k.k} data-reveal className="flex items-baseline gap-5 py-4">
               <kbd className="w-24 shrink-0 font-mono text-lg font-bold text-accent">{k.k}</kbd>
               <span className="text-muted">{k.does}</span>
-            </motion.li>
+            </li>
           ))}
         </ul>
         <p className="mt-4 text-sm text-muted">All of them rebindable in <a className="text-accent underline-offset-4 hover:underline" href="/settings">Settings</a>.</p>
@@ -97,6 +102,7 @@ export default function Tutorial() {
           <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-semibold">Open the Studio</Button>
         </div>
       </motion.div>
+      </div>
     </Page>
   );
 }
