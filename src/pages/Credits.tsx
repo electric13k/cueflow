@@ -14,7 +14,7 @@ const TOOLS: Credit[] = [
   },
   {
     name: "darktable", url: "https://www.darktable.org/", licence: "GPL-3.0-or-later",
-    what: "The order of the picture controls. Exposure, then contrast, then colour, then the local effects — adjust in that order and each control still reads true after the one before it.",
+    what: "The order of the picture controls. Exposure, then contrast, then colour, then the local effects, adjust in that order and each control still reads true after the one before it.",
   },
   {
     name: "Krita", url: "https://krita.org/en/", licence: "GPL-3.0-or-later",
@@ -26,7 +26,7 @@ const TOOLS: Credit[] = [
   },
   {
     name: "pptWeb", url: "https://github.com/theBigGavin/pptWeb", licence: "MIT",
-    what: "The slide composer's default layout — title, accent rule, bulleted lines — and the idea that a deck tool should offer a good layout instead of an empty canvas.",
+    what: "The slide composer's default layout, title, accent rule, bulleted lines, and the idea that a deck tool should offer a good layout instead of an empty canvas.",
   },
 ];
 
@@ -55,7 +55,7 @@ export default function Credits() {
       <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Thanks</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Standing on open shoulders</h1>
       <p className="mt-2 text-sm text-muted">
-        CueFloww's editors were built by studying tools that got these problems right first.
+        CueFlow's editors were built by studying tools that got these problems right first.
       </p>
 
       <div className="glass mt-10 p-6 sm:p-8">
@@ -64,13 +64,13 @@ export default function Credits() {
         <Section title="What was borrowed">
           <p>
             Every project below is open source, and several are licensed under the GPL. The GPL asks that
-            anything built from its code carry the same licence — and a web app hands its own source to
+            anything built from its code carry the same licence, and a web app hands its own source to
             every visitor's browser, which counts as distributing it.
           </p>
           <p>
-            So <b>none of their code is in CueFloww</b>. What was taken is the part that is free to take
+            So <b>none of their code is in CueFlow</b>. What was taken is the part that is free to take
             anyway: the behaviour. Which control comes first, what a crop handle should do, what a trim
-            strip should look like. That is the hard-won part, and it is theirs. Go and use the real tools —
+            strip should look like. That is the hard-won part, and it is theirs. Go and use the real tools -
             each does far more than a cue player needs to.
           </p>
         </Section>
@@ -91,7 +91,7 @@ export default function Credits() {
         <h2 className="text-2xl font-black tracking-tight">Built with</h2>
         <p className="mt-2 text-sm text-muted">
           React, Vite, Tailwind CSS, HeroUI, react-aria-components, Lucide icons, Supabase, and the Web
-          Audio API — which does all the sound work here, in your browser, with nothing uploaded to process it.
+          Audio API, which does all the sound work here, in your browser, with nothing uploaded to process it.
         </p>
       </div>
     </Page>

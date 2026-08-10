@@ -30,7 +30,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-white/10 py-8">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
-        <span className="flex items-center gap-2"><Music size={14} /> CueFloww</span>
+        <span className="flex items-center gap-2"><Music size={14} /> CueFlow</span>
         <span className="flex flex-wrap items-center gap-4">
           {/* min-h-6 so a footer link clears the 24px minimum tap target on a phone; at 20px they failed it. */}
           {shown.map(l => <Link key={l.to} to={l.to} className="inline-flex min-h-6 items-center hover:text-foreground">{l.label}</Link>)}

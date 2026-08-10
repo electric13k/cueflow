@@ -21,25 +21,25 @@ const rise = (d = 0) => ({
 const screens: Screen[] = [
   {
     shot: `${import.meta.env.BASE_URL}shots/soundboard.png`, title: "Library",
-    alt: "The CueFloww library: a grid of media cards above the transport bar",
+    alt: "The CueFlow library: a grid of media cards above the transport bar",
     body: "Click a card and it fires. That is the whole interaction.",
     points: ["Sound, pictures, video and decks together", "Search your own or the open archives", "Nothing plays until you say so"],
   },
   {
     shot: `${import.meta.env.BASE_URL}shots/editor.png`, title: "Editors",
-    alt: "The CueFloww waveform editor showing a rendered waveform and channel controls",
+    alt: "The CueFlow waveform editor showing a rendered waveform and channel controls",
     body: "Drag across the waveform to pick a region, then reshape it.",
     points: ["Shift-drag grabs one channel", "Cut, level, tone, mono to stereo", "Pictures and video get their own panel"],
   },
   {
     shot: `${import.meta.env.BASE_URL}shots/sequences.png`, title: "The deck",
-    alt: "The CueFloww sequences tab showing a cue deck",
+    alt: "The CueFlow sequences tab showing a cue deck",
     body: "A list you step through, one key at a time.",
     points: ["Sound and screens in one order", "Link a slide to the sound under it", "Arm it and the frame turns amber"],
   },
   {
     shot: `${import.meta.env.BASE_URL}shots/phone.png`, title: "On a phone", fit: "contain",
-    alt: "CueFloww running on a phone",
+    alt: "CueFlow running on a phone",
     body: "The same board, sized for one thumb.",
     points: ["No install, no app store", "Runs from the back of the room"],
   },
@@ -48,7 +48,7 @@ const screens: Screen[] = [
 /** The keys, which are the one thing worth memorising before you start. */
 const keys = [
   { k: "→ ←", does: "Next cue, previous cue" },
-  { k: "D A", does: "Next slide only — the sound underneath keeps running" },
+  { k: "D A", does: "Next slide only, the sound underneath keeps running" },
   { k: "W S", does: "Zoom the stage" },
   { k: "Space", does: "Play or pause" },
 ];

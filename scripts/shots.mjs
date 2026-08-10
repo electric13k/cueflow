@@ -9,7 +9,7 @@ import { mkdir } from "node:fs/promises";
 const BASE = process.env.SHOTS_BASE ?? "http://localhost:5173";
 const OUT = "public/shots";
 
-// A short tone as a data: URL — real decodable audio, so the waveform editor has something to draw.
+// A short tone as a data: URL, real decodable audio, so the waveform editor has something to draw.
 const seed = `(() => {
   const tone = (freq, secs) => {
     const sr = 22050, n = Math.floor(sr * secs), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
@@ -28,8 +28,8 @@ const seed = `(() => {
   const fx = { speed: 1, volume: 1, gain: 1, reverb: 0, fadeIn: 0, fadeOut: 0, distortion: 0, reverse: false };
   const names = [["Door slam", 90, 1.1], ["Thunder roll", 55, 2.4], ["Applause", 320, 1.8], ["Phone ring", 480, 1.4], ["Glass smash", 700, 0.9], ["Wind howl", 140, 2.2]];
   const tracks = names.map(([title, f, d], i) => ({ id: "demo-" + i, title, url: tone(f, d), createdAt: new Date().toISOString(), effects: { ...fx, reverb: i === 1 ? 0.35 : 0 } }));
-  const sequence = { id: "seq-demo", name: "Act I — storm", createdAt: new Date().toISOString(),
-    items: [0, 1, 3, 2].map((t, n) => ({ id: "item-" + n, trackId: "demo-" + t, label: ["Cue 1 — knock", "Cue 2 — thunder", "Cue 3 — phone", "Cue 4 — curtain"][n], effects: { ...fx } })) };
+  const sequence = { id: "seq-demo", name: "Act I, storm", createdAt: new Date().toISOString(),
+    items: [0, 1, 3, 2].map((t, n) => ({ id: "item-" + n, trackId: "demo-" + t, label: ["Cue 1, knock", "Cue 2, thunder", "Cue 3, phone", "Cue 4, curtain"][n], effects: { ...fx } })) };
   localStorage.setItem("cueflow:tracks", JSON.stringify(tracks));
   localStorage.setItem("cueflow:sequences", JSON.stringify([sequence]));
   localStorage.setItem("cueflow:session", JSON.stringify({ selectedId: "demo-1", sequenceId: "seq-demo", cueIndex: 1, tab: "library" }));

@@ -1,6 +1,6 @@
 {
-  "name": "CueFloww: browser soundboard & cue system",
-  "short_name": "CueFloww",
+  "name": "CueFlow: browser soundboard & cue system",
+  "short_name": "CueFlow",
   "description": "A browser soundboard, Web Audio editor and arrow-key cue system for theatre, presentations and streams.",
   "id": "/",
   "start_url": "/",
