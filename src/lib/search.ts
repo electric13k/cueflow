@@ -34,7 +34,7 @@ const haystack = (f: Facets) => norm(f.text.filter(Boolean).join(" "));
 
 /**
  * Every word in the query has to appear somewhere in the item, in any order. Substring rather than
- * prefix: cue names are full of numbers and punctuation, and "act 2" should find "Act 2 — reprise".
+ * prefix: cue names are full of numbers and punctuation, and "act 2" should find "Act 2, reprise".
  * An empty query matches everything, so a search box that has not been typed in hides nothing.
  */
 const words = (query: string) => norm(query).split(/\s+/).filter(Boolean);

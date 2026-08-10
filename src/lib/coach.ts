@@ -20,7 +20,7 @@ export const lessons: Record<string, Lesson> = {
   editor: {
     id: "editor",
     title: "The editor",
-    body: "Trim, level and tone a sound — or crop and grade a picture. It never leaves your browser.",
+    body: "Trim, level and tone a sound, or crop and grade a picture. It never leaves your browser.",
   },
   sequence: {
     id: "sequence",
@@ -36,13 +36,13 @@ export const lessons: Record<string, Lesson> = {
   script: {
     id: "script",
     title: "The script",
-    body: "Import it, name the words that matter, and the screen flashes just before each one arrives. Split, popup or its own tab — the same reader either way, so put it where you would put a prompt copy.",
+    body: "Import it, name the words that matter, and the screen flashes just before each one arrives. Split, popup or its own tab, the same reader either way, so put it where you would put a prompt copy.",
     target: "[data-coach='script']",
   },
   show: {
     id: "show",
     title: "Shows",
-    body: "Hand out a key and the rest of the room joins on their own devices — silent, no accounts. Joining is the same key on Join a show, and the deck lands on their screen as you fire it.",
+    body: "Hand out a key and the rest of the room joins on their own devices, silent, no accounts. Joining is the same key on Join a show, and the deck lands on their screen as you fire it.",
     target: "[data-coach='show']",
   },
   sidebar: {
@@ -60,7 +60,7 @@ export const lessons: Record<string, Lesson> = {
   presenter: {
     id: "presenter",
     title: "The presenter window",
-    body: "This is the window the room sees. Drag it to the projector and leave it there — the board stays on your screen.",
+    body: "This is the window the room sees. Drag it to the projector and leave it there, the board stays on your screen.",
     target: "[data-coach='presenter']",
   },
   transport: {

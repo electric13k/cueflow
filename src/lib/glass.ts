@@ -4,7 +4,7 @@
  * light source in viewport coordinates and no element ever has to be measured. This is the whole
  * of the JavaScript: one passive listener, no per-element handlers, no layout reads.
  *
- * Coalesced to one write per frame — pointermove fires faster than the compositor paints, and each
+ * Coalesced to one write per frame, pointermove fires faster than the compositor paints, and each
  * write on the root invalidates style for everything that inherits the property.
  *
  * requestAnimationFrame is the right clock here and the one place in this app where it is: it does

@@ -74,7 +74,7 @@ export function useDragList(onCommit: (from: number, to: number) => void, onDrop
 
   /**
    * `touch-action` decides what a gesture may become before it starts; it cannot revoke a scroll the
-   * browser has already granted. A lifted row therefore refuses touchmove itself — non-passive, or
+   * browser has already granted. A lifted row therefore refuses touchmove itself, non-passive, or
    * preventDefault is ignored.
    */
   const block = useRef((e: TouchEvent) => e.preventDefault()).current;

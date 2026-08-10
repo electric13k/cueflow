@@ -53,6 +53,28 @@
     --cue-armed: #8A6A2A;   /* brass */
     --cue-live: #A32330;    /* crimson */
     --cue-ready: #46583A;
+    /**
+     * The neutral ramp, re-cut warm.
+     *
+     * HeroUI's own neutrals are blue-grey (every one of them sits on hue 286) and its `--surface` is
+     * literally `oklch(100% 0 0)`, pure white. On a beige page that is a cold white card floating on
+     * cream with a cold grey label on it, which is the "colours are messed up" report. Every card,
+     * popover, modal, input and separator in the app resolves through these five names, so re-cutting
+     * them here retints all of them at once instead of at ~40 call sites.
+     *
+     * The derived tokens (`--surface-hover`, `--border-secondary`, the `-soft` ramps) are declared by
+     * HeroUI on `:root` as `color-mix(... var(--surface) ...)`, and a custom property is substituted
+     * at computed-value time on the element it is declared on. Same element, so they pick these up.
+     */
+    --surface: #FBF7EE;
+    --surface-secondary: #F5EFE1;
+    --surface-tertiary: #EEE6D4;
+    --overlay: #FBF7EE;
+    --field-background: #FBF7EE;
+    --muted: #6B5F55;
+    --border: #DBD0BB;
+    --separator: #E5DBC8;
+    --default: #E9DFCD;
   }
   /**
    * Dark, as a scope rather than a mode.
@@ -81,6 +103,17 @@
     --cue-armed: #D4A957;
     --cue-live: #E05566;
     --cue-ready: #A3B37A;
+    /* Same ramp, dark and still warm. HeroUI's dark neutrals are the same blue-grey hue and a
+       blue-black control screen was the single note that made this look like a synth plugin. */
+    --surface: #241F1C;
+    --surface-secondary: #2C2622;
+    --surface-tertiary: #352E28;
+    --overlay: #241F1C;
+    --field-background: #241F1C;
+    --muted: #A79A8B;
+    --border: #3A322B;
+    --separator: #322B25;
+    --default: #322B25;
   }
 }
 
@@ -101,6 +134,23 @@
     --prism-warm: color-mix(in srgb, var(--cue-visual) 62%, transparent);
     --prism-cool: color-mix(in srgb, var(--cue-audio) 52%, transparent);
     --glass-specular: rgba(255, 255, 255, .85);
+    /**
+     * Shared spacing, because three things that are not in each other's tree have to agree on it.
+     *
+     * The bar is sticky at the top of every page and the toaster is fixed above it, so a toast at a
+     * hardcoded `top-3` lands on the logo -- which is the "alerts sit misaligned throughout the site"
+     * report, and it was a different literal in each file. Nav sizes itself off `--nav-h`, so the
+     * token is the measurement rather than a guess about it.
+     *
+     * The safe-area pair is here for the same reason: `viewport-fit=cover` means the notch and the
+     * home indicator are inside the viewport, and anything docked to an edge has to say so. The
+     * `, 0px` fallback is not optional: on a browser that does not know `env()` the whole calc()
+     * would be invalid and the offset would fall back to nothing.
+     */
+    --nav-h: 3.8rem;
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --toast-top: calc(var(--nav-h) + var(--safe-t) + .5rem);
   }
   .theme-dark, .dark {
     --glass-tint: 239, 231, 216;
@@ -111,16 +161,28 @@
     --prism-cool: color-mix(in srgb, var(--cue-audio) 70%, transparent);
     --glass-specular: rgba(255, 250, 240, .16);
   }
-  body {
-    @apply m-0 min-h-screen bg-background text-foreground font-sans antialiased;
-    /* The beige wash: house glow off the top, curtain in the upper corner, olive off the floor.
-       Backdrop.tsx paints the same three over the top in WebGL; this is what a machine with no GL
-       context gets, and it has to stand on its own. */
+  /* dvh, not vh. `100vh` on a phone is the viewport with the URL bar *retracted*, so a page sized in
+     it is taller than the screen the moment the bar is showing and the bottom of every layout is cut
+     off. `dvh` is the viewport that is actually there. */
+  body { @apply m-0 min-h-dvh bg-background text-foreground font-sans antialiased; }
+
+  /**
+   * The beige wash: house glow off the top, curtain in the upper corner, olive off the floor.
+   * Backdrop.tsx paints the same three over the top in WebGL; this is what a machine with no GL
+   * context gets, and it has to stand on its own.
+   *
+   * A fixed pseudo-element rather than `background-attachment: fixed` on the body. iOS Safari does
+   * not honour a fixed attachment: it paints the gradient once at the initial containing block and
+   * then leaves everything past the first screenful unpainted, which is a page that starts warm and
+   * goes flat as you scroll -- the "faded on mobile" report. A fixed element has no such caveat
+   * anywhere. Behind the WebGL canvas (-z-10), so an opaque shader still covers it.
+   */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -20; pointer-events: none;
     background-image:
       radial-gradient(70rem 46rem at 50% -18%, color-mix(in srgb, var(--cue-foolscap) 85%, transparent), transparent 68%),
       radial-gradient(56rem 38rem at 90% -8%, color-mix(in srgb, var(--cue-curtain) 13%, transparent), transparent 62%),
       radial-gradient(48rem 36rem at 4% 108%, color-mix(in srgb, var(--cue-audio) 12%, transparent), transparent 64%);
-    background-attachment: fixed;
   }
 
   /**
@@ -302,12 +364,27 @@
     -webkit-mask-composite: xor;
     mask-composite: exclude;
   }
-  .glass::after, .modal__dialog::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    border-radius: inherit;
-    background-image: radial-gradient(26rem 9rem at var(--sweep-x) var(--sweep-y),
-      var(--glass-specular), color-mix(in srgb, var(--glass-specular) 30%, transparent) 34%, transparent 68%);
-    background-attachment: fixed;
+  /**
+   * The specular is placed from the pointer, so it only exists where there is a pointer.
+   *
+   * On a touchscreen there is no `pointermove`, so `--gx`/`--gy` never get written and the highlight
+   * parks at its fallback of 50vw / 0px. That would be survivable on its own. What is not: iOS
+   * Safari ignores `background-attachment: fixed`, so the positioning area falls back to the panel
+   * itself and every single panel gets its own 416x144px blob of 85% white across its top. On a
+   * 375px screen that is the whole panel. Measured on the Studio at 375x812: this is the "colours
+   * appear faded" report, and it is the entire cause of it.
+   *
+   * Gating on `pointer: fine` is the fix and it is also the honest one: a light source that follows
+   * your hand has nothing to follow on a finger. The bevel and the panel face are unconditional.
+   */
+  @media (hover: hover) and (pointer: fine) {
+    .glass::after, .modal__dialog::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      border-radius: inherit;
+      background-image: radial-gradient(26rem 9rem at var(--sweep-x) var(--sweep-y),
+        var(--glass-specular), color-mix(in srgb, var(--glass-specular) 30%, transparent) 34%, transparent 68%);
+      background-attachment: fixed;
+    }
   }
   /* Someone who asked for less motion still gets the bevel and the highlight -- the highlight just
      stops following anything. Rest position is the top centre of the viewport, which is where a

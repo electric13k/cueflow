@@ -12,10 +12,10 @@ const thing = (name: string, extra: Partial<Thing> = {}): Thing =>
 const names = (list: Thing[]) => list.map(t => t.name);
 
 describe("matcher", () => {
-  const items = [thing("Act 2 — reprise"), thing("Café door slam"), thing("Thunder")];
+  const items = [thing("Act 2, reprise"), thing("Café door slam"), thing("Thunder")];
 
   it("wants every word, in any order", () => {
-    expect(names(items.filter(matcher("2 act", facet)))).toEqual(["Act 2 — reprise"]);
+    expect(names(items.filter(matcher("2 act", facet)))).toEqual(["Act 2, reprise"]);
     expect(items.filter(matcher("act thunder", facet))).toEqual([]);
   });
 

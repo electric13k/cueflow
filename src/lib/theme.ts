@@ -16,8 +16,21 @@ const STUDIO_KEY = "cueflow:theme:studio";
 
 const stored = (key: string): Theme => (localStorage.getItem(key) === "dark" ? "dark" : "light");
 
-/** Class name for a wrapper: `<div className={themeClass(t)}>` re-themes everything inside it. */
-export const themeClass = (t: Theme) => (t === "dark" ? DARK : "");
+/**
+ * Class names for a wrapper: `<div className={themeClass(t)}>` re-themes everything inside it.
+ *
+ * Two classes, and the second one is the whole reason the dark button used to darken almost nothing.
+ * `theme-dark` carries the house palette, which is nine tokens. The interface resolves through
+ * roughly forty more that HeroUI owns -- `--surface`, `--overlay`, `--border`, `--muted`,
+ * `--field-background`, every `-soft` and `-hover` ramp -- and HeroUI declares its dark values under
+ * `.dark, [data-theme="dark"]`. Inside a `theme-dark` subtree those stayed at their light values, so
+ * the background went dark while every card, popover, input and menu inside it stayed white.
+ *
+ * `.dark` is a plain class selector, not an `html` rule, so it applies to any element. Adding it to
+ * the same wrapper flips HeroUI's whole set for that subtree, `color-scheme: dark` with it, and the
+ * house palette still wins on top because our block is declared later in the same layer.
+ */
+export const themeClass = (t: Theme) => (t === "dark" ? `${DARK} dark` : "");
 
 export const getTheme = (): Theme => stored(PAGE_KEY);
 

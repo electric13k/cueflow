@@ -9,7 +9,7 @@ import type { RefObject } from "react";
  *
  * House rules, all of them load-bearing:
  *  - transforms and opacity only (a cue board must stay at 60fps while this plays behind it);
- *  - every trigger is made inside `useGSAP({ scope })`, so a route change reverts it — react-router
+ *  - every trigger is made inside `useGSAP({ scope })`, so a route change reverts it, react-router
  *    unmounts these pages and a ScrollTrigger on a dead node keeps firing otherwise;
  *  - `gsap.matchMedia()` with a reduce branch that sets the end state and animates nothing.
  */
@@ -21,7 +21,7 @@ const REDUCE = "(prefers-reduced-motion: reduce)";
 const MOTION = "(prefers-reduced-motion: no-preference)";
 
 /**
- * Reveal-on-enter for a row of repeated things — mark them `data-reveal`.
+ * Reveal-on-enter for a row of repeated things, mark them `data-reveal`.
  * One batched trigger for the whole row, not one per card.
  */
 export function useReveal(scope: Scope) {
@@ -49,7 +49,7 @@ export function useReveal(scope: Scope) {
 
 /**
  * The one held beat per page: pin `data-pin` and scrub `data-pin-inner` up to full while it is held.
- * Desktop only — pinning a short section on a phone is more jolt than effect.
+ * Desktop only, pinning a short section on a phone is more jolt than effect.
  */
 export function usePinScrub(scope: Scope) {
   useGSAP(() => {

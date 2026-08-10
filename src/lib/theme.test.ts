@@ -26,8 +26,18 @@ test("the studio theme is scoped, not global", () => {
   expect(getStudioTheme()).toBe("dark");
   expect(getTheme()).toBe("light");
   expect(document.documentElement.classList.contains(DARK)).toBe(false);
-  expect(themeClass(getStudioTheme())).toBe(DARK);
   expect(themeClass("light")).toBe("");
+});
+
+/**
+ * The regression behind "the dark toggle only darkens some things". The house palette is nine
+ * tokens; every card, input, popover and separator resolves through HeroUI's forty-odd, and those
+ * only go dark under `.dark`. A scope carrying only `theme-dark` leaves white cards on a dark page.
+ */
+test("the dark scope carries the alias HeroUI's own tokens are keyed on", () => {
+  const classes = themeClass("dark").split(" ");
+  expect(classes).toContain(DARK);
+  expect(classes).toContain("dark");
 });
 
 // This is the signal every canvas draw effect hangs off. If it stops firing, the waveform, the

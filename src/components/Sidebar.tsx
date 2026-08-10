@@ -32,7 +32,9 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   // BASE_URL, because GitHub Pages serves the app from /<repo>/ and a bare "/workspace" leaves it.
   const open = (id: string | null) => { setCurrentProject(id); location.assign(`${import.meta.env.BASE_URL}workspace`); };
 
-  const row = "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors";
+  // min-h-11 is 44px, the smallest target a thumb hits reliably. At py-2 these were 36px rows and
+  // picking a project on a phone took two goes.
+  const row = "flex min-h-11 w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors";
   const on = "bg-accent/12 text-foreground";
   const off = "text-muted hover:bg-white/5 hover:text-foreground";
 

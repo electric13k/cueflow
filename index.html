@@ -1,11 +1,14 @@
 <!doctype html>
-<html lang="en" class="dark">
+<!-- No `class="dark"` here. The page is beige and has been since there stopped being a page-wide
+     mode; main.tsx calls applyTheme("light") on boot, so the class was only ever a dark first paint
+     that flipped to cream a frame later. Dark is a scope now, on a wrapper, never on this element. -->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <!-- viewport-fit=cover so the docked transport can sit on the screen edge and pad itself past
          the home indicator with env(safe-area-inset-bottom) instead of floating above it. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>CueFloww: browser soundboard & cue system</title>
+    <title>CueFlow: browser soundboard & cue system</title>
     <meta name="description" content="A browser soundboard, Web Audio editor and arrow-key cue system for theatre, presentations and streams." />
     <link rel="canonical" href="https://cuefloww.netlify.app/" />
 
@@ -20,19 +23,19 @@
     <meta name="theme-color" content="#1A1614" media="(prefers-color-scheme: dark)" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="CueFloww" />
+    <meta property="og:site_name" content="CueFlow" />
     <meta property="og:url" content="https://cuefloww.netlify.app/" />
-    <meta property="og:title" content="CueFloww: browser soundboard & cue system" />
+    <meta property="og:title" content="CueFlow: browser soundboard & cue system" />
     <meta property="og:description" content="A browser soundboard, Web Audio editor and arrow-key cue system for theatre, presentations and streams." />
     <meta property="og:image" content="https://cuefloww.netlify.app/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="A maroon playbill card: the CueFloww monogram, a cream Bodoni C with a brass cue lamp in its mouth, above the wordmark CueFloww." />
+    <meta property="og:image:alt" content="A maroon playbill card: the CueFlow monogram, a cream Bodoni C with a brass cue lamp in its mouth, above the wordmark CueFlow." />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CueFloww: browser soundboard & cue system" />
+    <meta name="twitter:title" content="CueFlow: browser soundboard & cue system" />
     <meta name="twitter:description" content="A browser soundboard, Web Audio editor and arrow-key cue system for theatre, presentations and streams." />
     <meta name="twitter:image" content="https://cuefloww.netlify.app/og.png" />
-    <meta name="twitter:image:alt" content="A maroon playbill card: the CueFloww monogram, a cream Bodoni C with a brass cue lamp in its mouth, above the wordmark CueFloww." />
+    <meta name="twitter:image:alt" content="A maroon playbill card: the CueFlow monogram, a cream Bodoni C with a brass cue lamp in its mouth, above the wordmark CueFlow." />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
