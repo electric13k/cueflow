@@ -1,114 +1,100 @@
-import { useRef, useState } from "react";
-import { Button } from "../ui";
-import { Check, Crop, X } from "lucide-react";
-import { fullRect, type Rect } from "../lib/image";
+import { useEffect, useRef, useState } from "react";
+import Cropper from "cropperjs";
+import "cropperjs/dist/cropper.css";
+import { Button, Tooltip } from "../ui";
+import { Check, Crop, FlipHorizontal, RotateCcw, RotateCw, Undo2, X } from "lucide-react";
 
-const RATIOS: { label: string; value: number | null }[] = [
-  { label: "Free", value: null },
-  { label: "16:9", value: 16 / 9 },
-  { label: "4:3", value: 4 / 3 },
-  { label: "1:1", value: 1 },
-  { label: "9:16", value: 9 / 16 },
+const RATIOS: { label: string; hint: string; value: number }[] = [
+  { label: "Free", hint: "Any shape", value: NaN },
+  { label: "16:9", hint: "Widescreen, the shape of most projectors", value: 16 / 9 },
+  { label: "4:3", hint: "The older projector shape", value: 4 / 3 },
+  { label: "1:1", hint: "Square", value: 1 },
+  { label: "9:16", hint: "Upright, for a phone or a tall screen", value: 9 / 16 },
 ];
 
 /**
- * Drag a box over the picture and keep what is inside. Ratio presets constrain the drag rather than
- * squashing the result, which is the behaviour darktable and Krita both settled on -- a 16:9 crop
- * should hand you a 16:9 file, not a stretched one.
+ * Crop and rotate, on Cropper.js (github.com/fengyuanchen/cropperjs, MIT). The library owns the
+ * box, the handles, the ratio lock and the pixel readback; this component owns the buttons and
+ * hands the result out as a file.
+ *
+ * The rotation is baked by `getCroppedCanvas`, so a turned picture leaves as a turned file rather
+ * than as a CSS transform the presenter would have to reapply.
  */
-export default function CropBox({ url, onCancel, onApply }: {
-  url: string; onCancel: () => void; onApply: (r: Rect) => void;
+export default function CropBox({ url, title, onCancel, onApply }: {
+  url: string; title: string; onCancel: () => void; onApply: (file: File) => void;
 }) {
-  const [rect, setRect] = useState<Rect>(fullRect());
-  const [ratio, setRatio] = useState<number | null>(null);
-  const frame = useRef<HTMLDivElement>(null);
-  const from = useRef<{ x: number; y: number } | null>(null);
+  const img = useRef<HTMLImageElement>(null);
+  const cropper = useRef<Cropper | null>(null);
+  const [ratio, setRatio] = useState(NaN);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const at = (e: { clientX: number; clientY: number }) => {
-    const box = frame.current!.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(1, (e.clientX - box.left) / box.width)),
-      y: Math.max(0, Math.min(1, (e.clientY - box.top) / box.height)),
-      aspect: box.width / box.height,
-    };
-  };
+  useEffect(() => {
+    const el = img.current; if (!el) return;
+    // Without this the canvas is tainted by a cross-origin file and getCroppedCanvas throws.
+    el.crossOrigin = "anonymous";
+    const c = new Cropper(el, {
+      viewMode: 1, autoCropArea: 1, background: false, responsive: true,
+      ready: () => setReady(true),
+    });
+    cropper.current = c;
+    return () => { c.destroy(); cropper.current = null; setReady(false); };
+  }, [url]);
 
-  const draw = (e: { clientX: number; clientY: number }) => {
-    const a = from.current;
-    if (!a) return;
-    const p = at(e);
-    // x and y are fractions of a box that is not square, so a pixel ratio of r means w/h = r/aspect.
-    let w = Math.abs(p.x - a.x);
-    let h = ratio ? (w * p.aspect) / ratio : Math.abs(p.y - a.y);
-    let x = p.x < a.x ? a.x - w : a.x;
-    let y = p.y < a.y ? a.y - h : a.y;
-    // Running off an edge shrinks the box; the anchor corner stays where it was put.
-    if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
-    w = Math.min(w, 1 - x);
-    h = Math.min(h, 1 - y);
-    if (ratio) {
-      // Whichever edge ran out first decides the size, so the ratio survives the clamp.
-      if ((w * p.aspect) / ratio > h) w = (h * ratio) / p.aspect; else h = (w * p.aspect) / ratio;
-      if (p.y < a.y) y = Math.max(0, a.y - h);
-      if (p.x < a.x) x = Math.max(0, a.x - w);
-    }
-    setRect({ x, y, w: Math.max(.02, w), h: Math.max(.02, h) });
-  };
+  const pick = (v: number) => { setRatio(v); cropper.current?.setAspectRatio(v); };
+  const turn = (deg: number) => cropper.current?.rotate(deg);
+  const mirror = () => cropper.current?.scaleX(-(cropper.current.getData().scaleX || 1));
+  const reset = () => { cropper.current?.reset(); pick(NaN); };
 
-  const track = () => {
-    const move = (ev: PointerEvent) => draw(ev);
-    const stop = () => { from.current = null; window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
+  const done = () => {
+    const c = cropper.current; if (!c) return;
+    setBusy(true);
+    // maxWidth keeps a 40 megapixel phone photo from turning into a canvas the tab cannot allocate.
+    c.getCroppedCanvas({ maxWidth: 4096, maxHeight: 4096, imageSmoothingQuality: "high" })
+      .toBlob(blob => {
+        setBusy(false);
+        if (!blob) return alert("That crop could not be rendered.");
+        onApply(new File([blob], `${title}.png`, { type: "image/png" }));
+      }, "image/png");
   };
-  const start = (e: React.PointerEvent) => { e.preventDefault(); from.current = at(e); track(); };
-  /**
-   * Dragging a corner is drawing the same box from the corner opposite it, so the whole resize is
-   * the anchor swap and nothing else. 44 px of hit area, which is a fingertip -- the visible ring is
-   * a fifth of that, because a target you can hit and a target you can see are different sizes.
-   */
-  const corner = (ax: 0 | 1, ay: 0 | 1) => (e: React.PointerEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    from.current = { x: rect.x + (1 - ax) * rect.w, y: rect.y + (1 - ay) * rect.h };
-    track();
-  };
-
-  const box = { left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` };
 
   return (
     <div className="space-y-3">
-      <div ref={frame} onPointerDown={start}
-        className="relative aspect-video w-full touch-none select-none overflow-hidden rounded-2xl border border-border bg-black">
-        <img src={url} alt="" className="h-full w-full object-contain" draggable={false} />
-        <div className="pointer-events-none absolute inset-0 bg-black/55" />
-        <div className="pointer-events-none absolute overflow-hidden ring-2 ring-accent" style={box}>
-          <img src={url} alt="" className="absolute h-full w-full object-contain"
-            style={{ left: `${-rect.x * 100 / rect.w}%`, top: `${-rect.y * 100 / rect.h}%`, width: `${100 / rect.w}%`, height: `${100 / rect.h}%` }} draggable={false} />
-          {/* Thirds, the one guide worth having on by default. */}
-          <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">
-            {Array.from({ length: 9 }, (_, i) => <div key={i} className="border border-white/20" />)}
-          </div>
-        </div>
-        {([[0, 0], [1, 0], [0, 1], [1, 1]] as const).map(([ax, ay]) => (
-          <button key={`${ax}${ay}`} type="button" aria-label="Resize the crop" onPointerDown={corner(ax, ay)}
-            className="absolute h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-none"
-            style={{ left: `${(rect.x + ax * rect.w) * 100}%`, top: `${(rect.y + ay * rect.h) * 100}%` }}>
-            <span className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-background/80" />
-          </button>
-        ))}
+      <div className="max-h-[60vh] overflow-hidden rounded-2xl border border-border bg-black">
+        {/* Cropper replaces this element with its own scaffold, so it needs a plain img and no layout of ours. */}
+        <img ref={img} src={url} alt="" className="block max-w-full" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Crop size={15} className="text-muted" />
         {RATIOS.map(r => (
-          <Button key={r.label} size="sm" variant={ratio === r.value ? "solid" : "flat"} color={ratio === r.value ? "primary" : "default"}
-            onPress={() => setRatio(r.value)}>{r.label}</Button>
+          <Tooltip key={r.label} content={r.hint}>
+            <Button size="sm" variant={Object.is(ratio, r.value) ? "solid" : "flat"} color={Object.is(ratio, r.value) ? "primary" : "default"}
+              onPress={() => pick(r.value)}>{r.label}</Button>
+          </Tooltip>
         ))}
-        <span className="text-xs text-muted">Drag across the picture to set the frame, or drag a corner.</span>
+        <Tooltip content="Turn a quarter left">
+          <Button isIconOnly size="sm" variant="flat" aria-label="Rotate left" onPress={() => turn(-90)}><RotateCcw size={15} /></Button>
+        </Tooltip>
+        <Tooltip content="Turn a quarter right">
+          <Button isIconOnly size="sm" variant="flat" aria-label="Rotate right" onPress={() => turn(90)}><RotateCw size={15} /></Button>
+        </Tooltip>
+        <Tooltip content="Mirror left to right">
+          <Button isIconOnly size="sm" variant="flat" aria-label="Mirror" onPress={mirror}><FlipHorizontal size={15} /></Button>
+        </Tooltip>
+        <Tooltip content="Put the box, the turn and the mirror back where they started">
+          <Button isIconOnly size="sm" variant="light" aria-label="Reset" onPress={reset}><Undo2 size={15} /></Button>
+        </Tooltip>
+        <span className="text-xs text-muted">Drag inside the picture to move the box, drag an edge to resize it.</span>
         <span className="ml-auto flex gap-2">
           <Button size="sm" variant="light" startContent={<X size={14} />} onPress={onCancel}>Cancel</Button>
-          <Button size="sm" color="primary" startContent={<Check size={14} />} onPress={() => onApply(rect)}>Crop to new image</Button>
+          <Tooltip content="Writes the framed part out as a new image in the library">
+            <span>
+              <Button size="sm" color="primary" isDisabled={!ready} isLoading={busy} startContent={<Check size={14} />} onPress={done}>
+                Crop to new image
+              </Button>
+            </span>
+          </Tooltip>
         </span>
       </div>
     </div>

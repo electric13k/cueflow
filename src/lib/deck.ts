@@ -2,7 +2,7 @@ import { moved } from "./dragList";
 
 /**
  * A deck is a document: a list of slides over one shared master. That is the whole idea taken from
- * the pptWeb editor (github.com/theBigGavin/pptWeb) — theme lives on the deck, content and layout
+ * the pptWeb editor (github.com/theBigGavin/pptWeb), theme lives on the deck, content and layout
  * live on the slide, so restyling a talk is one click rather than N. None of its code is here.
  *
  * The model is plain data and pure functions so the editor can stay a thin renderer, and so this
@@ -128,7 +128,7 @@ function rows(ctx: CanvasRenderingContext2D, m: Master, s: Slide, w: number, ts:
 
 const height = (r: Row[]) => r.reduce((h, x) => h + x.lead, 0);
 
-/** Fills a box with the image, cropping the overflow — a letterboxed slide wastes the projector. */
+/** Fills a box with the image, cropping the overflow, a letterboxed slide wastes the projector. */
 function cover(ctx: CanvasRenderingContext2D, img: CanvasImageSource & { width: number; height: number }, x: number, y: number, w: number, h: number) {
   const iw = img.width || 1, ih = img.height || 1;
   const scale = Math.max(w / iw, h / ih);
@@ -143,7 +143,7 @@ type Img = (CanvasImageSource & { width: number; height: number }) | null | unde
 
 /**
  * Draws one slide at 16:9. `width` exists so the strip can paint 180px thumbnails through the same
- * code as the 1920px export — everything inside is measured in the 1920×1080 design space.
+ * code as the 1920px export, everything inside is measured in the 1920×1080 design space.
  */
 export function drawSlide(canvas: HTMLCanvasElement, m: Master, s: Slide, img?: Img, width = W) {
   canvas.width = Math.round(width); canvas.height = Math.round(width * H / W);
@@ -202,7 +202,7 @@ async function toFile(canvas: HTMLCanvasElement, title: string) {
   return new File([blob], `${title}.png`, { type: "image/png" });
 }
 
-/** One PNG per slide, in deck order — a one-slide deck is exactly the old single-slide export. */
+/** One PNG per slide, in deck order, a one-slide deck is exactly the old single-slide export. */
 export async function deckFiles(d: Deck, images: Record<string, Img>) {
   const canvas = document.createElement("canvas");
   const out: { file: File; title: string }[] = [];

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { addPoint, commit, envelopeGain, movePoint, redo, stack, undo } from "./audioEdit";
+import { commit, envelopeGain, redo, stack, undo } from "./audioEdit";
 
 const of = (s: ReturnType<typeof stack<string>>) => [s.past.join(""), s.present, s.future.join("")];
 
@@ -42,10 +42,8 @@ test("envelope reads flat outside its points and interpolates between them", () 
   expect(envelopeGain([], 5)).toBe(1);
 });
 
-test("a dragged point stops at its neighbours and the ends keep their time", () => {
-  const pts = addPoint([{ t: 0, g: 1 }, { t: 4, g: 1 }], { t: 2, g: 1 });
-  expect(pts.map(p => p.t)).toEqual([0, 2, 4]);
-  expect(movePoint(pts, 1, 9, 0.5)[1]).toEqual({ t: 4, g: 0.5 });
-  expect(movePoint(pts, 1, -9, 3)[1]).toEqual({ t: 0, g: 2 });
-  expect(movePoint(pts, 2, 1, 1)[2].t).toBe(4);
+test("an out of order point set still reads as a curve, since the plugin hands them back unsorted", () => {
+  const pts = [{ t: 0, g: 1 }, { t: 2, g: .5 }, { t: 4, g: 0 }];
+  expect(envelopeGain(pts, 1)).toBeCloseTo(.75, 12);
+  expect(envelopeGain(pts, 3)).toBeCloseTo(.25, 12);
 });

@@ -727,10 +727,13 @@ export default function Studio() {
         <ShowManager show={liveShow} setShow={s => { setLiveShow(s); if (!s) setManaging(false); }}
           projectId={project} sequences={sequences} tracks={tracks} script={scriptDoc.html ? scriptDoc : null}
           links={links} stage={stage} onClose={() => setManaging(false)}
+          armedSequenceId={armed ? sequenceId : ""} cueIndex={cueIndex}
           onFlash={text => { showBus.current?.send({ type: "flash", text, from: "host" }); showAlert("warn", text); }}
           onResend={() => showBus.current?.send(deck())}
           onAddSequence={seqId => sequenceToShow(seqId, liveShow.id)} onAddScript={() => scriptToShow(liveShow.id)}
-          onRunSequence={runSequence} onStage={t => show(t)} />
+          onRunSequence={runSequence} onStage={t => show(t)}
+          onAddToSequence={(seqId, trackId) => addTracksTo(seqId, [trackId])}
+          onFire={playCue} onOpenAudience={openAudience} />
       )}
 
       <SlideComposer open={slideOpen} onClose={() => setSlideOpen(false)} onCreate={addProcessedFile} />
@@ -903,7 +906,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
       {heading}
       <p className="max-w-2xl text-sm text-muted">
         {kind === "embed"
-          ? "An embedded deck. Edit the slides in Google Slides or PowerPoint itself; the transition and caption below are what CueFloww adds when the cue fires."
+          ? "An embedded deck. Edit the slides in Google Slides or PowerPoint itself; the transition and caption below are what CueFlow adds when the cue fires."
           : "Framing, colour and timing ride with this asset and are applied when the cue fires, so the original file is never touched. Flatten to a new image if you want a copy with the look baked in."}
       </p>
       <MediaEditor track={track} cues={cues} onChange={updateVisual} onSave={onSave} />
@@ -1011,7 +1014,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                           {linking && linking !== item.id ? (
                             <Button size="sm" variant="flat" color="primary" onPress={() => { linkCues(linking, item.id); setLinking(""); }}>Link here</Button>
                           ) : (
-                            <Tooltip content={item.link ? `Linked to cue ${numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"} — click to unlink` : linking === item.id ? "Now click the cue this goes with" : "Fire this cue together with another"}>
+                            <Tooltip content={item.link ? `Linked to cue ${numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}, click to unlink` : linking === item.id ? "Now click the cue this goes with" : "Fire this cue together with another"}>
                               <Button isIconOnly size="sm" variant={item.link || linking === item.id ? "solid" : "light"} color={item.link ? "secondary" : linking === item.id ? "primary" : "default"}
                                 onPress={() => { if (item.link) { unlinkCue(item.id); setLinking(""); } else setLinking(l => (l === item.id ? "" : item.id)); }}>
                                 {item.link ? <Unlink size={14} /> : <Link2 size={15} />}

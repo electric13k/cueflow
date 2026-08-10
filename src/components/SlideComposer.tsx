@@ -13,7 +13,7 @@ type Img = HTMLImageElement | null | undefined;
 /**
  * A deck editor, not a slide typer. Following the pptWeb editor
  * (github.com/theBigGavin/pptWeb): the deck is the document, the theme is a master shared by every
- * slide, and each slide picks a layout rather than a free canvas — a slide read from the back of a
+ * slide, and each slide picks a layout rather than a free canvas, a slide read from the back of a
  * room needs to line up with the one before it, and dragging text anywhere guarantees it will not.
  * No pptWeb code is used here.
  *

@@ -15,9 +15,6 @@ import { defaultVisual, type Visual } from "../types";
 export const tempColour = (temp: number) => (temp >= 0 ? "255,138,61" : "61,168,255");
 export const tempAlpha = (temp: number) => Math.min(Math.abs(temp), 100) / 260;
 
-export type Rect = { x: number; y: number; w: number; h: number };
-export const fullRect = (): Rect => ({ x: 0, y: 0, w: 1, h: 1 });
-
 // --- The adjustment stack ------------------------------------------------------------------------
 
 export type Ctl = { key: keyof Visual; label: string; min: number; max: number; step: number; suffix?: string; decimals?: number };
@@ -144,19 +141,6 @@ export async function flatten(url: string, v: Visual, title: string) {
     ctx.fillStyle = band; ctx.fillRect(0, h - size * 3, w, size * 3);
     ctx.fillStyle = "#fff"; ctx.fillText(v.caption, w / 2, h - size);
   }
-  return toFile(canvas, title);
-}
-
-/**
- * Crop is the one edit that cannot ride along as a setting: it changes the frame every later
- * control measures against. So it writes a new file and leaves the original in the library.
- */
-export async function cropImage(url: string, rect: Rect, title: string) {
-  const img = await load(url);
-  const sx = Math.round(rect.x * img.naturalWidth), sy = Math.round(rect.y * img.naturalHeight);
-  const sw = Math.max(1, Math.round(rect.w * img.naturalWidth)), sh = Math.max(1, Math.round(rect.h * img.naturalHeight));
-  const canvas = Object.assign(document.createElement("canvas"), { width: sw, height: sh });
-  canvas.getContext("2d")!.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
   return toFile(canvas, title);
 }
 

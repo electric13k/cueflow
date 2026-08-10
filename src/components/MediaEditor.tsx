@@ -6,8 +6,8 @@ import CropBox from "./CropBox";
 import Filmstrip from "./Filmstrip";
 import { downloadAsset } from "../lib/media";
 import {
-  MODULES, cropImage, flatten, moduleTouched, resetModule, toggleModule,
-  type Bypassed, type ImageModule, type Rect,
+  MODULES, flatten, moduleTouched, resetModule, toggleModule,
+  type Bypassed, type ImageModule,
 } from "../lib/image";
 import { defaultVisual, kindOf, type Track, type Transition, type Visual } from "../types";
 
@@ -103,11 +103,11 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
     finally { setBusy(false); }
   };
 
-  const crop = async (rect: Rect) => {
+  // Cropper.js owns the crop itself and hands back a finished file, so there is nothing to redraw here.
+  const crop = async (file: File) => {
     setCropping(false);
     setBusy(true);
-    const title = `${track.title} (crop)`;
-    try { await onSave(await cropImage(track.url, rect, title), title); }
+    try { await onSave(file, `${track.title} (crop)`); }
     catch (e) { alert(`Could not crop this image: ${(e as Error).message}`); }
     finally { setBusy(false); }
   };
@@ -123,7 +123,7 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
     </ModulePanel>
   ));
 
-  if (cropping) return <CropBox url={track.url} onCancel={() => setCropping(false)} onApply={r => void crop(r)} />;
+  if (cropping) return <CropBox url={track.url} title={`${track.title} (crop)`} onCancel={() => setCropping(false)} onApply={f => void crop(f)} />;
 
   return (
     <div className="space-y-4">

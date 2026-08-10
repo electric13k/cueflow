@@ -28,9 +28,11 @@ export const redo = <T>(s: Stack<T>): Stack<T> => s.future.length
   : s;
 
 // --- gain envelope ---------------------------------------------------------
-/** A control point: `g` is a linear multiplier, 1 = untouched, matching the channel faders. */
+/**
+ * A control point: `g` is a linear multiplier, 1 = untouched, matching the channel faders.
+ * Placing and dragging points is wavesurfer's envelope plugin; what the curve *means* is here.
+ */
 export type EnvPoint = { t: number; g: number };
-export const ENV_MAX = 2;
 
 /** The flat, does-nothing envelope a clip starts with. */
 export const flatEnvelope = (duration: number): EnvPoint[] => [{ t: 0, g: 1 }, { t: duration, g: 1 }];
@@ -46,25 +48,6 @@ export function envelopeGain(points: EnvPoint[], t: number) {
   const a = points[i - 1], b = points[i];
   const span = b.t - a.t;
   return span <= 0 ? b.g : a.g + (b.g - a.g) * ((t - a.t) / span);
-}
-
-/** Inserts a point in time order. */
-export const addPoint = (points: EnvPoint[], p: EnvPoint): EnvPoint[] =>
-  [...points, p].sort((x, y) => x.t - y.t);
-
-/**
- * Drags point `i` to (t, g). It stops at its neighbours instead of hopping past them -- a point you
- * drag through the next one should stop, the same rule the region handles follow. The two end
- * points keep their time so the envelope always spans the whole clip.
- */
-export function movePoint(points: EnvPoint[], i: number, t: number, g: number): EnvPoint[] {
-  const p = points[i]; if (!p) return points;
-  const pinned = i === 0 || i === points.length - 1;
-  const lo = pinned ? p.t : points[i - 1].t;
-  const hi = pinned ? p.t : points[i + 1].t;
-  return points.map((q, j) => j === i
-    ? { t: Math.max(lo, Math.min(hi, t)), g: Math.max(0, Math.min(ENV_MAX, g)) }
-    : q);
 }
 
 /** src with the envelope multiplied in, hard-limited so a boost cannot wrap past full scale. */

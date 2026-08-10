@@ -102,7 +102,7 @@ export default function Filmstrip({ url, duration, trimIn, trimOut, cues = [], o
         <span>{(end - trimIn).toFixed(2)}s on screen</span>
         <span>{end.toFixed(2)}s</span>
       </div>
-      <p className="text-[11px] text-muted">Pick up a handle and nudge it a frame with <kbd>,</kbd> and <kbd>.</kbd>{cues.length > 0 && " — it sticks to where other cues cut this file."}</p>
+      <p className="text-[11px] text-muted">Pick up a handle and nudge it a frame with <kbd>,</kbd> and <kbd>.</kbd>{cues.length > 0 && ", it sticks to where other cues cut this file."}</p>
     </div>
   );
 }
