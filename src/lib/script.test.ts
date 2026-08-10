@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clean, findInScript, keywordsOf, markKeywords, shapeParagraph, type Cue } from "./script";
+import { clean, cueAlert, findInScript, keywordsOf, markKeywords, REARM_SLACK, shapeParagraph, type Armed, type Cue } from "./script";
 
 const cue = (words: string, id = "c1"): Cue => ({ id, words, message: "" });
 const marks = (html: string) => [...html.matchAll(/<mark[^>]*>(.*?)<\/mark>/g)].map(m => m[1]);
@@ -131,5 +131,50 @@ describe("markKeywords", () => {
 describe("keywordsOf", () => {
   it("splits on commas and ignores blanks and case", () => {
     expect(keywordsOf(cue(" Lights , , LX 4 "))).toEqual(["lights", "lx 4"]);
+  });
+});
+
+// The reading line moving back up a script is a stage manager going back over a page. Every cue it
+// passes on the way up has not happened yet, and must flash again on the way down.
+describe("cueAlert", () => {
+  const armed = (): Armed => ({ warn: new Set(), hit: new Set() });
+  const LOOK = 260;
+
+  it("warns once as the cue comes into range, then hits once as it lands", () => {
+    const fired = armed();
+    expect(cueAlert(400, LOOK, "0", fired)).toBe(null);
+    expect(cueAlert(200, LOOK, "0", fired)).toBe("warn");
+    expect(cueAlert(120, LOOK, "0", fired)).toBe(null);
+    expect(cueAlert(-5, LOOK, "0", fired)).toBe("hit");
+    expect(cueAlert(-300, LOOK, "0", fired)).toBe(null);
+  });
+
+  it("re-arms a cue that scrolling has put back in front of the reading line", () => {
+    const fired = armed();
+    cueAlert(200, LOOK, "0", fired);
+    cueAlert(-5, LOOK, "0", fired);
+    // Scrolled back to the top by hand. No rewind button was pressed.
+    expect(cueAlert(900, LOOK, "0", fired)).toBe(null);
+    expect(fired.hit.size + fired.warn.size).toBe(0);
+    // And down again: the whole sequence repeats.
+    expect(cueAlert(200, LOOK, "0", fired)).toBe("warn");
+    expect(cueAlert(-5, LOOK, "0", fired)).toBe("hit");
+  });
+
+  it("does not re-arm on jitter around the warning boundary", () => {
+    const fired = armed();
+    expect(cueAlert(LOOK, LOOK, "0", fired)).toBe("warn");
+    expect(cueAlert(LOOK + REARM_SLACK, LOOK, "0", fired)).toBe(null);
+    expect(cueAlert(LOOK, LOOK, "0", fired)).toBe(null);
+    expect(fired.warn.has("0")).toBe(true);
+  });
+
+  it("re-arms each cue on its own", () => {
+    const fired = armed();
+    cueAlert(-5, LOOK, "0", fired);
+    cueAlert(-5, LOOK, "1", fired);
+    cueAlert(900, LOOK, "1", fired);
+    expect(fired.hit.has("0")).toBe(true);
+    expect(fired.hit.has("1")).toBe(false);
   });
 });

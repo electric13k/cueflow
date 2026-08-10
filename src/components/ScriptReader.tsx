@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input, Tooltip } from "../ui";
 import { Bell, ChevronDown, ChevronUp, FileUp, Minus, Pause, Play, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { send } from "../lib/bus";
-import { emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Cue, type ScriptDoc } from "../lib/script";
+import { cueAlert, emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Armed, type Cue, type ScriptDoc } from "../lib/script";
 
 /** Where on screen the line you are reading sits. Not the very top: you need to see what is coming. */
 const READ_LINE = .38;
@@ -46,7 +46,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
   const [flash, setFlash] = useState<"warn" | "hit" | null>(null);
   const [message, setMessage] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
-  const fired = useRef<{ warn: Set<string>; hit: Set<string> }>({ warn: new Set(), hit: new Set() });
+  const fired = useRef<Armed>({ warn: new Set(), hit: new Set() });
   const accrued = useRef(0);
 
   const marked = useMemo(() => markKeywords(doc.html, doc.cues), [doc.html, doc.cues]);
@@ -67,19 +67,18 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
   };
 
   // Scroll position drives the alerts: whether the scrolling came from a hand or from the timer
-  // below, there is one place that knows where the reading line is.
+  // below, there is one place that knows where the reading line is. `cueAlert` also re-arms a cue
+  // the scroll has put back in front of the line, so scrolling up by hand is as good as rewinding.
   const check = () => {
     const box = scroller.current;
     if (!box) return;
     const line = box.getBoundingClientRect().top + box.clientHeight * READ_LINE;
     for (const mark of box.querySelectorAll<HTMLElement>("mark[data-hit]")) {
-      const id = mark.dataset.hit!;
       const cue = doc.cues.find(c => c.id === mark.dataset.cue);
       if (!cue) continue;
-      const top = mark.getBoundingClientRect().top;
-      const ahead = top - line;
-      if (ahead <= 0 && !fired.current.hit.has(id)) { fired.current.hit.add(id); fired.current.warn.add(id); raise("hit", cue); }
-      else if (ahead > 0 && ahead <= doc.lookahead && !fired.current.warn.has(id)) { fired.current.warn.add(id); raise("warn", cue); }
+      const ahead = mark.getBoundingClientRect().top - line;
+      const level = cueAlert(ahead, doc.lookahead, mark.dataset.hit!, fired.current);
+      if (level) raise(level, cue);
     }
   };
 

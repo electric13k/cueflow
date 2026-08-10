@@ -54,7 +54,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
     <div className="space-y-4">
       <p className="text-sm text-muted">
         A show is one performance across however many devices are in the room. Everyone types the same
-        code — no accounts — and what each of them can see and do comes from the job you give them.
+        code, no accounts, and what each of them can see and do comes from the job you give them.
       </p>
       <div className="flex flex-wrap gap-2">
         <Input className="min-w-48 flex-1" label="Name this show" value={name} onValueChange={setName} placeholder="Friday night" />
@@ -83,11 +83,11 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Collaborator password</p>
-          <p className="font-mono text-3xl font-black tracking-[.3em] text-accent">{show.password ?? "—"}</p>
+          <p className="font-mono text-3xl font-black tracking-[.3em] text-accent">{show.password ?? "-"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="bordered" startContent={<Copy size={14} />}
-            onPress={() => void navigator.clipboard?.writeText(`${location.origin}/show — ${show.password ?? ""}`).then(() => toast("Copied", "Only give that to someone who should run the show with you.", "success"))}>
+            onPress={() => void navigator.clipboard?.writeText(`${location.origin}/show, ${show.password ?? ""}`).then(() => toast("Copied", "Only give that to someone who should run the show with you.", "success"))}>
             Copy
           </Button>
           <Button size="sm" variant="light" startContent={<RefreshCw size={14} />} isLoading={busy}
@@ -112,7 +112,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       <p className="text-xs text-muted">
         The password lets someone in as a <strong>collaborator</strong>: everything a job can see, plus
         firing cues, editing them and calling the show on. Give it only to the person running it with
-        you. It is yours to choose — 4 to 12 letters and numbers — and it may be the same string as one
+        you. It is yours to choose, 4 to 12 letters and numbers, and it may be the same string as one
         of the job keys below, but it can never be a key another show is already using. Nothing to
         recover if it is lost: type a new one and tell the person who needs it.
       </p>
@@ -120,7 +120,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       <section className="space-y-3">
         <h3 className="text-sm font-bold">Jobs and their keys</h3>
         <p className="text-xs text-muted">
-          Each job has its own key. Whoever types it lands in that job — you decide who does what by
+          Each job has its own key. Whoever types it lands in that job, you decide who does what by
           deciding who gets which key, and a key you replace stops working the moment you save it.
         </p>
         {roles.map(role => (
@@ -170,7 +170,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
           <Button isIconOnly color="primary" aria-label="Flash it"
             onPress={() => { if (message.trim()) { onFlash(message.trim()); setMessage(""); } }}><Send size={16} /></Button>
         </div>
-        <p className="text-xs text-muted">It flashes on every device in the show. No sound, ever — that is the point.</p>
+        <p className="text-xs text-muted">It flashes on every device in the show. No sound, ever, that is the point.</p>
       </section>
 
       <section className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">

@@ -5,7 +5,7 @@ import { listen, send } from "../lib/bus";
 import { emptyDoc, loadScript, type ScriptDoc } from "../lib/script";
 
 /**
- * The script on its own. Opened from the Studio (popup or new tab) it wears no chrome — someone
+ * The script on its own. Opened from the Studio (popup or new tab) it wears no chrome, someone
  * reading this is reading it, not browsing. Reached by a link from the workspace it wears the
  * Shell, because a route with no way out is a dead end.
  *

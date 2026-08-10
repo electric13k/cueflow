@@ -12,7 +12,7 @@ import type { Sequence } from "../types";
  * What sits above the tabs on a project screen: the shows, and beside them the script.
  *
  * Both start as a single button. Making the first one turns that button into a grid and the grid is
- * where it stays — a project that has ever had a show is a project whose shows are the subject, and
+ * where it stays, a project that has ever had a show is a project whose shows are the subject, and
  * a screen whose furniture moves back and forth under you is a screen you have to re-learn. Only
  * deleting every last one puts the button back.
  *

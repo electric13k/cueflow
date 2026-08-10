@@ -2,7 +2,7 @@
  * Turns a Word or PDF script into HTML the reader can show. The point is that the page keeps the
  * shape the writer gave it -- headings, stage directions in italics, character names in bold -- and
  * loses only the paper: no white page, no margins, no drop shadow. It should read as if the script
- * were typed into CueFloww.
+ * were typed into CueFlow.
  *
  * Both parsers are loaded on demand. They are large, and most sessions never open a script.
  */
@@ -241,6 +241,35 @@ export function markKeywords(html: string, cues: Cue[]) {
     queue.unshift(rest);
   }
   return { html: doc.body.innerHTML, hits };
+}
+
+/** Which cues have already flashed, by marker id. One set per level: a warn does not imply a hit. */
+export type Armed = { warn: Set<string>; hit: Set<string> };
+
+/**
+ * Hysteresis, in pixels. A cue re-arms only once it is this much further ahead than the warning
+ * distance, so a hand jiggling the wheel on the boundary cannot flash the same cue twice.
+ */
+export const REARM_SLACK = 24;
+
+/**
+ * What one marker is owed, given how far ahead of the reading line it now sits. `fired` is the
+ * running record and is updated in place.
+ *
+ * The re-arming is the point. Scrolling back up puts a cue in front of the reading line again, and
+ * a cue in front of the reading line has not happened yet, whether it got back there by the rewind
+ * button or by a hand on the scrollbar. Only forgetting on rewind is what left manual scrolling
+ * silent for the rest of the run.
+ */
+export function cueAlert(ahead: number, lookahead: number, id: string, fired: Armed): "warn" | "hit" | null {
+  if (ahead > lookahead + REARM_SLACK) { fired.warn.delete(id); fired.hit.delete(id); return null; }
+  if (ahead <= 0) {
+    if (fired.hit.has(id)) return null;
+    fired.hit.add(id); fired.warn.add(id);
+    return "hit";
+  }
+  if (ahead <= lookahead && !fired.warn.has(id)) { fired.warn.add(id); return "warn"; }
+  return null;
 }
 
 /**

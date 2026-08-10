@@ -42,7 +42,7 @@ function Door({ onIn }: { onIn: (t: Ticket) => void }) {
       <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Join a show</p>
       <h1 className="text-3xl font-black tracking-tight">Type your key</h1>
       <p className="text-sm text-muted">
-        No account needed. Whoever is running the show gives you a key, and the key is the job — type
+        No account needed. Whoever is running the show gives you a key, and the key is the job, type
         it and you are on followspot, or on sound, or holding the whole thing. Nothing to choose.
       </p>
       <Input autoFocus label="Your key" value={key} onValueChange={v => setKey(v.trim())}
@@ -51,7 +51,7 @@ function Door({ onIn }: { onIn: (t: Ticket) => void }) {
       {note && <p className="text-sm text-live">{note}</p>}
       <Button color="primary" isLoading={busy} isDisabled={key.trim().length < 4} onPress={go}>Go in</Button>
       <p className="text-xs text-muted">
-        Lost it, or it stopped working? Ask whoever is running the show — they can hand out a new one,
+        Lost it, or it stopped working? Ask whoever is running the show, they can hand out a new one,
         and the old one dies the moment they do.
       </p>
     </div>
@@ -99,7 +99,7 @@ export default function Show() {
         if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
       }
       if (msg.type === "cue") { setIndex(msg.index); setNote(`Cue ${msg.label}`); }
-      if (msg.type === "start") { setStarted(msg.at); show("Standby — show is live"); }
+      if (msg.type === "start") { setStarted(msg.at); show("Standby, show is live"); }
       if (msg.type === "end") { setStarted(null); setNote("Show ended"); }
       if (msg.type === "flash") show(msg.text);
     });
@@ -209,7 +209,7 @@ export default function Show() {
 
         {!can(ticket, "cues") && !can(ticket, "script") && !can(ticket, "stage") && (
           <section className="glass flex items-center justify-center p-8 text-center text-sm text-muted lg:col-span-2">
-            You are in. Your job does not need the cue list or the script — messages will still reach you.
+            You are in. Your job does not need the cue list or the script, messages will still reach you.
           </section>
         )}
       </div>
