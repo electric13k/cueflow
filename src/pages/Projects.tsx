@@ -114,7 +114,7 @@ export default function Projects() {
                     onPress={() => void run(() => updateProject(p.id, { name, code }), "Project updated.")}>Save</Button>
                 </div>
                 <p className="text-xs text-muted">
-                  The code is yours to choose — 4 to 12 letters and numbers, and no two projects can
+                  The code is yours to choose, 4 to 12 letters and numbers, and no two projects can
                   share one. Treat it like a password: anyone you give it to can ask to be let in.
                 </p>
 

@@ -1,4 +1,5 @@
 import { supabase, local } from "./store";
+import type { Role } from "./collab";
 
 /**
  * Six characters, no 0/O/1/I/l. A code gets read aloud across a room more often than it gets typed,
@@ -13,6 +14,9 @@ export const codeProblem = (code: string) =>
   !code.trim() ? "A code cannot be empty."
   : !CODE_RE.test(code.trim()) ? "Letters and numbers only, 4 to 12 of them."
   : "";
+
+/** A taken code is a unique violation on projects.code, and nothing else here retries on one. */
+const TAKEN = (e: { code?: string }) => e.code === "23505";
 
 export type Project = { id: string; name: string; code: string; owner: string; role: string };
 export type Member = { userId: string; username: string | null; displayName: string | null; role: string };
@@ -42,7 +46,21 @@ export async function createProject(name: string): Promise<Project> {
       .insert({ name: name.trim() || "Untitled project", code: newCode(), owner: user.id })
       .select("id,name,code,owner").single();
     if (!error) return { ...data, role: "owner" };
-    if (error.code !== "23505") throw new Error(error.message);
+    if (!TAKEN(error)) throw new Error(error.message);
+  }
+  throw new Error("Could not find a free code. Try again.");
+}
+
+/**
+ * A fresh code when the old one has been read out to too many people. Same three tries as creating
+ * one: a generated code that lands on a taken one is a coincidence, not an answer to give the host.
+ */
+export async function regenerateCode(id: string): Promise<string> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = newCode();
+    const { error } = await need().from("projects").update({ code }).eq("id", id);
+    if (!error) return code;
+    if (!TAKEN(error)) throw new Error(error.message);
   }
   throw new Error("Could not find a free code. Try again.");
 }
@@ -53,7 +71,7 @@ export async function updateProject(id: string, patch: { name?: string; code?: s
     if (problem) throw new Error(problem);
   }
   const { error } = await need().from("projects").update(patch).eq("id", id);
-  if (error) throw new Error(error.code === "23505" ? "Another project already uses that code." : error.message);
+  if (error) throw new Error(TAKEN(error) ? "Another project already uses that code." : error.message);
 }
 
 export async function deleteProject(id: string) {
@@ -65,7 +83,7 @@ export async function deleteProject(id: string) {
  * By username or by email address. The lookup runs server-side because profiles deliberately has no
  * email column -- being findable by name is the point, being enumerable by address is not.
  */
-export async function addCollaborator(project: string, who: string, role: "editor" | "viewer") {
+export async function addCollaborator(project: string, who: string, role: Role) {
   const { error } = await need().rpc("add_collaborator", { p_project: project, p_who: who.trim(), p_role: role });
   if (error) throw new Error(error.message.replace(/^.*?:\s*/, ""));
 }
@@ -80,6 +98,13 @@ export async function listMembers(project: string): Promise<Member[]> {
     const p = people?.find(x => x.id === r.user_id);
     return { userId: r.user_id, username: p?.username ?? null, displayName: p?.display_name ?? null, role: r.role };
   });
+}
+
+/** Only the owner reaches this: the roster policy is `project_role(project_id) = 'owner'`. */
+export async function setMemberRole(project: string, userId: string, role: Role) {
+  const { error } = await need().from("project_members").update({ role })
+    .eq("project_id", project).eq("user_id", userId);
+  if (error) throw new Error(error.message);
 }
 
 export async function removeMember(project: string, userId: string) {
