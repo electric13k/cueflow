@@ -25,6 +25,7 @@ import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
 import { applyTheme } from "./lib/theme";
 import { trackGlassPointer } from "./lib/glass";
+import { touchLastSeen } from "./lib/retention";
 
 /** /legal was one page with two anchors; keep old links working now that it is two pages. */
 function LegalRedirect() {
@@ -37,6 +38,9 @@ function LegalRedirect() {
 // the top bar would otherwise come back to a dark app with nothing in the UI to undo it.
 applyTheme("light");
 trackGlassPointer();
+// Once per load, and only for a session that exists. This is the clock the retention sweep reads,
+// so the thing that must never happen is an active account looking idle to it.
+void touchLastSeen();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {/* BASE_URL is "/" everywhere except GitHub Pages, which serves the app from /<repo>/. */}

@@ -18,7 +18,7 @@ export default function Privacy() {
         <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><ShieldCheck size={20} className="text-accent" />What we hold</h2>
 
         <Section title="The short version">
-          No ads. No analytics. No third-party trackers. No selling or sharing of your data. CueFloww collects the minimum it needs to work.
+          No ads. No analytics. No third-party trackers. No selling or sharing of your data. CueFlow collects the minimum it needs to work.
         </Section>
 
         <Section title="What is stored on your device">
@@ -26,12 +26,12 @@ export default function Privacy() {
         </Section>
 
         <Section title="What is stored on the server">
-          <p>Accounts and cue data are held by <b>Supabase</b> (our hosting and database provider). If you sign in, we store your email address, your asset and sequence metadata, and nothing else about you. Passwords are handled by Supabase Auth and are never visible to CueFloww.</p>
+          <p>Accounts and cue data are held by <b>Supabase</b> (our hosting and database provider). If you sign in, we store your email address, your asset and sequence metadata, and nothing else about you. Passwords are handled by Supabase Auth and are never visible to CueFlow.</p>
           <p><b>Uploaded files are stored in a public storage bucket.</b> Their URLs are long and random and are not listed anywhere, but they are not access-controlled, anyone holding a file's URL can open it. Treat uploads as unlisted, not private, and do not upload confidential recordings, images or slides.</p>
         </Section>
 
         <Section title="Imports and searches">
-          <p>Importing by link sends that URL to this site's server, which fetches the file and stores it for you. The URL is not logged or retained by CueFloww beyond that request.</p>
+          <p>Importing by link sends that URL to this site's server, which fetches the file and stores it for you. The URL is not logged or retained by CueFlow beyond that request.</p>
           <p>Searching the Internet Archive or Wikimedia Commons sends your query straight from your browser to those services, under their own privacy policies. Searching Myinstants opens their site in a new tab, at which point you are on their site.</p>
           <p>An embedded Google Slides or PowerPoint deck loads directly from that provider in the presenter window, so that provider sees the request.</p>
         </Section>
@@ -41,15 +41,22 @@ export default function Privacy() {
         </Section>
 
         <Section title="Hosting logs">
-          The site is served by <b>Netlify</b>, with a mirror deployment on <b>Vercel</b>. Both keep standard request logs (IP address, timestamp, requested URL) for security and abuse prevention, under their own privacy policies. CueFloww does not read them for any other purpose.
+          The site is served by <b>Netlify</b>, with a mirror deployment on <b>Vercel</b>. Both keep standard request logs (IP address, timestamp, requested URL) for security and abuse prevention, under their own privacy policies. CueFlow does not read them for any other purpose.
+        </Section>
+
+        <Section title="How long it is kept" id="retention">
+          <p><b>Uploaded without an account: 30 days.</b> A file uploaded by a visitor who is not signed in is deleted 30 days after it lands. There is no account to warn and no address to warn it at, which is exactly why the window is short. Sign in before you upload anything you want to keep.</p>
+          <p><b>With an account: one year of inactivity.</b> Opening CueFlow while signed in resets that clock for another year. If an account goes a whole year untouched, its files, sequences, shows, scripts and login are deleted, and that cannot be undone.</p>
+          <p><b>One email, a month before.</b> At eleven months of silence we email the address on the account once, with the deletion date, a link that keeps everything (opening CueFlow), and a link that downloads all of it as a zip. Coming back at any point before the date cancels the deletion.</p>
+          <p>The export lives on your <Link to="/account" className="text-accent underline-offset-2 hover:underline">account page</Link> and needs no notice to use: your files under their own names, and your cue data as plain JSON that opens without CueFlow.</p>
         </Section>
 
         <Section title="Your rights">
-          You can export or delete your data at any time: sign out and clear browser data to remove the local copy, and use the <Link to="/contact" className="text-accent underline-offset-2 hover:underline">contact form</Link> to have your account and its server-side records deleted. If you are in the UK/EU, the usual GDPR rights (access, correction, erasure, portability, objection) apply.
+          You can export or delete your data at any time: the account page hands you a zip of everything, signing out and clearing browser data removes the local copy, and the <Link to="/contact" className="text-accent underline-offset-2 hover:underline">contact form</Link> has your account and its server-side records deleted on request. If you are in the UK/EU, the usual GDPR rights (access, correction, erasure, portability, objection) apply.
         </Section>
 
         <Section title="Children">
-          CueFloww is not aimed at children under 13, and accounts should not be created by them.
+          CueFlow is not aimed at children under 13, and accounts should not be created by them.
         </Section>
       </div>
     </Page>

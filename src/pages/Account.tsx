@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "../ui";
-import { AtSign, KeyRound, LogOut, UserRound } from "lucide-react";
+import { AtSign, Download, KeyRound, LogOut, UserRound } from "lucide-react";
 import Shell from "../components/Shell";
 import { toast } from "../lib/toast";
 import { onAuth, signOut } from "../lib/store";
+import { buildBackup, saveBackup } from "../lib/backup";
+import { ACCOUNT_DAYS, myNotice, type Notice } from "../lib/retention";
 import { changePassword, getProfile, saveProfile, sendPasswordReset, usernameFree, usernameProblem, type Profile } from "../lib/account";
 
 export default function Account() {
@@ -15,6 +17,8 @@ export default function Account() {
   const [busy, setBusy] = useState(false);
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [exporting, setExporting] = useState("");
 
   const load = () => void getProfile().then(p => {
     setProfile(p); setReady(true);
@@ -23,6 +27,20 @@ export default function Account() {
   // Reload on sign-in/out too: this page is reachable from the password-reset email, which lands
   // here already authenticated.
   useEffect(() => onAuth(() => load()), []);
+  // The warning email points people here, so this page has to be able to show what it warned about.
+  useEffect(() => { void myNotice().then(setNotice); }, [profile?.email]);
+
+  const exportAll = async () => {
+    setExporting("Gathering your rows");
+    try {
+      const { blob, missing } = await buildBackup((done, total) => setExporting(`Fetching file ${done} of ${total}`));
+      saveBackup(blob);
+      toast("Your export is downloading",
+        missing.length ? `${missing.length} file${missing.length === 1 ? "" : "s"} could not be fetched and are listed by name in the zip's JSON.` : "Everything you own, as one zip.",
+        missing.length ? "warn" : "success");
+    } catch (e) { toast("Export failed", (e as Error).message, "warn"); }
+    finally { setExporting(""); }
+  };
 
   const saveName = async () => {
     const problem = usernameProblem(name);
@@ -53,7 +71,7 @@ export default function Account() {
   if (!profile) return (
     <Shell width="max-w-2xl">
       <h1 className="text-3xl font-black tracking-tight">Your account</h1>
-      <p className="mt-3 text-muted">You are not signed in. Open the Studio and sign in there — an account is optional, and CueFloww works without one.</p>
+      <p className="mt-3 text-muted">You are not signed in. Open the Studio and sign in there, an account is optional, and CueFlow works without one.</p>
       <Button className="mt-6" href="/studio" color="primary">Open the Studio</Button>
     </Shell>
   );
@@ -70,7 +88,7 @@ export default function Account() {
         <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><UserRound size={18} className="text-accent" />Profile</h2>
         <p className="text-sm text-muted">
           Your username is how people add you to a project. It is the only part of your account anyone
-          else can look up — your email address is never shown to them.
+          else can look up, your email address is never shown to them.
         </p>
         <Input label="Username" value={name} onValueChange={v => setName(v.trim())} placeholder="stage_left" />
         <Input label="Display name" value={display} onValueChange={setDisplay} placeholder="Sam on sound" />
@@ -87,6 +105,29 @@ export default function Account() {
             Email me a reset link
           </Button>
         </div>
+      </section>
+
+      <section className="glass mt-6 space-y-4 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Download size={18} className="text-accent" />Your data</h2>
+        {notice ? (
+          <p className="rounded-xl border border-live/40 bg-live/10 px-4 py-3 text-sm">
+            This account has been idle, so it is scheduled for deletion on{" "}
+            <strong>{new Date(notice.deadline).toLocaleDateString()}</strong>. Using CueFlow at all cancels that,
+            you are doing it right now by reading this.
+          </p>
+        ) : (
+          <p className="text-sm text-muted">
+            An account that goes unopened for {ACCOUNT_DAYS} days is deleted, with one email a month beforehand.
+            Anything uploaded without an account goes after 30 days. Opening CueFlow resets the clock.
+          </p>
+        )}
+        <p className="text-sm text-muted">
+          The export is one zip: your files under their own names, and your projects, sequences, shows and
+          scripts as plain JSON that opens without CueFlow.
+        </p>
+        <Button color="primary" isLoading={!!exporting} startContent={<Download size={16} />} onPress={() => void exportAll()}>
+          {exporting || "Download everything as a zip"}
+        </Button>
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
