@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "../ui";
 import { LogIn, LogOut, User } from "lucide-react";
+import GoogleMark from "./GoogleMark";
 import { onAuth, signIn, signInWith, signOut, signUp } from "../lib/store";
 import { toast } from "../lib/toast";
 
@@ -48,9 +49,14 @@ export default function AuthButton() {
           <ModalHeader className="flex items-center gap-2"><User size={18} className="text-accent" />{mode === "in" ? "Sign in" : "Create account"}</ModalHeader>
           <ModalBody>
             <p className="text-sm text-muted">Saves your sounds and sequences to your account so they follow you across devices.</p>
-            <Button variant="bordered" onPress={() => void signInWith("google").catch(e => setNote((e as Error).message))}>
+            <Button variant="bordered" startContent={<GoogleMark />} className="font-medium"
+              onPress={() => void signInWith("google").catch(e => setNote((e as Error).message))}>
               Continue with Google
             </Button>
+            <p className="text-xs text-muted">
+              Already have a password account? Sign in with it, then add Google from your account page.
+              Signing in with Google first makes a second, separate account.
+            </p>
             <p className="text-center font-mono text-[10px] uppercase tracking-[.3em] text-muted">or</p>
             <Input
               type={mode === "up" ? "email" : "text"}

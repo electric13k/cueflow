@@ -5,8 +5,13 @@
  */
 export const hasApi = import.meta.env.VITE_STATIC_HOST !== "1";
 
-/** Where the full-featured build lives, for pointing at when this one cannot do something. */
-export const PRIMARY_ORIGIN = "https://cuefloww.netlify.app";
+/**
+ * Where the full-featured build lives, for pointing at when this one cannot do something.
+ *
+ * Cloudflare Pages, because that is the deployment that is actually current. Whatever this says has
+ * to agree with Supabase's Site URL, which is what every auth email builds its link from.
+ */
+export const PRIMARY_ORIGIN = "https://cueflow.pages.dev";
 
 /**
  * Pulls a remote file down for import. The proxy exists because most hosts send no CORS headers;

@@ -20,10 +20,12 @@ import Show from "./pages/Show";
 import RequireAuth from "./components/RequireAuth";
 import UsernamePrompt from "./components/UsernamePrompt";
 import Coach from "./components/Coach";
+import Tour from "./components/Tour";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
 import { applyTheme } from "./lib/theme";
+import { applyLayout } from "./lib/layout";
 import { trackGlassPointer } from "./lib/glass";
 import { touchLastSeen } from "./lib/retention";
 
@@ -37,6 +39,8 @@ function LegalRedirect() {
 // way rather than off the stored page theme: anyone who set dark back when the toggle was still in
 // the top bar would otherwise come back to a dark app with nothing in the UI to undo it.
 applyTheme("light");
+// Before first paint, so a compact phone never renders one card per row and then snaps to two.
+applyLayout();
 trackGlassPointer();
 // Once per load, and only for a session that exists. This is the clock the retention sweep reads,
 // so the thing that must never happen is an active account looking idle to it.
@@ -71,6 +75,7 @@ createRoot(document.getElementById("root")!).render(
       <SignInPrompt />
       <UsernamePrompt />
       <Coach />
+      <Tour />
     </BrowserRouter>
   </StrictMode>
 );

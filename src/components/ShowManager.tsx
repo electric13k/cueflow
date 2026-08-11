@@ -281,7 +281,7 @@ export default function ShowManager({
             {sequences.length === 0 ? (
               <p className="mt-2 text-sm text-muted">No sequences in this project yet.</p>
             ) : (
-              <ol ref={seqDrag.list} className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <ol ref={seqDrag.list} className="mt-2 auto-grid">
                 {sequences.map((s, i) => (
                   <li key={s.id} data-drop={`seq:${s.id}`}
                     className={`flex items-center gap-1 rounded-xl border p-2 transition-colors ${
@@ -316,7 +316,7 @@ export default function ShowManager({
             {tracks.length === 0 ? (
               <p className="mt-2 text-sm text-muted">Nothing in the library yet.</p>
             ) : (<>
-              <ol ref={libDrag.list} className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <ol ref={libDrag.list} className="mt-2 auto-grid">
                 {tracks.map((t, i) => (
                   <li key={t.id} className="flex items-center gap-1 rounded-xl border border-border bg-surface/60 p-2">
                     <span role="button" tabIndex={-1} aria-label={`Drag ${t.title} onto a sequence`} className={grip}

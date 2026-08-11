@@ -34,14 +34,27 @@ const seed = `(() => {
   localStorage.setItem("cueflow:sequences", JSON.stringify([sequence]));
   localStorage.setItem("cueflow:session", JSON.stringify({ selectedId: "demo-1", sequenceId: "seq-demo", cueIndex: 1, tab: "library" }));
   localStorage.setItem("cueflow:onboarded", "1");
+  // Every first-run overlay marked as already seen. The coach dims the page behind its tooltip and
+  // the sign-in nudge docks over the transport, so without these the shot is of the overlay and any
+  // click aimed at the page underneath lands on nothing.
+  localStorage.setItem("cueflow:taught", JSON.stringify(
+    ["studio", "library", "editor", "sequence", "armed", "script", "show", "sidebar", "projects", "presenter", "transport"]));
+  localStorage.setItem("cueflow:signin-prompt", "dismissed");
   document.cookie = "cueflow:consent=accepted;path=/;max-age=31536000";
 })()`;
 
 const shots = [
   { name: "soundboard", tab: 0, w: 1440, h: 900 },
-  { name: "editor", tab: 1, w: 1440, h: 900 },
-  { name: "sequences", tab: 2, w: 1440, h: 900 },
-  { name: "phone", tab: 0, w: 390, h: 844 },
+  { name: "sequences", tab: 1, w: 1440, h: 900 },
+  // The editor is no longer a tab: it opens over the library from a card. Reached by its accessible
+  // name rather than by position, so adding a control to that row does not silently reshoot the
+  // wrong screen -- which is exactly how these went stale the last time the Studio was rearranged.
+  { name: "editor", tab: 0, w: 1440, h: 900, open: "Open Thunder roll in the editor" },
+  // A phone runs a different layout, not a narrower one, so it is shot on its own terms: there is
+  // no tab strip to click, the pane bar at the bottom of the screen is what switches these.
+  { name: "phone", pane: "Library", w: 390, h: 844 },
+  { name: "phone-deck", pane: "Deck", w: 390, h: 844 },
+  { name: "phone-editor", pane: "Library", w: 390, h: 844, open: "Open Thunder roll in the editor" },
 ];
 
 await mkdir(OUT, { recursive: true });
@@ -51,9 +64,37 @@ for (const s of shots) {
   await page.goto(`${BASE}/studio`);
   await page.evaluate(seed);
   await page.goto(`${BASE}/studio`);
-  await page.waitForSelector("[role=tab]");
-  await page.locator("[role=tab]").nth(s.tab).click();
-  await page.waitForTimeout(2500); // let the waveform decode and the entry animations settle
+  // Animations off for the whole capture. Two reasons, and the second one is why this is not
+  // optional: a shot taken mid-transition is a different picture every run, and framer-motion's
+  // `layout` on the library grid never reports the card as "stable", so Playwright's actionability
+  // check waits out its timeout on a card that is sitting perfectly still to the eye.
+  await page.addStyleTag({ content: "*,*::before,*::after{animation:none !important;transition:none !important}" });
+  if (s.pane) {
+    const bar = page.locator('nav[aria-label="Studio panes"]');
+    await bar.waitFor();
+    await bar.getByRole("button", { name: s.pane }).click({ force: true });
+  } else {
+    await page.waitForSelector("[role=tab]");
+    await page.locator("[role=tab]").nth(s.tab).click();
+  }
+  if (s.open) {
+    // Wait for the card itself rather than for a fixed number of milliseconds. The library hydrates
+    // after first paint and the dev server's module graph makes that take anywhere from a moment to
+    // most of a minute under load, which is what made a sleep here flake every few runs.
+    //
+    // Attribute selector rather than getByLabel: the button carries a plain `aria-label` and this
+    // resolves it, where the accessible-name query does not see through the tooltip wrapper.
+    const open = page.locator(`button[aria-label="${s.open}"]`);
+    await open.waitFor({ state: "attached", timeout: 90_000 });
+    await open.click({ force: true });
+  }
+  await page.waitForTimeout(2500); // let the waveform decode and the library images settle
+  // Clicking a card scrolls it into view, which leaves the shot halfway down a panel with no
+  // heading in frame. Back to the top, and move the pointer off whatever it was over so no tooltip
+  // is left hanging in the picture.
+  await page.mouse.move(2, 2);
+  await page.evaluate(() => scrollTo(0, 0));
+  await page.waitForTimeout(400);
   await page.screenshot({ path: `${OUT}/${s.name}.png` });
   await page.close();
   console.log("wrote", `${OUT}/${s.name}.png`);

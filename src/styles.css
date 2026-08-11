@@ -147,7 +147,9 @@
      * `, 0px` fallback is not optional: on a browser that does not know `env()` the whole calc()
      * would be invalid and the offset would fall back to nothing.
      */
-    --nav-h: 3.8rem;
+    /* 4.4rem, not 3.8: the mark is 44px and the bar's own padding is 24, so a shorter bar would be
+       grown past this by its own contents and every offset measured from it would sit short. */
+    --nav-h: 4.4rem;
     --safe-t: env(safe-area-inset-top, 0px);
     --safe-b: env(safe-area-inset-bottom, 0px);
     --toast-top: calc(var(--nav-h) + var(--safe-t) + .5rem);
@@ -385,6 +387,11 @@
         var(--glass-specular), color-mix(in srgb, var(--glass-specular) 30%, transparent) 34%, transparent 68%);
       background-attachment: fixed;
     }
+    /* The highlight is decoration, and a working screen is not decorated. One light source in
+       viewport coordinates lights every panel in the document at once, which on a cue board reads as
+       a glow sliding along under the operator's hand. Off on the six Shell routes and the show host.
+       0,2,1 against the rule above's 0,1,1, so it wins on specificity wherever it sits in the file. */
+    [data-app] .glass::after { content: none; }
   }
   /* Someone who asked for less motion still gets the bevel and the highlight -- the highlight just
      stops following anything. Rest position is the top centre of the viewport, which is where a
@@ -433,6 +440,96 @@
     box-shadow: 0 2px 10px rgba(36, 31, 28, .65);
   }
   .slider__thumb[data-dragging], .slider__thumb[data-focus-visible] { background: #fff; transform: scale(1.06); }
+
+  /**
+   * Card grids size themselves off one token instead of a breakpoint ladder, which is what makes the
+   * density setting possible at all: `sm:grid-cols-2 xl:grid-cols-3` hard-codes the answer, so no
+   * preference can change it. auto-fill asks the row how many fit and the token moves the threshold.
+   */
+  .auto-grid {
+    display: grid;
+    gap: var(--grid-gap, .75rem);
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--grid-min, 16rem), 100%), 1fr));
+  }
+  /* The density choice is only offered where it is a real choice. Above this width a phone setting
+     has no business shrinking a desk layout, so the rule simply is not there. */
+  @media (max-width: 639px) {
+    :root[data-density="compact"] { --grid-min: 9.5rem; --grid-gap: .5rem; }
+    :root[data-density="compact"] [data-density-hide] { display: none; }
+  }
+
+  /**
+   * A screenshot of a wide app, shown on a narrow screen, is a strip of unreadable pixels. So the
+   * frame changes shape with the viewport rather than the image being scaled down to nothing: tall
+   * and cropped to its top-left on a phone, the real 16:9 once there is room for it.
+   */
+  .shot { aspect-ratio: 4 / 5; object-fit: cover; object-position: left top; width: 100%; }
+  @media (min-width: 640px) { .shot { aspect-ratio: 16 / 9; object-position: center top; } }
+
+  /**
+   * Scroll-driven motion that costs no JavaScript and no scroll listener, which is the only kind
+   * worth running on a phone. Where `view()` is unsupported the element is simply already at its end
+   * state, so the fallback is the finished layout rather than a blank page.
+   */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      @keyframes cue-enter { from { opacity: 0; transform: translateY(2.5rem) scale(.97); } to { opacity: 1; transform: none; } }
+      @keyframes cue-rise { from { transform: translateY(2rem); } to { transform: translateY(-2rem); } }
+      .enter-on-scroll { animation: cue-enter linear both; animation-timeline: view(); animation-range: entry 5% cover 32%; }
+      /* Parallax: the frame is clipped and only the picture inside it travels, so nothing reflows. */
+      .parallax-on-scroll { animation: cue-rise linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+    }
+  }
+
+  /**
+   * How far down the page you are, as a hairline under the nav. `scroll()` means the browser drives
+   * it off the scroller itself: no listener, no rAF, nothing to leak, and it cannot fall behind the
+   * scroll the way a JS-driven bar does.
+   */
+  @supports (animation-timeline: scroll()) {
+    @media (prefers-reduced-motion: no-preference) {
+      @keyframes cue-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+      .scroll-progress {
+        transform-origin: 0 50%;
+        animation: cue-progress linear both;
+        animation-timeline: scroll(root block);
+      }
+    }
+  }
+
+  /**
+   * Hover, and only where hovering is a thing that happens. Without the `pointer: fine` gate a
+   * phone latches these on first tap and leaves the card stuck in its hover state, which is the same
+   * trap the specular highlight fell into further up this file.
+   *
+   * Transform and opacity only. Anything that moves layout would reflow the page under the pointer.
+   */
+  @media (hover: hover) and (pointer: fine) {
+    /* The frame clips, the picture inside it grows. The frame itself must not move, or the row
+       under it shifts. */
+    .shot-frame img { transition: transform .5s cubic-bezier(.16, 1, .3, 1); }
+    .shot-frame:hover img { transform: scale(1.03); }
+
+    /* An underline that arrives from the left rather than fading in, so it reads as a thing being
+       drawn under the word. */
+    .link-rule { position: relative; }
+    .link-rule::after {
+      content: ""; position: absolute; left: 0; bottom: -2px; height: 1.5px; width: 100%;
+      background: currentColor; transform: scaleX(0); transform-origin: 0 50%;
+      transition: transform .28s cubic-bezier(.16, 1, .3, 1);
+    }
+    .link-rule:hover::after, .link-rule:focus-visible::after { transform: scaleX(1); }
+
+    /* The cue number in the margin brightens with its row, the way a pencilled number catches the
+       light when you lean over the prompt book. */
+    .beat .cue-mark { transition: color .3s, transform .3s; }
+    .beat:hover .cue-mark { color: var(--accent); transform: translateX(-50%) scale(1.12); }
+  }
+  /* Reduced motion keeps every end state and removes the travel: the underline is simply there. */
+  @media (prefers-reduced-motion: reduce) {
+    .shot-frame img, .link-rule::after, .beat .cue-mark { transition: none; }
+    .link-rule::after { transform: scaleX(1); opacity: .35; }
+  }
 }
 
 /**

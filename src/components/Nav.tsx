@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "../ui";
-import { Github, Music } from "lucide-react";
+import { Github } from "lucide-react";
+import LogoMark from "./LogoMark";
 import AuthButton from "./AuthButton";
 import { useSignedIn } from "./RequireAuth";
 
@@ -34,7 +35,7 @@ export default function Nav({ inShell }: { inShell?: boolean }) {
       <div style={{ minHeight: "calc(var(--nav-h) + var(--safe-t))", paddingTop: "var(--safe-t)" }}
         className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accent-foreground"><Music size={17} /></div>
+          <LogoMark size={44} />
           <span className="font-display text-xl font-bold tracking-tight">CueFlow</span>
         </Link>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">

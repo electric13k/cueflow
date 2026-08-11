@@ -40,7 +40,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   if (!signedIn) return (
     <nav data-coach="sidebar" aria-label="Workspace" className="flex h-full flex-col gap-6 p-4">
-      <Link to="/studio" onClick={onNavigate} className={`${row} ${pathname === "/studio" ? on : off}`}>
+      <Link data-tour="studio-link" to="/studio" onClick={onNavigate} className={`${row} ${pathname === "/studio" ? on : off}`}>
         <SlidersHorizontal size={16} /> Studio
       </Link>
       <div className="space-y-2 rounded-md border border-dashed border-white/15 p-3">
@@ -81,7 +81,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="mt-auto space-y-1">
-        <Link to="/studio" onClick={onNavigate} className={`${row} ${pathname === "/studio" ? on : off}`}><SlidersHorizontal size={16} /> Studio</Link>
+        <Link data-tour="studio-link" to="/studio" onClick={onNavigate} className={`${row} ${pathname === "/studio" ? on : off}`}><SlidersHorizontal size={16} /> Studio</Link>
         <Link to="/show" onClick={onNavigate} className={`${row} ${pathname === "/show" ? on : off}`}><Radio size={16} /> Join a show</Link>
         <Link to="/settings" onClick={onNavigate} className={`${row} ${pathname === "/settings" ? on : off}`}><Settings size={16} /> Settings</Link>
         <Link to="/account" onClick={onNavigate} className={`${row} ${pathname === "/account" ? on : off}`}><UserRound size={16} /> Account</Link>

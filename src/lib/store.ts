@@ -39,6 +39,51 @@ export async function signInWith(provider: "google" | "github") {
   });
   if (error) throw error;
 }
+/**
+ * Attaching Google to an account that already exists, which is a different operation from signing in
+ * with it and cannot be done by signing in with it.
+ *
+ * Supabase links two identities automatically only when the addresses match and both are verified.
+ * Someone who signed up as `sam@work.com` with a password and holds `sam@gmail.com` gets a second,
+ * separate account instead, and their library does not follow. This is the deliberate way across.
+ *
+ * The redirect comes back to the account page rather than the workspace: this journey started with
+ * someone looking at their sign-in methods, so that is where the answer belongs.
+ *
+ * Requires "Allow manual linking" in Supabase, Authentication, Providers. Without it the call fails
+ * with a 422 that says nothing useful to the person reading it, hence the rewrite below.
+ */
+export async function linkGoogle() {
+  if (!supabase) throw new Error("Cloud not configured");
+  const { error } = await supabase.auth.linkIdentity({
+    provider: "google", options: { redirectTo: `${location.origin}${import.meta.env.BASE_URL}account` },
+  });
+  if (error) throw new Error(/manual linking/i.test(error.message) ? "Linking accounts is switched off for this project." : error.message);
+}
+
+export type Identity = { id: string; provider: string; email?: string };
+
+export async function listIdentities(): Promise<Identity[]> {
+  if (!supabase) return [];
+  const { data } = await supabase.auth.getUserIdentities();
+  return (data?.identities ?? []).map(i => ({ id: i.identity_id ?? i.id, provider: i.provider, email: i.identity_data?.email as string | undefined }));
+}
+
+/**
+ * Unlinking the only way into an account locks its owner out permanently, so the guard is here as
+ * well as in the button that calls it. Supabase refuses this too, and it should stay refused twice.
+ */
+export async function unlinkIdentity(id: string) {
+  if (!supabase) throw new Error("Cloud not configured");
+  const { data } = await supabase.auth.getUserIdentities();
+  const all = data?.identities ?? [];
+  if (all.length < 2) throw new Error("This is the only way into your account, so it cannot be removed.");
+  const target = all.find(i => (i.identity_id ?? i.id) === id);
+  if (!target) throw new Error("That sign-in method is already gone.");
+  const { error } = await supabase.auth.unlinkIdentity(target);
+  if (error) throw error;
+}
+
 export async function signOut() { await supabase?.auth.signOut(); }
 export function onAuth(cb: (email: string | null) => void) { if (!supabase) { cb(null); return () => {}; } supabase.auth.getUser().then(({ data }) => cb(data.user?.email ?? null)); const { data } = supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.email ?? null)); return () => data.subscription.unsubscribe(); }
 export const local = { get<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(`cueflow:${key}`) || "") as T; } catch { return fallback; } }, set(key: string, value: unknown) { localStorage.setItem(`cueflow:${key}`, JSON.stringify(value)); } };

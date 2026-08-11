@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "../ui";
-import { AtSign, Download, KeyRound, LogOut, UserRound } from "lucide-react";
+import { AtSign, Download, KeyRound, Link2, LogOut, UserRound } from "lucide-react";
 import Shell from "../components/Shell";
+import GoogleMark from "../components/GoogleMark";
 import { toast } from "../lib/toast";
-import { onAuth, signOut } from "../lib/store";
+import { linkGoogle, listIdentities, onAuth, signOut, unlinkIdentity, type Identity } from "../lib/store";
 import { buildBackup, saveBackup } from "../lib/backup";
 import { ACCOUNT_DAYS, myNotice, type Notice } from "../lib/retention";
 import { changePassword, getProfile, saveProfile, sendPasswordReset, usernameFree, usernameProblem, type Profile } from "../lib/account";
@@ -19,11 +20,23 @@ export default function Account() {
   const [pw2, setPw2] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [exporting, setExporting] = useState("");
+  const [identities, setIdentities] = useState<Identity[]>([]);
 
   const load = () => void getProfile().then(p => {
     setProfile(p); setReady(true);
     setName(p?.username ?? ""); setDisplay(p?.displayName ?? "");
+    void listIdentities().then(setIdentities);
   });
+
+  const unlink = async (id: string) => {
+    setBusy(true); setNote("");
+    try {
+      await unlinkIdentity(id);
+      setIdentities(await listIdentities());
+      toast("Removed", "That way in no longer works. The account and everything in it is untouched.", "success");
+    } catch (e) { setNote((e as Error).message); }
+    finally { setBusy(false); }
+  };
   // Reload on sign-in/out too: this page is reachable from the password-reset email, which lands
   // here already authenticated.
   useEffect(() => onAuth(() => load()), []);
@@ -105,6 +118,38 @@ export default function Account() {
             Email me a reset link
           </Button>
         </div>
+      </section>
+
+      <section className="glass mt-6 space-y-4 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Link2 size={18} className="text-accent" />Ways in</h2>
+        <p className="text-sm text-muted">
+          Every method below opens this same account and the same library. Adding one does not make a
+          second account, and removing one leaves everything where it is.
+        </p>
+        <ul className="space-y-2">
+          {identities.map(i => (
+            <li key={i.id} className="flex items-center gap-3 rounded-md border border-white/10 px-3 py-2.5">
+              {i.provider === "google" ? <GoogleMark /> : <KeyRound size={16} className="text-muted" />}
+              <span className="min-w-0 flex-1">
+                <span className="text-sm font-semibold capitalize">{i.provider === "email" ? "Email and password" : i.provider}</span>
+                {i.email && <span className="block truncate text-xs text-muted">{i.email}</span>}
+              </span>
+              {/* Hidden rather than disabled on the last one: an unusable control invites the click
+                  that produces the refusal, and the refusal is not news anybody wants. */}
+              {identities.length > 1 && (
+                <Button size="sm" variant="light" isDisabled={busy} onPress={() => void unlink(i.id)}>Remove</Button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {identities.some(i => i.provider === "google") ? (
+          <p className="text-xs text-muted">Google is connected. The button in the sign-in box will bring you straight here.</p>
+        ) : (
+          <Button variant="bordered" startContent={<GoogleMark />} isDisabled={busy}
+            onPress={() => void linkGoogle().catch(e => setNote((e as Error).message))}>
+            Connect Google
+          </Button>
+        )}
       </section>
 
       <section className="glass mt-6 space-y-4 p-6 sm:p-8">

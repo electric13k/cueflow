@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Music } from "lucide-react";
 import Backdrop from "./Backdrop";
+import LogoMark from "./LogoMark";
 import Nav from "./Nav";
 import { useSignedIn } from "./RequireAuth";
 
@@ -30,11 +30,11 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-white/10 py-8">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
-        <span className="flex items-center gap-2"><Music size={14} /> CueFlow</span>
+        <span className="flex items-center gap-2"><LogoMark size={24} /> CueFlow</span>
         <span className="flex flex-wrap items-center gap-4">
           {/* min-h-6 so a footer link clears the 24px minimum tap target on a phone; at 20px they failed it. */}
-          {shown.map(l => <Link key={l.to} to={l.to} className="inline-flex min-h-6 items-center hover:text-foreground">{l.label}</Link>)}
-          <Link to="/studio" className="inline-flex min-h-6 items-center font-semibold text-accent">Open Studio →</Link>
+          {shown.map(l => <Link key={l.to} to={l.to} className="link-rule inline-flex min-h-6 items-center hover:text-foreground">{l.label}</Link>)}
+          <Link to="/studio" className="link-rule inline-flex min-h-6 items-center font-semibold text-accent">Open Studio →</Link>
         </span>
       </div>
     </footer>
@@ -56,6 +56,11 @@ export default function Page({ children, width = "max-w-7xl" }: { children: Reac
     <div className="relative min-h-screen">
       <Backdrop />
       <Nav />
+      {/* Marketing only: `Page` is what the public pages wear and `Shell` is what the working ones
+          wear, so this never appears over a cue board. Sits directly under the bar, which is why it
+          reads off the same --nav-h the bar sizes itself from. */}
+      <div aria-hidden className="scroll-progress fixed inset-x-0 z-40 h-[2px] origin-left bg-accent"
+        style={{ top: "calc(var(--nav-h) + var(--safe-t))" }} />
       <main className={`mx-auto ${width} px-4 py-12 sm:px-6 lg:px-8`}>{children}</main>
       <SiteFooter />
     </div>

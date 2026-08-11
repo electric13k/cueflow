@@ -38,7 +38,7 @@ function Door({ onIn }: { onIn: (t: Ticket) => void }) {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
+    <div data-app className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
       <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Join a show</p>
       <h1 className="text-3xl font-black tracking-tight">Type your key</h1>
       <p className="text-sm text-muted">

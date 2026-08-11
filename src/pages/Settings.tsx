@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Button, Switch } from "../ui";
-import { Keyboard, Palette, RotateCcw } from "lucide-react";
+import { GraduationCap, Keyboard, LayoutGrid, Palette, RotateCcw } from "lucide-react";
 import Shell from "../components/Shell";
+import { startTour } from "../components/Tour";
 import KeybindRow from "../components/KeybindRow";
 import { clashes, defaultBinds, keyActions, loadBinds, saveBinds, type Action } from "../lib/keys";
 import { useStudioTheme } from "../lib/theme";
+import { useLayout } from "../lib/layout";
 import { emptyDoc, loadScript, saveScript, type ScriptDoc } from "../lib/script";
 
 export default function Settings() {
@@ -14,6 +16,7 @@ export default function Settings() {
   // applyTheme, which now writes the scope onto <html> and would take the whole app dark -- and §14
   // says there is no page-wide dark left to take.
   const [theme, setTheme] = useStudioTheme();
+  const [layout, setLayout] = useLayout();
   const [doc, setDoc] = useState<ScriptDoc>(() => (typeof localStorage === "undefined" ? emptyDoc() : loadScript()));
   const bad = clashes(binds);
 
@@ -60,6 +63,59 @@ export default function Settings() {
           </label>
         </div>
       </section>
+
+      <section className="glass mt-6 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><LayoutGrid size={18} className="text-accent" />Layout</h2>
+        <p className="mt-2 text-sm text-muted">A phone and a desk are not asking the same question, so they get one setting each.</p>
+        <div className="mt-5 space-y-6">
+          <Choice label="On a computer" value={layout.pane} onChange={pane => setLayout({ pane })}
+            options={[
+              { id: "panel", label: "Panel", note: "The workspace list on the left, the page kept to a readable width." },
+              { id: "wide", label: "Wide", note: "The list stays and the width cap comes off, for a cue board on a big monitor." },
+              { id: "focus", label: "Focus", note: "No panel. The Menu button still opens it when you want it." },
+            ]} />
+          <Choice label="On a phone" value={layout.density} onChange={density => setLayout({ density })}
+            options={[
+              { id: "comfy", label: "Comfy", note: "One card per row, every label on show." },
+              { id: "compact", label: "Compact", note: "Two cards per row. More of the deck at once, smaller titles." },
+            ]} />
+        </div>
+      </section>
+
+      <section className="glass mt-6 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><GraduationCap size={18} className="text-accent" />Tutorial</h2>
+        <p className="mt-2 text-sm text-muted">
+          It walks you through building a deck and firing a cue, on a board it fills with demo sounds, pictures
+          and a script. That material is cleared when you reach the end, and nothing you made yourself goes with it.
+        </p>
+        <Button className="mt-4 min-h-11" size="sm" variant="flat" startContent={<GraduationCap size={14} />}
+          onPress={startTour}>Run the tutorial again</Button>
+      </section>
     </Shell>
+  );
+}
+
+/** A segmented control. Radios in a row, because the choice is small enough to show whole. */
+function Choice<T extends string>({ label, value, options, onChange }: {
+  label: string;
+  value: T;
+  options: { id: T; label: string; note: string }[];
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-semibold">{label}</p>
+      {/* min-h-11 is 44px: this is a control someone sets on the device it describes. */}
+      <div role="radiogroup" aria-label={label} className="mt-2 flex flex-wrap gap-1.5">
+        {options.map(o => (
+          <button key={o.id} type="button" role="radio" aria-checked={value === o.id} onClick={() => onChange(o.id)}
+            className={`min-h-11 rounded-md border px-4 text-sm transition-colors ${
+              value === o.id ? "border-accent bg-accent/12 font-semibold text-foreground" : "border-white/15 text-muted hover:text-foreground"}`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted">{options.find(o => o.id === value)?.note}</p>
+    </div>
   );
 }

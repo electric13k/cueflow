@@ -5,7 +5,7 @@ import Nav from "./Nav";
 import Sidebar from "./Sidebar";
 import { SiteFooter } from "./Page";
 import { Button } from "../ui";
-import { local } from "../lib/store";
+import { useLayout } from "../lib/layout";
 
 /**
  * The chrome every working page wears: hierarchy down the left, the site footer underneath so no
@@ -52,17 +52,21 @@ function useSwipe(onSwipe: (dx: number) => void) {
 
 export default function Shell({ children, width = "" }: { children: React.ReactNode; width?: string }) {
   const [open, setOpen] = useState(false);
-  // ponytail: collapse hides the panel outright. An icon rail is the upgrade if anyone misses it.
-  const [collapsed, setCollapsed] = useState(() => local.get("sidebar:collapsed", false));
-  const collapse = (v: boolean) => { setCollapsed(v); local.set("sidebar:collapsed", v); };
+  // The panel button is a shortcut into the same setting Settings offers, not a second one: it
+  // toggles between the two states someone reaches for mid-work and leaves `wide` to the picker.
+  const [{ pane }, setLayout] = useLayout();
+  const collapsed = pane === "focus";
   const fromEdge = useSwipe(dx => { if (dx > 0) setOpen(true); });
   const onDrawer = useSwipe(dx => { if (dx < 0) setOpen(false); });
 
   return (
-    <div className="relative min-h-screen">
+    // data-app marks a working screen. The stylesheet reads it to switch off the pointer-tracked
+    // highlight on panels: decoration belongs on the pages that are selling the thing, not on the
+    // one somebody is running a show from.
+    <div data-app className="relative min-h-screen">
       <Backdrop />
       <Nav inShell />
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 sm:px-6 lg:px-8">
+      <div className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
         {!collapsed && (
           <aside className="sticky top-20 hidden h-[calc(100vh-6rem)] w-60 shrink-0 lg:block">
             {/* The scroll lives on the inner element: the panel's bevel and highlight are absolutely
@@ -87,9 +91,11 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
         )}
         <main className={`min-w-0 flex-1 py-8 ${width}`}>
           <div className="mb-4 flex items-center gap-2">
-            <Button className="lg:hidden" size="sm" variant="bordered" startContent={<Menu size={15} />} onPress={() => setOpen(true)}>Menu</Button>
+            {/* min-h-11 on a phone: at `size="sm"` this was a 36px target, under the 44px minimum,
+                and it is the only way to the rest of the app on a small screen. */}
+            <Button className="min-h-11 lg:hidden" size="sm" variant="bordered" startContent={<Menu size={15} />} onPress={() => setOpen(true)}>Menu</Button>
             <Button className="hidden lg:inline-flex" size="sm" variant="light" isIconOnly
-              aria-label={collapsed ? "Show sidebar" : "Hide sidebar"} onPress={() => collapse(!collapsed)}>
+              aria-label={collapsed ? "Show sidebar" : "Hide sidebar"} onPress={() => setLayout({ pane: collapsed ? "panel" : "focus" })}>
               {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
             </Button>
           </div>

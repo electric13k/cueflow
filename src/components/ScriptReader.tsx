@@ -159,25 +159,29 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
       <AlertFlash level={flash} />
 
       {editable && (
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex">
+        // A phone gets rows that line up rather than a desktop toolbar left to wrap where it likes:
+        // the file button takes the full width, and the three settings below it share it evenly.
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <label className="flex">
             <input type="file" accept=".docx,.pdf,.txt,.md,.rtf" className="sr-only"
               onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void load(f); }} />
-            <span className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm font-medium hover:border-accent">
+            <span className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm font-medium hover:border-accent sm:h-9 sm:w-auto sm:justify-start">
               <FileUp size={15} />{busy ? "Reading…" : doc.name || "Open a script"}
             </span>
           </label>
-          <Tooltip content="Smaller text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.max(12, s - 2))}><Minus size={14} /></Button></Tooltip>
-          <span className="w-10 text-center text-xs tabular-nums text-muted">{size}px</span>
-          <Tooltip content="Bigger text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.min(48, s + 2))}><Plus size={14} /></Button></Tooltip>
-          <label className="inline-flex items-center gap-1 text-xs text-muted">
-            Colour
-            <input type="color" aria-label="Text colour" value={colour || "#d8cfc4"} onChange={e => setColour(e.target.value)}
-              className="h-7 w-8 cursor-pointer rounded-lg border border-border bg-transparent p-0.5" />
-          </label>
-          {colour && <Button size="sm" variant="light" onPress={() => setColour("")}>Theme colour</Button>}
-          <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addCue}>Alert word</Button>
-          {marked.hits > 0 && <span className="text-xs text-muted">{marked.hits} marked</span>}
+          <div className="flex flex-wrap items-center gap-2">
+            <Tooltip content="Smaller text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.max(12, s - 2))}><Minus size={14} /></Button></Tooltip>
+            <span className="w-10 text-center text-xs tabular-nums text-muted">{size}px</span>
+            <Tooltip content="Bigger text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.min(48, s + 2))}><Plus size={14} /></Button></Tooltip>
+            <label className="inline-flex items-center gap-1 text-xs text-muted">
+              Colour
+              <input type="color" aria-label="Text colour" value={colour || "#d8cfc4"} onChange={e => setColour(e.target.value)}
+                className="h-8 w-9 cursor-pointer rounded-lg border border-border bg-transparent p-0.5" />
+            </label>
+            {colour && <Button size="sm" variant="light" onPress={() => setColour("")}>Theme colour</Button>}
+            <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addCue}>Alert word</Button>
+            {marked.hits > 0 && <span className="text-xs text-muted">{marked.hits} marked</span>}
+          </div>
         </div>
       )}
 
@@ -198,9 +202,11 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
           <span className="w-16 tabular-nums">{speed} px/s</span>
         </label>
 
-        <div className="ml-auto flex items-center gap-1">
+        {/* Full width on a phone, so the two step arrows sit against the field instead of being
+            flung to the far edge by `ml-auto` once the row has wrapped. */}
+        <div className="flex w-full items-center gap-1 sm:ml-auto sm:w-auto">
           <Search size={14} className="text-muted" />
-          <Input className="w-44" size="sm" placeholder="Find in script" value={query} onValueChange={setQuery}
+          <Input className="min-w-0 flex-1 sm:w-44 sm:flex-none" size="sm" placeholder="Find in script" value={query} onValueChange={setQuery}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); } }} />
           <span className="w-14 text-center text-xs tabular-nums text-muted">
             {found.hits ? `${at + 1}/${found.hits}` : query.trim() ? "none" : ""}

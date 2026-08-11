@@ -1,8 +1,9 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Music, Pause, Pencil, Play, Plus, Presentation, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
-import Onboarding from "../components/Onboarding";
+import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2 } from "lucide-react";
+import { useIsPhone } from "../lib/layout";
+import LogoMark from "../components/LogoMark";
 import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
@@ -58,6 +59,18 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 const kindIcon = { audio: Volume2, image: ImageIcon, video: Film, embed: Presentation };
 const UPLOAD_ACCEPT = "audio/*,image/*,video/*";
 
+/**
+ * The four things the Studio is, in the order they are used: you gather media, you put it in an
+ * order, you run it as a show, and you read from the script while it goes. On a phone these are
+ * destinations rather than sections of one long page.
+ */
+const PANES = [
+  { id: "library", label: "Library", icon: Layers },
+  { id: "deck", label: "Deck", icon: ListMusic },
+  { id: "shows", label: "Shows", icon: Radio },
+  { id: "script", label: "Script", icon: FileText },
+] as const;
+type PaneId = (typeof PANES)[number]["id"];
 
 export default function Studio() {
   const audio = useRef<HTMLAudioElement>(new Audio());
@@ -86,6 +99,10 @@ export default function Studio() {
   // Two tabs, and the editor is not one of them: an item opens into it. A saved session or a
   // ?tab=editor link from the workspace therefore opens the item rather than selecting a tab.
   const [tab, setTab] = useState(session.tab === "editor" ? "library" : session.tab);
+  // Which of the four panes a phone is showing. Ignored entirely above 640px, where all four are on
+  // screen together and the question does not arise.
+  const phone = useIsPhone();
+  const [pane, setPane] = useState<PaneId>("library");
   const [editingId, setEditingId] = useState(session.tab === "editor" ? session.selectedId : "");
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -167,7 +184,6 @@ export default function Studio() {
     }
     toast("Added to the show", `${sequences.find(s => s.id === seqId)?.name ?? "That sequence"} goes out with ${show?.name ?? "the show"}.`, "success");
   };
-  const guideModal = useDisclosure(); // no button: it opens itself once per browser, on the first visit
 
   /**
    * Library and sequence search live out here rather than inside the panels that render them,
@@ -547,8 +563,9 @@ export default function Studio() {
           {alertNote}
         </div>
       )}
-      {/* Bottom padding clears the fixed player, which stacks taller on phones. */}
-      <div className="pb-52 sm:pb-36">
+      {/* Bottom padding clears the fixed player, which stacks taller on phones, and on a phone the
+          pane bar below it as well. */}
+      <div className="pb-72 sm:pb-36">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className={`text-[11px] font-semibold uppercase tracking-[.3em] ${armed ? "text-armed" : "text-accent"}`}>{armed ? (cueIndex < 0 ? "Armed" : "Running") : "Studio"}</p>
@@ -571,14 +588,14 @@ export default function Studio() {
         {/* Armed: an amber frame round the window, red once cues are running. No sound, ever. */}
         {armed && <div aria-hidden className={`armed-frame ${cueIndex >= 0 ? "live-frame" : ""}`} />}
         {armed && (
-          <div className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 ${cueIndex < 0 ? "border-armed/40 bg-armed/10" : "border-live/40 bg-live/10"}`}>
+          <div data-tour="armed-banner" className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 ${cueIndex < 0 ? "border-armed/40 bg-armed/10" : "border-live/40 bg-live/10"}`}>
             <span className={`armed-dot h-2.5 w-2.5 rounded-full ${cueIndex < 0 ? "bg-armed" : "bg-live"}`} />
             <span className="text-sm font-semibold">
               {cueIndex < 0 ? "Deck armed. Nothing has gone out yet." : `Cue ${cueIndex + 1} of ${selectedSequence?.items.length ?? 0} is out.`}
             </span>
             <span className="text-xs text-muted">Press → for the next cue, ← to go back.</span>
             <span className="ml-auto flex items-center gap-1">
-              <Button size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button>
+              <Button data-coach="presenter" size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button>
               <CoachHelp id="armed" />
             </span>
           </div>
@@ -586,7 +603,7 @@ export default function Studio() {
 
         {/* Above the tabs: the shows, and beside them the script. Both go away while a library item
             is selected -- the toolbar takes their place -- and while a deck is armed. */}
-        {!armed && !editingId && !picked.length && (
+        {!armed && !editingId && !picked.length && (!phone || pane === "shows") && (
           <ShowsBoard shows={shows} links={links} sequences={sequences} script={scriptDoc.html ? scriptDoc : null}
             showsGrid={showsGrid} scriptGrid={scriptGrid} busy={!signedIn} over={seqDrag.over}
             onCreateShow={addShow} onOpenShow={openShow} onDeleteShow={removeShow}
@@ -595,11 +612,11 @@ export default function Studio() {
 
         {/* The sequence rail. It is a drop target for library cards and a drag source onto a show,
             so all three drags land on one screen without opening anything first. */}
-        {!armed && !editingId && (
+        {!armed && !editingId && (!phone || pane === "deck") && (
           <section className="mt-4 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted">Sequences</p>
-              <Button size="sm" variant="light" startContent={<Plus size={14} />} onPress={addSequence}>New sequence</Button>
+              <Button data-tour="new-sequence" size="sm" variant="light" startContent={<Plus size={14} />} onPress={addSequence}>New sequence</Button>
               <div className="min-w-48 flex-1">
                 <SearchBar query={seqQuery} setQuery={setSeqQuery} sort={seqSort} setSort={setSeqSort} kind={[]} setKind={() => {}} placeholder="Search sequences" />
               </div>
@@ -662,20 +679,25 @@ export default function Studio() {
               <Button size="sm" variant="bordered" startContent={<ArrowLeft size={15} />} onPress={() => setEditingId("")}>Back to the library</Button>
               <Editor track={tracks.find(t => t.id === editingId)} cues={cuePoints(sequences, editingId)} busy={busy} update={updateEffects} updateVisual={updateVisual} bakeReverse={bakeReverse} onSave={addProcessedFile} onPreview={setEditUrl} onRename={() => { const t = tracks.find(x => x.id === editingId); if (t) openRename("track", t.id, t.title); }} />
             </div>
-          ) : (
+          ) : phone && pane !== "library" && pane !== "deck" ? null : (
           /* Armed, the library goes away: the deck is the only thing that matters and nothing on
              this screen should invite a stray click during a show. */
-          <Tabs selectedKey={tab} onSelectionChange={k => { setTab(k as string); teach(k as "library" | "sequence"); }} classNames={{ tabList: armed ? "hidden" : "glass-soft" }}>
+          /* On a phone the bar at the bottom of the screen is the tab list, so this one is hidden
+             and follows it. Two tab strips for one choice is how the phone layout read as a
+             shrunken desktop rather than a design. */
+          <Tabs selectedKey={phone ? (pane === "deck" ? "sequence" : "library") : tab}
+            onSelectionChange={k => { setTab(k as string); teach(k as "library" | "sequence"); }}
+            classNames={{ tabList: armed || phone ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
               <Library tracks={shownTracks} total={tracks.length} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} />
             </Tab>
-            <Tab key="sequence" id="sequence" title={<span className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
+            <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
               <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} />
             </Tab>
           </Tabs>
           )}
         </motion.div>
-        {scriptMode === "split" && (
+        {(phone ? pane === "script" : scriptMode === "split") && (
           <div className="h-[75vh] min-w-0 xl:sticky xl:top-4">
             {/* Split is where the board opens it; popup and its own tab are still one control away. */}
             <label className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
@@ -695,6 +717,32 @@ export default function Studio() {
         )}
         </div>
       </div>
+
+      {/**
+        * The phone layout, and the reason it is not the desktop one shrunk: a phone shows one pane
+        * at a time and switches between them from the bottom of the screen, where a thumb already
+        * is. Stacked, these four sections were a scroll past three things you were not looking for
+        * to reach the one you were.
+        *
+        * It stands down while a deck is armed, because the transport below owns the bottom of the
+        * screen then and nothing may sit on top of the next-cue button. It also stands down in the
+        * editor, which is a place you leave rather than a pane you switch away from.
+        */}
+      {phone && !armed && !editingId && (
+        <nav aria-label="Studio panes"
+          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-white/10 bg-background/95 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
+          {PANES.map(p => {
+            const on = pane === p.id;
+            return (
+              <button key={p.id} type="button" data-tour={`pane-${p.id}`} aria-current={on} onClick={() => setPane(p.id)}
+                className={`flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 pt-2 text-[11px] font-semibold transition-colors ${on ? "text-accent" : "text-muted"}`}>
+                <p.icon size={19} aria-hidden />
+                {p.label}
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {/* Hidden in the editor: that tab has its own transport, and three play buttons on one screen
           is two too many. Visual assets have no transport at all. */}
@@ -737,7 +785,6 @@ export default function Studio() {
       )}
 
       <SlideComposer open={slideOpen} onClose={() => setSlideOpen(false)} onCreate={addProcessedFile} />
-      <Onboarding control={guideModal} />
       </WorkSurface>
     </Shell>
   );
@@ -760,12 +807,12 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
 
       {shown.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center rounded-2xl border border-dashed border-default-200 py-16 text-center">
-          <Music size={40} className="text-muted" />
+          <LogoMark size={40} className="opacity-45" />
           <p className="mt-3 font-semibold">{total ? "Nothing matches that" : "Nothing here yet"}</p>
           <p className="text-sm text-muted">{total ? "Clear the search to see everything." : "Upload audio, images or video, or search the free libraries above."}</p>
         </motion.div>
       ) : (
-        <motion.div layout className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <motion.div layout className="auto-grid">
           <AnimatePresence>{shown.map((t: Track, i: number) => {
             const isPlaying = playingId === t.id, pick = selectedIds.indexOf(t.id), isChecked = pick >= 0;
             const kind = kindOf(t), Icon = kindIcon[kind];
@@ -793,8 +840,8 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
                           {isChecked ? <span className="text-xs font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
                         </Button>
                       </Tooltip>
-                      <Tooltip content="Open in the editor"><Button isIconOnly size="sm" variant="light" onPress={() => onOpenEditor(t.id)}><SlidersHorizontal size={14} /></Button></Tooltip>
-                      <Tooltip content="Rename"><Button isIconOnly size="sm" variant="light" onPress={() => onRename(t.id)}><Pencil size={14} /></Button></Tooltip>
+                      <Tooltip content="Open in the editor"><Button isIconOnly size="sm" variant="light" aria-label={`Open ${t.title} in the editor`} onPress={() => onOpenEditor(t.id)}><SlidersHorizontal size={14} /></Button></Tooltip>
+                      <Tooltip content="Rename"><Button isIconOnly size="sm" variant="light" aria-label={`Rename ${t.title}`} onPress={() => onRename(t.id)}><Pencil size={14} /></Button></Tooltip>
                     </div>
                   </div>
                   {t.error

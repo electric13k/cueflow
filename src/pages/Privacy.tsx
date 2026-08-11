@@ -41,7 +41,7 @@ export default function Privacy() {
         </Section>
 
         <Section title="Hosting logs">
-          The site is served by <b>Netlify</b>, with a mirror deployment on <b>Vercel</b>. Both keep standard request logs (IP address, timestamp, requested URL) for security and abuse prevention, under their own privacy policies. CueFlow does not read them for any other purpose.
+          The site is served by <b>Cloudflare Pages</b>, with mirror deployments on <b>Vercel</b> and <b>Netlify</b>. All three keep standard request logs (IP address, timestamp, requested URL) for security and abuse prevention, under their own privacy policies. CueFlow does not read them for any other purpose.
         </Section>
 
         <Section title="How long it is kept" id="retention">

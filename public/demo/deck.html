@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Demo deck</title><style>
+  html,body{margin:0;height:100%;background:#241F1C;color:#F3E9D8;font-family:Georgia,'Times New Roman',serif}
+  .slides{height:100%;display:grid;place-items:center;text-align:center}
+  .slide{grid-area:1/1;opacity:0;transition:opacity .8s;padding:0 8%}
+  .slide.on{opacity:1}
+  h2{font-size:clamp(28px,7vw,64px);margin:0 0 .3em}
+  p{font-size:clamp(14px,2.6vw,22px);color:#E7C9B0;margin:0;letter-spacing:.36em;text-transform:uppercase}
+</style></head><body>
+  <div class="slides">
+    <section class="slide on"><p>Programme</p><h2>A Winter's Tale</h2></section>
+    <section class="slide"><p>Act One</p><h2>The Court of Sicilia</h2></section>
+    <section class="slide"><p>Interval</p><h2>Fifteen minutes</h2></section>
+  </div>
+  <script>
+    const slides = document.querySelectorAll(".slide");
+    let i = 0;
+    setInterval(() => { slides[i].classList.remove("on"); i = (i + 1) % slides.length; slides[i].classList.add("on"); }, 4000);
+  </script>
+</body></html>
