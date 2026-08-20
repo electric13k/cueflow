@@ -15,3 +15,9 @@ Resolve selector matches to their closest actionable element, prefer the visible
 After adding route guards, reloading Settings no longer left the tutorial popup over the Settings page. The Settings surface remained unobscured, and `Run the tutorial again` stayed available as the restart entry point.
 
 The latest local Studio snapshot shows the cues-step spotlight wrapped around the compact `Sequence 1` button, not the full tab strip. The popup sits beneath and to the right of the target with a connector line. A follow-up browser click was interrupted by the browser extension losing its connection, so the post-click Add cue remount was validated from the observer design and build checks rather than that single click attempt.
+
+Vercel's authenticated dashboard showed the Cueflow project updated to commit `8e8d482` with the message `Fix tutorial spotlight targeting` approximately one minute after the push.
+
+Cloudflare Pages confirmed a successful Production deployment from commit `8e8d482` at `https://f1139f65.cueflow.pages.dev`, with the canonical domain `https://cueflow.pages.dev` active and automatic deployments enabled.
+
+Vercel's project dashboard continued to show `Fix tutorial spotlight targeting` from `electric13k/cueflow` as the latest Cueflow project deployment entry, approximately two minutes after the push. The production domain remained `https://cuefloww.vercel.app` and returned HTTP 200 during the host check.
