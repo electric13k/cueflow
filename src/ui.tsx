@@ -63,7 +63,7 @@ export function Card({ isPressable, onPress, className, children, "data-tour": d
       {...rest}
       {...(dataTour ? { "data-tour": dataTour } : {})}
       className={cn(isPressable && "cursor-pointer text-left", className)}
-      {...(isPressable ? { role: "button", tabIndex: 0, onClick: onPress, onKeyDown: (e: React.KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onPress?.()) } : {})}
+      {...(isPressable ? { role: "button", tabIndex: 0, onClick: (e: React.MouseEvent) => { if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return; onPress?.(); }, onKeyDown: (e: React.KeyboardEvent) => { if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPress?.(); } } } : {})}
     >
       {children}
     </C>
@@ -71,8 +71,8 @@ export function Card({ isPressable, onPress, className, children, "data-tour": d
 }
 export const CardBody = C.Content;
 
-export function Input({ label, value, onValueChange, className, size: _size, ...rest }: {
-  label?: string; value?: string; onValueChange?: (v: string) => void; className?: string;
+export function Input({ label, value, onValueChange, className, startContent, size: _size, ...rest }: {
+  label?: string; value?: string; onValueChange?: (v: string) => void; className?: string; startContent?: ReactNode;
   type?: string; placeholder?: string; autoComplete?: string; autoFocus?: boolean;
   size?: "sm" | "md" | "lg"; // v2 sizing; v3's Input `size` is the HTML numeric attribute, so it is dropped
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -80,7 +80,10 @@ export function Input({ label, value, onValueChange, className, size: _size, ...
   return (
     <label className={cn("block", className)}>
       {label && <span className="mb-1 block text-sm text-muted">{label}</span>}
-      <I {...rest} fullWidth value={value} onChange={e => onValueChange?.(e.target.value)} />
+      <span className="relative block">
+        {startContent && <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-muted">{startContent}</span>}
+        <I {...rest} className={cn(startContent && "pl-9")} fullWidth value={value} onChange={e => onValueChange?.(e.target.value)} />
+      </span>
     </label>
   );
 }
