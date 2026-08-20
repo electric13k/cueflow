@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Cloud, Image, Keyboard, ListMusic, Monitor, Presentation, Radio, SlidersHorizontal, Users, Zap } from "lucide-react";
 import Page from "../components/Page";
 import { useReveal } from "../lib/motion";
@@ -71,6 +71,9 @@ const workflow = [
 
 export default function Features() {
   const root = useRef<HTMLDivElement>(null);
+  const workflowRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: workflowProgress } = useScroll({ target: workflowRef, offset: ["start 82%", "end 30%"] });
+  const workflowRail = useTransform(workflowProgress, [0, 1], [0, 1]);
   useReveal(root);
   return (
     <Page>
@@ -88,11 +91,11 @@ export default function Features() {
             const Icon = feature.icon;
             return (
               <motion.article key={feature.number} {...rise(index * .04)} data-reveal
-                className="glass group relative overflow-hidden p-6 transition-transform duration-300 hover:-translate-y-1 sm:p-8">
+                className="glass feature-card group relative overflow-hidden p-6 sm:p-8">
                 <span className="pointer-events-none absolute -right-3 -top-8 font-display text-[8rem] font-bold leading-none text-accent/10">{feature.number}</span>
                 <div className="relative">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
+                    <span className="feature-icon flex h-11 w-11 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
                       <Icon size={20} aria-hidden />
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-[.28em] text-brass">{feature.eyebrow}</span>
@@ -108,12 +111,13 @@ export default function Features() {
           })}
         </section>
 
-        <section className="mt-20 border-y border-white/10 py-14 sm:py-16">
+        <section ref={workflowRef} className="relative mt-20 border-y border-white/10 py-14 sm:py-16">
+          <motion.div aria-hidden className="workflow-rail" style={{ scaleX: workflowRail }} />
           <motion.div {...rise()}>
             <p className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">The working loop</p>
             <h2 className="mt-3 max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">Less setup. More confidence when the room goes dark.</h2>
           </motion.div>
-          <div className="mt-10 grid gap-8 md:grid-cols-3">
+          <div className="workflow-grid relative mt-10 grid gap-8 md:grid-cols-3">
             {workflow.map((step, index) => {
               const Icon = step.icon;
               return (

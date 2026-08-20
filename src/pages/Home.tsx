@@ -106,16 +106,23 @@ function BeatRow({ beat }: { beat: Beat }) {
 export default function Home() {
   // Triggers are made top to bottom in page order: the explanation rows, then the held line under them.
   const root = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const { scrollYProgress: heroProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
+  const heroGridY = useTransform(heroProgress, [0, 1], [0, 72]);
+  const heroGridRotate = useTransform(heroProgress, [0, 1], [0, 8]);
   useReveal(root);
   usePinScrub(root);
   return (
     <Page>
       <div ref={root}>
-        <section className="relative overflow-hidden py-14 sm:py-20">
+        <section ref={heroRef} className="relative overflow-hidden py-14 sm:py-20">
           <motion.div aria-hidden className="hero-grid pointer-events-none absolute inset-0"
+            style={{ y: prefersReducedMotion ? 0 : heroGridY, rotate: prefersReducedMotion ? 0 : heroGridRotate }}
             animate={prefersReducedMotion ? undefined : { backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
             transition={{ duration: 18, repeat: Infinity, ease: "linear" }} />
+          <motion.span aria-hidden className="hero-orbit pointer-events-none absolute left-[58%] top-24 hidden h-44 w-44 rounded-full border border-accent/20 lg:block"
+            animate={prefersReducedMotion ? undefined : { rotate: 360 }} transition={{ duration: 22, repeat: Infinity, ease: "linear" }} />
           <div className="relative z-10">
           <motion.div initial={prefersReducedMotion ? false : { opacity: 0, scale: .8, rotate: -12 }} animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1, rotate: 0 }}
             transition={{ duration: .7, ease: [.16, 1, .3, 1] }}>
@@ -139,7 +146,7 @@ export default function Home() {
             </Button>
           </motion.div>
 
-          <motion.figure initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
+          <motion.figure initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} whileHover={prefersReducedMotion ? undefined : { y: -5 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
             className="glass shot-frame mt-14 overflow-hidden p-2">
             <picture>
               <source media="(max-width: 639px)" srcSet={shot("phone-deck")} />
