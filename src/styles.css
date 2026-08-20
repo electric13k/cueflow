@@ -472,6 +472,36 @@
     object-position: center;
     background: var(--surface);
   }
+  /* The final feature is a real 390x844 capture. Keep it readable without letting a full-width
+     mobile column make the phone look oversized or pull it off the visual centre line. */
+  .phone-shot-frame {
+    width: min(100%, 18rem);
+    aspect-ratio: 9 / 16;
+    margin-inline: auto;
+  }
+  .phone-shot-frame picture,
+  .phone-shot-frame .phone-shot {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .phone-shot-frame .phone-shot {
+    aspect-ratio: auto;
+    object-fit: contain;
+    object-position: center;
+  }
+
+  /* A local progress trace gives each feature frame a little stage-light movement without shifting
+     layout. Motion drives the scaleX value, while this rule supplies the quiet visual treatment. */
+  .beat-scanline {
+    position: absolute;
+    inset: auto .75rem .75rem;
+    height: 2px;
+    transform-origin: 0 50%;
+    background: var(--accent);
+    opacity: .8;
+    pointer-events: none;
+  }
 
   /**
    * Scroll-driven motion that costs no JavaScript and no scroll listener, which is the only kind
@@ -535,6 +565,7 @@
   /* Reduced motion keeps every end state and removes the travel: the underline is simply there. */
   @media (prefers-reduced-motion: reduce) {
     .shot-frame img, .link-rule::after, .beat .cue-mark { transition: none; }
+    .beat-scanline { transform: scaleX(1); }
     .link-rule::after { transform: scaleX(1); opacity: .35; }
   }
 }

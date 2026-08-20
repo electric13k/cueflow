@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { Radio } from "lucide-react";
 import LogoMark from "../components/LogoMark";
 import Page from "../components/Page";
@@ -59,6 +59,50 @@ const beats = [
   },
 ];
 
+type Beat = (typeof beats)[number];
+
+function BeatRow({ beat }: { beat: Beat }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: rowRef,
+    offset: ["start 88%", "end 28%"],
+  });
+  const scanProgress = useTransform(scrollYProgress, [0, 1], [0, 1]);
+
+  return (
+    <div ref={rowRef} data-reveal
+      className="beat grid items-center gap-6 border-b border-white/10 py-12 sm:py-16 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-14">
+      {/* GSAP owns the row reveal. Motion owns these child reveals and the local scanline, so no node
+          has two scroll owners fighting over the same opacity or transform. */}
+      <motion.div
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: .45, margin: "0px 0px -10% 0px" }}
+        transition={{ duration: .48, ease: [.16, 1, .3, 1] }}
+        className="margin-rule">
+        <span className="cue-mark text-brass">{beat.n}</span>
+        <h2 className="text-3xl font-bold leading-tight sm:text-4xl">{beat.head}</h2>
+        <p className="mt-3 text-muted">{beat.line}</p>
+      </motion.div>
+      <motion.figure
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 24, scale: .985 }}
+        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+        viewport={{ once: true, amount: .22, margin: "0px 0px -8% 0px" }}
+        transition={{ duration: .68, delay: .08, ease: [.16, 1, .3, 1] }}
+        className={`glass shot-frame relative overflow-hidden p-2 ${beat.n === "4" ? "phone-shot-frame" : ""}`}>
+        <picture>
+          <source media="(max-width: 639px)" srcSet={beat.phone} />
+          <img src={beat.src} alt={beat.alt} loading="lazy" width={1600} height={900}
+            className={`shot ${beat.n === "4" ? "phone-shot" : ""} parallax-on-scroll rounded-2xl bg-black/30`} />
+        </picture>
+        <motion.span aria-hidden className="beat-scanline"
+          style={{ scaleX: prefersReducedMotion ? 1 : scanProgress }} />
+      </motion.figure>
+    </div>
+  );
+}
+
 export default function Home() {
   // Triggers are made top to bottom in page order: the explanation rows, then the held line under them.
   const root = useRef<HTMLDivElement>(null);
@@ -105,25 +149,7 @@ export default function Home() {
           {/* GSAP's useReveal already drives these rows and works in every browser, so they do not
               also get .enter-on-scroll: two things animating one node's opacity is one too many. The
               CSS timeline is used on the pages that have no GSAP reveal. */}
-          {beats.map(b => (
-            <div key={b.n} data-reveal
-              className="beat grid items-center gap-6 border-b border-white/10 py-12 sm:py-16 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-14">
-              <div className="margin-rule">
-                <span className="cue-mark text-brass">{b.n}</span>
-                <h2 className="text-3xl font-bold leading-tight sm:text-4xl">{b.head}</h2>
-                <p className="mt-3 text-muted">{b.line}</p>
-              </div>
-              {/* The frame is clipped and the picture inside it travels, so the parallax moves no
-                  layout, and the hover zoom has something to be clipped by. */}
-              <figure className="glass shot-frame overflow-hidden p-2">
-                <picture>
-                  <source media="(max-width: 639px)" srcSet={b.phone} />
-                  <img src={b.src} alt={b.alt} loading="lazy" width={1600} height={900}
-                    className={`shot ${b.n === "4" ? "phone-shot" : ""} parallax-on-scroll rounded-2xl bg-black/30`} />
-                </picture>
-              </figure>
-            </div>
-          ))}
+          {beats.map(b => <BeatRow key={b.n} beat={b} />)}
         </section>
 
         {/* Held for half a screen, the way a house light fade is held. Nothing moves but opacity. */}
