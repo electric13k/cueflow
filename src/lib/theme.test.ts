@@ -20,12 +20,12 @@ test("applyTheme scopes the page and persists it", () => {
   expect(getTheme()).toBe("light");
 });
 
-// The Studio's theme is a class on a wrapper, so it must not touch <html> or the page's own setting.
-test("the studio theme is scoped, not global", () => {
+// The setting is shared so app chrome, working surfaces, and portal content stay in sync.
+test("the studio setting synchronizes the document theme", () => {
   setStudioTheme("dark");
   expect(getStudioTheme()).toBe("dark");
-  expect(getTheme()).toBe("light");
-  expect(document.documentElement.classList.contains(DARK)).toBe(false);
+  expect(getTheme()).toBe("dark");
+  expect(document.documentElement.classList.contains(DARK)).toBe(true);
   expect(themeClass("light")).toBe("");
 });
 

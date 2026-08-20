@@ -11,10 +11,8 @@ import { emptyDoc, loadScript, saveScript, type ScriptDoc } from "../lib/script"
 
 export default function Settings() {
   const [binds, setBinds] = useState<Record<Action, string>>(loadBinds);
-  // The same setting the Studio and the show manager toggle, read through the same hook: this
-  // switch and those buttons are one value, and flipping either moves the other. It used to call
-  // applyTheme, which now writes the scope onto <html> and would take the whole app dark -- and §14
-  // says there is no page-wide dark left to take.
+  // The same device setting is shared by the Studio, the show manager, and the rest of the app.
+  // Keeping one source of truth also themes portal-rendered menus and dialogs.
   const [theme, setTheme] = useStudioTheme();
   const [layout, setLayout] = useLayout();
   const [doc, setDoc] = useState<ScriptDoc>(() => (typeof localStorage === "undefined" ? emptyDoc() : loadScript()));
@@ -47,10 +45,10 @@ export default function Settings() {
         <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Palette size={18} className="text-accent" />Look</h2>
         <div className="mt-4 space-y-4">
           <div>
-            <Switch isSelected={theme === "dark"} onValueChange={v => setTheme(v ? "dark" : "light")}>Dark control screen</Switch>
+            <Switch isSelected={theme === "dark"} onValueChange={v => setTheme(v ? "dark" : "light")}>Dark mode</Switch>
             <p className="mt-1 text-xs text-muted">
-              The Studio and the show manager only, and only on this device. The rest of the app stays
-              beige, nobody else in the show sees it, and what the audience sees is black either way.
+              This device only. It covers the app chrome and working surfaces, nobody else in the show
+              sees it, and what the audience sees is black either way.
             </p>
           </div>
           <label className="block">

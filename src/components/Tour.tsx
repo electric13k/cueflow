@@ -6,36 +6,27 @@ import { clearDemo, demoPresent, loadDemo } from "../lib/demo";
 import { getTour, setTour, steps } from "../lib/tour";
 import { toast } from "../lib/toast";
 
-/** How often to ask the current step whether it has been satisfied. */
 const TICK = 400;
-/** Set just before the reload that makes the teardown stick, so the toast survives it. */
 const CLEARED = "cueflow:demo-cleared";
 
-/** Anyone can start it: the workspace on a first visit, and the Settings button forever after. */
 export const startTour = () => window.dispatchEvent(new Event("cueflow:tour"));
 
-/**
- * The tutorial. It highlights a real control and waits for the person to use it, then moves on.
- *
- * Nothing here drives the app. Each step watches for a fact to become true (see `lib/tour.ts`), so
- * the user can reach it any way they like and the Studio needs no tutorial code inside it.
- */
 export default function Tour() {
   const [step, setStep] = useState(-1);
   const { pathname } = useLocation();
   const active = step >= 0 && step < steps.length;
   const current = active ? steps[step] : undefined;
   const { spot, state } = useAnchor(current?.anchor, active);
-  // The step that was showing when the anchor was last measured, so a press is attributed correctly.
   const pressed = useRef(false);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /**
-   * The Studio reads the library once, in `useState`, and writes it back on a debounce. Seeding
-   * behind it means the write it already has queued puts the empty library straight back, so a
-   * tutorial started from the Studio has to boot the page again to be seen at all. Nothing is lost:
-   * the tour has only just started. Started from anywhere else, there is no Studio to race.
-   */
+  const clearAdvanceTimer = () => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    advanceTimer.current = null;
+  };
+
   const begin = (from = 0) => {
+    clearAdvanceTimer();
     loadDemo();
     setTour({ done: false, step: from });
     if (pathname.endsWith("/studio")) location.reload();
@@ -54,30 +45,29 @@ export default function Tour() {
     toast("Demo material cleared", "The sounds, pictures and script the tutorial loaded have gone. Anything you made is still here.", "info");
   }, []);
 
-  // First visit to the workspace starts it, and an abandoned run picks up where it stopped.
   useEffect(() => {
-    // The workspace for someone with an account, the Studio for someone without one. `Onboarding`
-    // used to cover the second case with seven panels of prose and is gone; leaving it out here
-    // would mean a signed-out first-timer is taught nothing at all.
     if (!pathname.endsWith("/workspace") && !pathname.endsWith("/studio")) return;
     const saved = getTour();
     if (saved.done) return;
     if (localStorage.getItem("cueflow:tour") === null) begin(0);
-    else if (step < 0) { loadDemo(); setStep(saved.step); }
+    else if (step < 0) {
+      loadDemo();
+      setStep(Math.min(Math.max(saved.step, 0), steps.length - 1));
+    }
   }, [pathname]);
 
   const finish = (keep: boolean) => {
+    clearAdvanceTimer();
     setTour({ done: true, step: 0 });
     setStep(-1);
     if (keep || !demoPresent()) return;
     clearDemo();
-    // Same race as `begin`, the other way around: the Studio is still holding the demo library in
-    // state and would write it back over the clearing. Boot the page, and say so on the way in.
     sessionStorage.setItem(CLEARED, "1");
     location.reload();
   };
 
   const next = () => {
+    clearAdvanceTimer();
     const to = step + 1;
     if (to >= steps.length) return finish(false);
     setTour({ step: to });
@@ -85,25 +75,43 @@ export default function Tour() {
     pressed.current = false;
   };
 
-  // Poll the current step. An interval rather than requestAnimationFrame, because rAF stops in a
-  // background tab and the presenter step deliberately sends people to another window.
+  const previous = () => {
+    clearAdvanceTimer();
+    if (step <= 0) return;
+    const to = step - 1;
+    setTour({ step: to, done: false });
+    setStep(to);
+    pressed.current = false;
+  };
+
   useEffect(() => {
     if (!current) return;
-    const timer = setInterval(() => { if (current.done()) next(); }, TICK);
+    const timer = setInterval(() => {
+      if (current.done()) next();
+    }, TICK);
     return () => clearInterval(timer);
   }, [current, step]);
 
-  // Steps whose completion cannot be watched for finish when the highlighted control is pressed.
   useEffect(() => {
     if (!current?.onPress || state !== "found") return;
     const el = findAnchor(current.anchor);
     if (!el) return;
-    const onClick = () => { if (!pressed.current) { pressed.current = true; setTimeout(next, 350); } };
+    const onClick = () => {
+      if (pressed.current) return;
+      pressed.current = true;
+      clearAdvanceTimer();
+      advanceTimer.current = setTimeout(() => {
+        advanceTimer.current = null;
+        if (active && step >= 0 && steps[step]?.id === current.id) next();
+      }, 350);
+    };
     el.addEventListener("click", onClick);
-    return () => el.removeEventListener("click", onClick);
-  }, [current, state]);
+    return () => {
+      el.removeEventListener("click", onClick);
+      clearAdvanceTimer();
+    };
+  }, [current, state, active, step]);
 
-  // Escape leaves. A tutorial that traps you is worse than no tutorial.
   useEffect(() => {
     if (!active) return;
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") finish(false); };
@@ -111,22 +119,18 @@ export default function Tour() {
     return () => window.removeEventListener("keydown", key);
   }, [active]);
 
-  if (!active || !current) return null;
-
-  // Wandered off the route this step lives on, or the control has not rendered: say nothing rather
-  // than point at nothing. The step resumes the moment its control is back on screen.
-  if (state !== "found") return null;
+  if (!active || !current || state !== "found") return null;
 
   return (
-    <Spotlight spot={spot} label={current.say} onDismiss={() => { /* the dim is not a way out */ }}>
+    <Spotlight spot={spot} label={current.say} onDismiss={() => finish(false)}>
       <p className="font-mono text-[10px] uppercase tracking-[.3em] text-brass">
         Step {step + 1} of {steps.length}
       </p>
       <p className="mt-2 text-base font-semibold leading-snug">{current.say}</p>
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="light" onPress={() => finish(false)}>Skip the tour</Button>
-        {/* No Next. The step is finished by doing the thing, which is the entire point. The one
-            exception is a step whose control opens another window, and that one advances itself. */}
+        {step > 0 && <Button size="sm" variant="light" onPress={previous}>Back</Button>}
+        <Button size="sm" color="primary" className="ml-auto" onPress={next}>Next</Button>
       </div>
     </Spotlight>
   );

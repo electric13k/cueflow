@@ -24,7 +24,7 @@ import Tour from "./components/Tour";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
-import { applyTheme } from "./lib/theme";
+import { applyTheme, getStudioTheme } from "./lib/theme";
 import { applyLayout } from "./lib/layout";
 import { trackGlassPointer } from "./lib/glass";
 import { touchLastSeen } from "./lib/retention";
@@ -35,10 +35,9 @@ function LegalRedirect() {
   return <Navigate to={hash === "#privacy" ? "/privacy" : "/terms"} replace />;
 }
 
-// The page is beige and there is no control left that makes it anything else (§14), so boot it that
-// way rather than off the stored page theme: anyone who set dark back when the toggle was still in
-// the top bar would otherwise come back to a dark app with nothing in the UI to undo it.
-applyTheme("light");
+// Restore the device theme before first paint so the app, its working surfaces, and portal content
+// start in the same mode instead of flashing light and then switching.
+applyTheme(getStudioTheme());
 // Before first paint, so a compact phone never renders one card per row and then snaps to two.
 applyLayout();
 trackGlassPointer();

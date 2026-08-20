@@ -6,6 +6,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: process.env.BASE_PATH || "/",
   plugins: [react()],
+  server: { host: true, allowedHosts: true },
   // The script parser works on real DOM nodes, so its tests need a DOM. happy-dom is dev-only.
   test: { environment: "happy-dom" },
 });

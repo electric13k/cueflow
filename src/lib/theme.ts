@@ -2,13 +2,7 @@ import { useSyncExternalStore } from "react";
 
 export type Theme = "dark" | "light";
 
-/**
- * Theming is a class on an element, never a global mode.
- *
- * `theme-dark` sets the whole token set, and custom properties inherit, so putting it on <html>
- * themes the page and putting it on a wrapper themes only that subtree. The page itself is beige;
- * dark is opt-in, and later only inside the Studio and the Show where a host asks for it.
- */
+/** The house dark palette can be applied globally and to nested working surfaces. */
 export const DARK = "theme-dark";
 
 const PAGE_KEY = "cueflow:theme";
@@ -16,20 +10,7 @@ const STUDIO_KEY = "cueflow:theme:studio";
 
 const stored = (key: string): Theme => (localStorage.getItem(key) === "dark" ? "dark" : "light");
 
-/**
- * Class names for a wrapper: `<div className={themeClass(t)}>` re-themes everything inside it.
- *
- * Two classes, and the second one is the whole reason the dark button used to darken almost nothing.
- * `theme-dark` carries the house palette, which is nine tokens. The interface resolves through
- * roughly forty more that HeroUI owns -- `--surface`, `--overlay`, `--border`, `--muted`,
- * `--field-background`, every `-soft` and `-hover` ramp -- and HeroUI declares its dark values under
- * `.dark, [data-theme="dark"]`. Inside a `theme-dark` subtree those stayed at their light values, so
- * the background went dark while every card, popover, input and menu inside it stayed white.
- *
- * `.dark` is a plain class selector, not an `html` rule, so it applies to any element. Adding it to
- * the same wrapper flips HeroUI's whole set for that subtree, `color-scheme: dark` with it, and the
- * house palette still wins on top because our block is declared later in the same layer.
- */
+/** Class names for a wrapper. The alias is required by HeroUI and Tailwind dark variants. */
 export const themeClass = (t: Theme) => (t === "dark" ? `${DARK} dark` : "");
 
 export const getTheme = (): Theme => stored(PAGE_KEY);
@@ -37,32 +18,23 @@ export const getTheme = (): Theme => stored(PAGE_KEY);
 export function applyTheme(t: Theme) {
   const root = document.documentElement;
   root.classList.toggle(DARK, t === "dark");
-  root.classList.toggle("dark", t === "dark"); // keeps Tailwind's dark: variants working
-  root.dataset.theme = t;                      // HeroUI reads data-theme
+  root.classList.toggle("dark", t === "dark");
+  root.dataset.theme = t;
+  root.style.colorScheme = t;
   localStorage.setItem(PAGE_KEY, t);
   bump();
 }
 
-/** The scoped theme the Studio and the Show run under. Read it, wrap with themeClass(), done. */
+/** The device theme used by Studio, Show, Settings, and the rest of the application. */
 export const getStudioTheme = (): Theme => stored(STUDIO_KEY);
 
 export function setStudioTheme(t: Theme) {
   localStorage.setItem(STUDIO_KEY, t);
-  bump();
+  // Portal content such as menus and dialogs renders under body, outside a scoped Studio wrapper.
+  // Apply the same setting to the document so every existing surface resolves the same tokens.
+  applyTheme(t);
 }
 
-/**
- * The theme signal.
- *
- * A canvas gets no CSS, so every canvas has to re-read the palette and repaint when the theme
- * moves. Nothing in the DOM tells it that happened: the tokens change value without any of the
- * canvas's own props changing, so a draw effect keyed on drawing state alone paints the old palette
- * until something unrelated moves. This is the missing dependency. Put `useThemeSignal()` in the
- * deps array of a draw effect and the canvas repaints on every theme change, scoped or global.
- *
- * Both writers above call bump() directly; the observer catches a class set on <html> by anything
- * else (a devtools poke, another tab's storage sync, a future host control).
- */
 let version = 0;
 const subs = new Set<() => void>();
 let obs: MutationObserver | null = null;
@@ -80,20 +52,9 @@ function subscribe(f: () => void) {
   };
 }
 
-/** Non-React subscribers (and the test) use this; the hook is a thin wrapper over it. */
 export function onThemeChange(f: () => void) { return subscribe(f); }
-
 export const useThemeSignal = () => useSyncExternalStore(subscribe, () => version, () => version);
 
-/**
- * The working theme, read as state. Every surface that offers the toggle reads it through here, so
- * the Studio, the show manager, a joined role's screen and the Settings switch are all the same
- * value and move together the moment any one of them writes.
- *
- * It is a device setting and stays one: it is written to localStorage and to nothing else, never to
- * a show row and never onto the realtime channel, so one operator wanting a dark control screen in
- * a blackout leaves everybody else's screen exactly as it was.
- */
 export function useStudioTheme() {
   useThemeSignal();
   return [getStudioTheme(), setStudioTheme] as const;

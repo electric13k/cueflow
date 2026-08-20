@@ -465,6 +465,13 @@
    */
   .shot { aspect-ratio: 4 / 5; object-fit: cover; object-position: left top; width: 100%; }
   @media (min-width: 640px) { .shot { aspect-ratio: 16 / 9; object-position: center top; } }
+  /* The final feature is a real phone capture, not a desktop frame placed in a phone crop. */
+  .phone-shot {
+    aspect-ratio: 9 / 16;
+    object-fit: contain;
+    object-position: center;
+    background: var(--surface);
+  }
 
   /**
    * Scroll-driven motion that costs no JavaScript and no scroll listener, which is the only kind

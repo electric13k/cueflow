@@ -119,7 +119,7 @@ export default function Home() {
                 <picture>
                   <source media="(max-width: 639px)" srcSet={b.phone} />
                   <img src={b.src} alt={b.alt} loading="lazy" width={1600} height={900}
-                    className="shot parallax-on-scroll rounded-2xl bg-black/30" />
+                    className={`shot ${b.n === "4" ? "phone-shot" : ""} parallax-on-scroll rounded-2xl bg-black/30`} />
                 </picture>
               </figure>
             </div>
