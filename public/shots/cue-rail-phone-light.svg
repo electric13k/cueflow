@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1600" role="img" aria-label="Cueflow abstract production graphic">
+  <defs>
+    <linearGradient id="bg-light-portrait" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4EEDF"/>
+      <stop offset="1" stop-color="#FFF9EF"/>
+    </linearGradient>
+    <linearGradient id="gold-light-portrait" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#C1842D"/>
+      <stop offset=".5" stop-color="#F5D88A"/>
+      <stop offset="1" stop-color="#C1842D"/>
+    </linearGradient>
+    <filter id="shadow-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#5D4933" flood-opacity=".22"/>
+    </filter>
+    <filter id="soft-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1600" fill="url(#bg-light-portrait)"/>
+  
+    <path d="M0 0 Q450 220 900 480 T900 880" fill="#FFF9EF" opacity=".72"/>
+    <path d="M90 0 Q560 280 720 640 T700 1600" fill="none" stroke="#646941" stroke-width="120" opacity=".18"/>
+    <path d="M450 150 C420 360 490 510 450 720 S420 1120 460 1450" fill="none" stroke="url(#gold-light-portrait)" stroke-width="16" stroke-linecap="round"/>
+    <circle cx="450" cy="360" r="58" fill="#646941" stroke="#1B1714" stroke-width="10" filter="url(#shadow-light-portrait)"/><circle cx="432" cy="342" r="12" fill="#FFF9EF" opacity=".55"/><circle cx="450" cy="630" r="58" fill="#C1842D" stroke="#1B1714" stroke-width="10" filter="url(#shadow-light-portrait)"/><circle cx="432" cy="612" r="12" fill="#FFF9EF" opacity=".55"/><circle cx="450" cy="900" r="58" fill="#7D3434" stroke="#1B1714" stroke-width="10" filter="url(#shadow-light-portrait)"/><circle cx="432" cy="882" r="12" fill="#FFF9EF" opacity=".55"/><circle cx="450" cy="1170" r="58" fill="#1B1714" stroke="#1B1714" stroke-width="10" filter="url(#shadow-light-portrait)"/><circle cx="432" cy="1152" r="12" fill="#FFF9EF" opacity=".55"/>
+    <path d="M220 1380 C130 1260 300 1180 220 1060 S130 860 230 740 S300 510 220 300" fill="none" stroke="#1B1714" stroke-width="9" opacity=".32"/>
+    <path d="M220 1380 C130 1260 300 1180 220 1060 S130 860 230 740 S300 510 220 300" fill="none" stroke="#D8CBB8" stroke-width="3" opacity=".9" transform="translate(0 18)"/>
+    <circle cx="650" cy="1240" r="100" fill="#C1842D" opacity=".13" filter="url(#soft-light-portrait)"/>
+  
+</svg>

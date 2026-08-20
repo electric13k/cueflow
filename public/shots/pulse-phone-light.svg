@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1600" role="img" aria-label="Cueflow abstract production graphic">
+  <defs>
+    <linearGradient id="bg-light-portrait" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4EEDF"/>
+      <stop offset="1" stop-color="#FFF9EF"/>
+    </linearGradient>
+    <linearGradient id="gold-light-portrait" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#C1842D"/>
+      <stop offset=".5" stop-color="#F5D88A"/>
+      <stop offset="1" stop-color="#C1842D"/>
+    </linearGradient>
+    <filter id="shadow-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#5D4933" flood-opacity=".22"/>
+    </filter>
+    <filter id="soft-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1600" fill="url(#bg-light-portrait)"/>
+  
+    <path d="M130 0 Q500 260 240 590 T700 1200 Q820 1450 640 1600" fill="none" stroke="#7D3434" stroke-width="180" opacity=".14"/>
+    <path d="M760 40 Q540 330 740 600 T250 1150 Q100 1390 300 1600" fill="none" stroke="#646941" stroke-width="120" opacity=".25"/>
+    <path d="M460 100 C240 180 680 300 460 420 S240 660 460 780 S680 1020 460 1140 S240 1360 460 1500" fill="none" stroke="#C1842D" stroke-width="24" stroke-linecap="round" opacity=".95"/>
+    <path d="M460 100 C240 180 680 300 460 420 S240 660 460 780 S680 1020 460 1140 S240 1360 460 1500" fill="none" stroke="#FFF9EF" stroke-width="4" stroke-linecap="round" opacity=".9" transform="translate(0 28)"/>
+    <circle cx="450" cy="780" r="142" fill="#FFF9EF" stroke="#C1842D" stroke-width="18" filter="url(#shadow-light-portrait)"/>
+    <circle cx="450" cy="780" r="106" fill="#F4EEDF" stroke="#646941" stroke-width="4"/>
+    <path d="M426 732 L510 780 L426 828 Z" fill="#C1842D"/>
+    <circle cx="240" cy="1320" r="68" fill="#7D3434" opacity=".9"/>
+    <circle cx="650" cy="180" r="46" fill="#646941" opacity=".9"/>
+  
+</svg>

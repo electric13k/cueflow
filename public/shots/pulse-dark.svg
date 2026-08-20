@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Cueflow abstract production graphic">
+  <defs>
+    <linearGradient id="bg-dark-wide" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151311"/>
+      <stop offset="1" stop-color="#26211C"/>
+    </linearGradient>
+    <linearGradient id="gold-dark-wide" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#D69A35"/>
+      <stop offset=".5" stop-color="#E8B64A"/>
+      <stop offset="1" stop-color="#D69A35"/>
+    </linearGradient>
+    <filter id="shadow-dark-wide" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity=".22"/>
+    </filter>
+    <filter id="soft-dark-wide" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg-dark-wide)"/>
+  
+    <path d="M0 170 Q330 360 660 160 T1600 220" fill="none" stroke="#A4514D" stroke-width="180" opacity=".14"/>
+    <path d="M80 720 Q420 580 720 760 T1540 690" fill="none" stroke="#8A8C55" stroke-width="120" opacity=".25"/>
+    <path d="M60 470 C140 260 230 680 320 470 S500 260 590 470 S770 680 860 470 S1040 260 1130 470 S1310 680 1540 430" fill="none" stroke="#D69A35" stroke-width="24" stroke-linecap="round" opacity=".95"/>
+    <path d="M60 470 C140 260 230 680 320 470 S500 260 590 470 S770 680 860 470 S1040 260 1130 470 S1310 680 1540 430" fill="none" stroke="#26211C" stroke-width="4" stroke-linecap="round" opacity=".9" transform="translate(0 28)"/>
+    <circle cx="800" cy="450" r="150" fill="#26211C" stroke="#D69A35" stroke-width="18" filter="url(#shadow-dark-wide)"/>
+    <circle cx="800" cy="450" r="116" fill="#151311" stroke="#8A8C55" stroke-width="4"/>
+    <path d="M776 402 L860 450 L776 498 Z" fill="#D69A35"/>
+    <circle cx="1300" cy="170" r="68" fill="#A4514D" opacity=".9"/>
+    <circle cx="1410" cy="680" r="46" fill="#8A8C55" opacity=".9"/>
+  
+</svg>

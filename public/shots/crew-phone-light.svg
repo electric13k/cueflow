@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1600" role="img" aria-label="Cueflow abstract production graphic">
+  <defs>
+    <linearGradient id="bg-light-portrait" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4EEDF"/>
+      <stop offset="1" stop-color="#FFF9EF"/>
+    </linearGradient>
+    <linearGradient id="gold-light-portrait" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#C1842D"/>
+      <stop offset=".5" stop-color="#F5D88A"/>
+      <stop offset="1" stop-color="#C1842D"/>
+    </linearGradient>
+    <filter id="shadow-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#5D4933" flood-opacity=".22"/>
+    </filter>
+    <filter id="soft-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1600" fill="url(#bg-light-portrait)"/>
+  
+    <path d="M450 120 Q80 620 450 1480 Q820 620 450 120" fill="none" stroke="#FFF9EF" stroke-width="38" opacity=".42"/>
+    <line x1="450" y1="220" x2="230" y2="620" stroke="#C1842D" stroke-width="12" opacity=".8"/><line x1="230" y1="620" x2="670" y2="620" stroke="#C1842D" stroke-width="12" opacity=".8"/><line x1="450" y1="220" x2="450" y2="1060" stroke="#C1842D" stroke-width="12" opacity=".8"/><line x1="670" y1="620" x2="450" y2="1060" stroke="#C1842D" stroke-width="12" opacity=".8"/>
+    <circle cx="450" cy="220" r="84" fill="#C1842D" stroke="#1B1714" stroke-width="12" filter="url(#shadow-light-portrait)"/><circle cx="426" cy="196" r="18" fill="#FFF9EF" opacity=".52"/><circle cx="450" cy="220" r="112" fill="none" stroke="#D8CBB8" stroke-width="3" opacity=".48"/><circle cx="230" cy="620" r="84" fill="#646941" stroke="#1B1714" stroke-width="12" filter="url(#shadow-light-portrait)"/><circle cx="206" cy="596" r="18" fill="#FFF9EF" opacity=".52"/><circle cx="230" cy="620" r="112" fill="none" stroke="#D8CBB8" stroke-width="3" opacity=".48"/><circle cx="670" cy="620" r="84" fill="#7D3434" stroke="#1B1714" stroke-width="12" filter="url(#shadow-light-portrait)"/><circle cx="646" cy="596" r="18" fill="#FFF9EF" opacity=".52"/><circle cx="670" cy="620" r="112" fill="none" stroke="#D8CBB8" stroke-width="3" opacity=".48"/><circle cx="450" cy="1060" r="84" fill="#FFF9EF" stroke="#1B1714" stroke-width="12" filter="url(#shadow-light-portrait)"/><circle cx="426" cy="1036" r="18" fill="#FFF9EF" opacity=".52"/><circle cx="450" cy="1060" r="112" fill="none" stroke="#D8CBB8" stroke-width="3" opacity=".48"/>
+    <path d="M120 300 Q450 60 780 300" fill="none" stroke="#7D3434" stroke-width="22" opacity=".6"/>
+    <circle cx="760" cy="1420" r="52" fill="#646941" opacity=".9"/>
+  
+</svg>

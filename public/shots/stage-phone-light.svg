@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1600" role="img" aria-label="Cueflow abstract production graphic">
+  <defs>
+    <linearGradient id="bg-light-portrait" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4EEDF"/>
+      <stop offset="1" stop-color="#FFF9EF"/>
+    </linearGradient>
+    <linearGradient id="gold-light-portrait" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#C1842D"/>
+      <stop offset=".5" stop-color="#F5D88A"/>
+      <stop offset="1" stop-color="#C1842D"/>
+    </linearGradient>
+    <filter id="shadow-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#5D4933" flood-opacity=".22"/>
+    </filter>
+    <filter id="soft-light-portrait" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1600" fill="url(#bg-light-portrait)"/>
+  
+    <rect width="900" height="1600" fill="#1B1714" opacity=".12"/>
+    <path d="M160 80 L300 1240 L500 1240 Z" fill="#F5D88A" opacity=".16"/><path d="M450 0 L350 1260 L550 1260 Z" fill="#F5D88A" opacity=".16"/><path d="M740 80 L400 1240 L600 1240 Z" fill="#F5D88A" opacity=".16"/>
+    <rect x="280" y="800" width="120" height="420" rx="14" fill="#C1842D" opacity=".72" filter="url(#shadow-light-portrait)"/>
+    <rect x="400" y="650" width="120" height="520" rx="14" fill="#FFF9EF" opacity=".84" filter="url(#shadow-light-portrait)"/>
+    <rect x="560" y="900" width="110" height="320" rx="14" fill="#7D3434" opacity=".72" filter="url(#shadow-light-portrait)"/>
+    <rect x="210" y="1300" width="480" height="48" rx="28" fill="#C1842D"/>
+    <path d="M190 1460 C300 1360 380 1500 460 1410 S620 1300 720 1400" fill="none" stroke="#D8CBB8" stroke-width="9" opacity=".7"/>
+    <circle cx="690" cy="220" r="74" fill="#F5D88A" opacity=".22" filter="url(#soft-light-portrait)"/>
+  
+</svg>

@@ -541,8 +541,14 @@
 
   /* Marketing screenshots are light UI captures. In dark mode they become a quiet, low-glare
      reference instead of a bright rectangle that fights the page's reading mode. */
-  .theme-dark .shot, .dark .shot {
+  .theme-dark .shot:not(.themed-shot), .dark .shot:not(.themed-shot) {
     filter: brightness(.72) contrast(1.12) saturate(.78);
+  }
+  .themed-shot {
+    transition: filter .34s ease;
+  }
+  .theme-dark .themed-shot, .dark .themed-shot {
+    filter: brightness(.98) contrast(1.04) saturate(.98);
   }
 
   .hero-orbit {
@@ -620,7 +626,8 @@
        under it shifts. */
     .shot-frame img { transition: transform .5s cubic-bezier(.16, 1, .3, 1), filter .36s ease; }
     .shot-frame:hover img { transform: scale(1.03); }
-    .theme-dark .shot-frame:hover .shot { filter: brightness(.8) contrast(1.14) saturate(.86); }
+    .theme-dark .shot-frame:hover .shot:not(.themed-shot) { filter: brightness(.8) contrast(1.14) saturate(.86); }
+    .theme-dark .shot-frame:hover .themed-shot { filter: brightness(1.04) contrast(1.06) saturate(1.03); }
     .hero-orbit { transition: opacity .3s ease, box-shadow .3s ease; }
     .hero-orbit:hover { opacity: 1; }
 
@@ -650,7 +657,8 @@
     .workflow-rail { transform: scaleX(1); opacity: .35; }
     .workflow-grid::before { opacity: .5; }
     .shot-frame img, .link-rule::after, .beat .cue-mark { transition: none; }
-    .theme-dark .shot, .dark .shot { filter: brightness(.74) contrast(1.1) saturate(.8); }
+    .theme-dark .shot:not(.themed-shot), .dark .shot:not(.themed-shot) { filter: brightness(.74) contrast(1.1) saturate(.8); }
+    .theme-dark .themed-shot, .dark .themed-shot { filter: brightness(.98) contrast(1.04) saturate(.98); }
     .beat-scanline { transform: scaleX(1); }
     .link-rule::after { transform: scaleX(1); opacity: .35; }
   }

@@ -4,6 +4,7 @@ import { Radio } from "lucide-react";
 import LogoMark from "../components/LogoMark";
 import Page from "../components/Page";
 import { useReveal, usePinScrub } from "../lib/motion";
+import { useStudioTheme, type Theme } from "../lib/theme";
 import { Button } from "../ui";
 
 /**
@@ -14,54 +15,55 @@ import { Button } from "../ui";
  * One button. The page used to offer three at the top and two at the bottom, which is five ways to
  * ask the same question and no answer about which one is the way in.
  */
-const shot = (name: string) => `${import.meta.env.BASE_URL}shots/${name}.png`;
+const shot = (name: string, theme: Theme) => `${import.meta.env.BASE_URL}shots/${name}-${theme}.svg`;
 
 /**
  * What it is, why it beats four windows, what you watch while it runs, who else is holding a screen.
  *
- * Each has two pictures, not one scaled picture. A 1440x900 capture cropped to a phone frame is a
- * zoom, and a zoom of a desktop layout is not evidence that the phone layout exists. `phone` is a
- * real 390x844 capture of the phone layout, which runs a different arrangement rather than a
- * narrower one.
+ * Each has two graphic compositions, not one scaled graphic. Wide artwork stays wide and portrait
+ * artwork stays portrait, so the mobile frame reads as an intentional vertical illustration rather
+ * than a cropped desktop scene.
  */
 const beats = [
   {
     n: "1",
     head: "One list. Every sound, every slide.",
     line: "In the order you will call them, numbered the way you will call them.",
-    src: shot("sequences"),
-    phone: shot("phone-deck"),
-    alt: "The CueFlow deck: numbered cues, sound and screens in one order",
+    src: "cue-rail",
+    phone: "cue-rail-phone",
+    alt: "Abstract brass cue rail with four colored cue markers and a translucent waveform ribbon",
   },
   {
     n: "2",
     head: "One key instead of four windows.",
     line: "Arrows step the deck. A and D move the slide without touching the sound.",
-    src: shot("soundboard"),
-    phone: shot("phone"),
-    alt: "The CueFlow library: a grid of media cards above the transport bar",
+    src: "pulse",
+    phone: "pulse-phone",
+    alt: "Abstract amber waveform ribbon passing through layered signal circles",
   },
   {
     n: "3",
     head: "On now, and standing by.",
     line: "The whole readout, on every device in the room.",
-    src: shot("editor"),
-    phone: shot("phone-editor"),
-    alt: "The CueFlow editor showing a rendered waveform and its controls",
+    src: "stage",
+    phone: "stage-phone",
+    alt: "Abstract stage-light beams crossing three warm theatrical blocks and a waveform arc",
   },
   {
     n: "4",
     head: "The crew join on their phones.",
     line: "Hand out a key. No install, nothing to hand back at the end.",
-    src: shot("phone"),
-    phone: shot("phone"),
-    alt: "CueFlow running on a phone",
+    src: "crew",
+    phone: "crew-phone",
+    alt: "Abstract connected crew signal circles linked by a shared cue line",
   },
 ];
 
 type Beat = (typeof beats)[number];
 
-function BeatRow({ beat }: { beat: Beat }) {
+function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
+  const src = shot(beat.src, theme);
+  const phone = shot(beat.phone, theme);
   const rowRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
@@ -92,9 +94,9 @@ function BeatRow({ beat }: { beat: Beat }) {
         transition={{ duration: .68, delay: .08, ease: [.16, 1, .3, 1] }}
         className={`glass shot-frame relative overflow-hidden p-2 ${beat.n === "4" ? "phone-shot-frame" : ""}`}>
         <picture>
-          <source media="(max-width: 639px)" srcSet={beat.phone} />
-          <img src={beat.src} alt={beat.alt} loading="lazy" width={1600} height={900}
-            className={`shot ${beat.n === "4" ? "phone-shot" : ""} parallax-on-scroll rounded-2xl bg-black/30`} />
+          <source media="(max-width: 639px)" srcSet={phone} />
+          <img key={src} src={src} alt={beat.alt} loading="lazy" width={beat.n === "4" ? 900 : 1600} height={beat.n === "4" ? 1600 : 900}
+            className={`shot themed-shot ${beat.n === "4" ? "phone-shot" : "shot-wide"} parallax-on-scroll rounded-2xl bg-black/30`} />
         </picture>
         <motion.span aria-hidden className="beat-scanline"
           style={{ scaleX: prefersReducedMotion ? 1 : scanProgress }} />
@@ -108,6 +110,7 @@ export default function Home() {
   const root = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const [theme] = useStudioTheme();
   const { scrollYProgress: heroProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroGridY = useTransform(heroProgress, [0, 1], [0, 72]);
   const heroGridRotate = useTransform(heroProgress, [0, 1], [0, 8]);
@@ -149,10 +152,10 @@ export default function Home() {
           <motion.figure initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} whileHover={prefersReducedMotion ? undefined : { y: -5 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
             className="glass shot-frame mt-14 overflow-hidden p-2">
             <picture>
-              <source media="(max-width: 639px)" srcSet={shot("phone-deck")} />
-              <img src={shot("sequences")} width={1600} height={900} loading="eager"
-                alt="The CueFlow deck with a sequence armed: numbered cues, the armed one framed in amber"
-                className="shot parallax-on-scroll rounded-2xl bg-black/30" />
+              <source media="(max-width: 639px)" srcSet={shot("cue-rail-phone", theme)} />
+              <img key={shot("cue-rail", theme)} src={shot("cue-rail", theme)} width={1600} height={900} loading="eager"
+                alt="Abstract brass cue rail with colored cue markers and a translucent waveform ribbon"
+                className="shot themed-shot parallax-on-scroll rounded-2xl bg-black/30" />
             </picture>
           </motion.figure>
           </div>
@@ -162,7 +165,7 @@ export default function Home() {
           {/* GSAP's useReveal already drives these rows and works in every browser, so they do not
               also get .enter-on-scroll: two things animating one node's opacity is one too many. The
               CSS timeline is used on the pages that have no GSAP reveal. */}
-          {beats.map(b => <BeatRow key={b.n} beat={b} />)}
+          {beats.map(b => <BeatRow key={b.n} beat={b} theme={theme} />)}
         </section>
 
         {/* Held for half a screen, the way a house light fade is held. Nothing moves but opacity. */}
