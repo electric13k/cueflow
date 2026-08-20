@@ -633,7 +633,7 @@ export default function Studio() {
                       onPointerDown={seqDrag.start(i)} onPointerMove={seqDrag.move} onPointerUp={seqDrag.end} onPointerCancel={seqDrag.end}>
                       <GripVertical size={13} aria-hidden />
                     </span>
-                    <button className="py-1.5 text-sm font-semibold" onClick={() => { setSequenceId(s.id); setTab("sequence"); }}>{s.name}</button>
+                    <button data-tour={i === 0 ? "sequence-select" : undefined} className="py-1.5 text-sm font-semibold" onClick={() => { setSequenceId(s.id); setTab("sequence"); }}>{s.name}</button>
                     <span className="text-[11px] text-muted">{s.items.length}</span>
                     {/* A sequence does not need a show to be run: this arms it and opens the
                         presenter window, in a project, outside any show. */}
@@ -753,7 +753,7 @@ export default function Studio() {
         <div data-coach="transport" className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-3 border-t border-white/10 bg-background/90 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
           <Button className="h-16 w-24 shrink-0 text-base" variant="flat" onPress={() => advance(-1)}>← Back</Button>
           {/* The one thing this screen exists to do, so it is the biggest thing on it. */}
-          <Button className="h-16 flex-1 text-lg font-bold" color="primary" onPress={() => advance(1)}>
+          <Button data-coach="fire" className="h-16 flex-1 text-lg font-bold" color="primary" onPress={() => advance(1)}>
             {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
           </Button>
           <CoachHelp id="transport" />
@@ -818,7 +818,7 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
             const kind = kindOf(t), Icon = kindIcon[kind];
             return (
             <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={{ y: -3 }}>
-              <Card isPressable onPress={() => onPlay(t)} className={`w-full overflow-hidden border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
+              <Card data-tour={i === 0 ? "library-card" : undefined} isPressable onPress={() => onPlay(t)} className={`w-full overflow-hidden border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
                 {kind === "image" && <img src={t.url} alt="" className="h-24 w-full object-cover" />}
                 {kind === "video" && <video src={t.url} muted preload="metadata" className="h-24 w-full object-cover" />}
                 <CardBody className="gap-2">
@@ -1013,7 +1013,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
             <div className="order-2 min-w-0 space-y-3 lg:order-1">
               <div className="flex items-center gap-2 text-sm text-muted">
                 <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected items</b>.</> : <>Adds the selected item{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
-                <Button size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
+                <Button data-tour="add-cue" size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
               </div>
               {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (
                 <ol className="space-y-2" ref={cueDrag.list}>
@@ -1041,7 +1041,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                         >
                           <GripVertical size={15} aria-hidden />
                         </span>
-                        <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
+                        <button data-coach={i === 0 ? "fire" : undefined} className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
                           <span className={`w-6 shrink-0 rounded-md text-center font-mono text-sm font-bold ${kind === "audio" ? "bg-audio/15 text-audio" : "bg-visual/15 text-visual"}`}>{numbers[i]}</span>
                           <Icon size={14} className="shrink-0 text-muted" aria-hidden />
                           <span className="truncate font-medium capitalize">{item.label}</span>

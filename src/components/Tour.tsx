@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../ui";
 import Spotlight, { findAnchor, useAnchor } from "./Spotlight";
 import { clearDemo, demoPresent, loadDemo } from "../lib/demo";
 import { getTour, setTour, steps } from "../lib/tour";
 import { toast } from "../lib/toast";
+import { useSignedIn } from "./RequireAuth";
 
 const TICK = 400;
 const CLEARED = "cueflow:demo-cleared";
@@ -14,11 +15,25 @@ export const startTour = () => window.dispatchEvent(new Event("cueflow:tour"));
 export default function Tour() {
   const [step, setStep] = useState(-1);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const signedIn = useSignedIn();
   const active = step >= 0 && step < steps.length;
   const current = active ? steps[step] : undefined;
   const { spot, state } = useAnchor(current?.anchor, active);
   const pressed = useRef(false);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const routeFor = (candidate: typeof current) => {
+    if (!candidate) return pathname;
+    return candidate.id === "sidebar" ? (signedIn ? "/workspace" : "/studio") : (candidate.route ?? pathname);
+  };
+
+  const moveToStep = (to: number) => {
+    const target = steps[to];
+    setStep(to);
+    const route = routeFor(target);
+    if (!pathname.endsWith(route)) navigate(route);
+  };
 
   const clearAdvanceTimer = () => {
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
@@ -29,8 +44,13 @@ export default function Tour() {
     clearAdvanceTimer();
     loadDemo();
     setTour({ done: false, step: from });
-    if (pathname.endsWith("/studio")) location.reload();
-    else setStep(from);
+    const route = routeFor(steps[from]);
+    if (pathname.endsWith(route)) {
+      setStep(from);
+      location.reload();
+    } else {
+      moveToStep(from);
+    }
   };
 
   useEffect(() => {
@@ -71,7 +91,7 @@ export default function Tour() {
     const to = step + 1;
     if (to >= steps.length) return finish(false);
     setTour({ step: to });
-    setStep(to);
+    moveToStep(to);
     pressed.current = false;
   };
 
@@ -80,17 +100,17 @@ export default function Tour() {
     if (step <= 0) return;
     const to = step - 1;
     setTour({ step: to, done: false });
-    setStep(to);
+    moveToStep(to);
     pressed.current = false;
   };
 
   useEffect(() => {
-    if (!current) return;
+    if (!current || !pathname.endsWith(routeFor(current))) return;
     const timer = setInterval(() => {
       if (current.done()) next();
     }, TICK);
     return () => clearInterval(timer);
-  }, [current, step]);
+  }, [current, step, pathname, signedIn]);
 
   useEffect(() => {
     if (!current?.onPress || state !== "found") return;
@@ -119,7 +139,7 @@ export default function Tour() {
     return () => window.removeEventListener("keydown", key);
   }, [active]);
 
-  if (!active || !current || state !== "found") return null;
+  if (!active || !current || state !== "found" || !pathname.endsWith(routeFor(current))) return null;
 
   return (
     <Spotlight spot={spot} label={current.say} onDismiss={() => finish(false)}>

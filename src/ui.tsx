@@ -33,7 +33,7 @@ export function Button({
   endContent?: ReactNode; isLoading?: boolean; href?: string; target?: string; children?: ReactNode;
   className?: string; size?: "sm" | "md" | "lg"; isIconOnly?: boolean; isDisabled?: boolean;
   // The press event carries the modifier keys, which the library uses for shift-click range select.
-  title?: string; as?: string; "aria-label"?: string; onPress?: (e: { shiftKey?: boolean }) => void; type?: "button" | "submit";
+  title?: string; as?: string; "aria-label"?: string; "data-tour"?: string; "data-coach"?: string; onPress?: (e: { shiftKey?: boolean }) => void; type?: "button" | "submit";
 }) {
   const navigate = useNavigate();
   const inner = <>{isLoading ? <Sp size="sm" /> : startContent}{children}{endContent}</>;
@@ -57,10 +57,11 @@ export function Button({
   );
 }
 
-export function Card({ isPressable, onPress, className, children, ...rest }: { isPressable?: boolean; onPress?: () => void; className?: string; children?: ReactNode }) {
+export function Card({ isPressable, onPress, className, children, "data-tour": dataTour, ...rest }: { isPressable?: boolean; onPress?: () => void; className?: string; children?: ReactNode; "data-tour"?: string }) {
   return (
     <C
       {...rest}
+      {...(dataTour ? { "data-tour": dataTour } : {})}
       className={cn(isPressable && "cursor-pointer text-left", className)}
       {...(isPressable ? { role: "button", tabIndex: 0, onClick: onPress, onKeyDown: (e: React.KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onPress?.()) } : {})}
     >

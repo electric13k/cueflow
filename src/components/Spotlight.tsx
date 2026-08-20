@@ -12,6 +12,15 @@ const PAD = 6;
 const CARD_MAX = 336;
 const VIEWPORT_PAD = 12;
 
+const ACTIONABLE = "button, a, [role='button'], [role='tab'], input, select, textarea, label";
+
+const actionableTarget = (el: Element) => el.matches(ACTIONABLE) ? el : el.closest(ACTIONABLE) ?? el;
+
+const inViewport = (el: Element) => {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.bottom > VIEWPORT_PAD && r.top < innerHeight - VIEWPORT_PAD;
+};
+
 const roundness = (el: Element, width: number, height: number) => {
   const css = typeof getComputedStyle === "function" ? getComputedStyle(el) : null;
   const radius = css ? Number.parseFloat(css.borderTopLeftRadius) : 0;
@@ -30,8 +39,8 @@ const measure = (el: Element): Spot => {
 
 /** Return the first visible match when responsive versions of a control share one selector. */
 export const findAnchor = (selector: string): Element | null => {
-  for (const el of document.querySelectorAll(selector)) if (measure(el)) return el;
-  return null;
+  const matches = Array.from(document.querySelectorAll(selector), actionableTarget);
+  return matches.find(inViewport) ?? matches.find(el => !!measure(el)) ?? null;
 };
 
 /** Find the target and keep its spotlight aligned as the layout changes. */
@@ -51,56 +60,59 @@ export function useAnchor(selector: string | undefined, active: boolean): { spot
       return;
     }
 
-    let done = false;
+    let stopped = false;
+    let found = false;
     let resizeObserver: ResizeObserver | null = null;
-    const look = () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const sync = () => {
+      if (stopped) return false;
       const el = findAnchor(selector);
       const next = el ? measure(el) : null;
-      if (!next) return false;
+      if (!el || !next) {
+        found = false;
+        setSpot(null);
+        setState("waiting");
+        return false;
+      }
+      if (!inViewport(el)) {
+        found = false;
+        setSpot(null);
+        setState("waiting");
+        el.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+        requestAnimationFrame(sync);
+        return true;
+      }
+      found = true;
       setSpot(next);
       setState("found");
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver?.disconnect();
+        resizeObserver = new ResizeObserver(sync);
+        resizeObserver.observe(el);
+      }
       return true;
     };
 
-    if (look()) {
-      const again = () => {
-        const el = findAnchor(selector);
-        const next = el ? measure(el) : null;
-        setSpot(next);
-        if (next) setState("found");
-      };
-      addEventListener("scroll", again, { passive: true, capture: true });
-      addEventListener("resize", again, { passive: true });
-      const el = findAnchor(selector);
-      if (el && typeof ResizeObserver !== "undefined") {
-        resizeObserver = new ResizeObserver(again);
-        resizeObserver.observe(el);
-      }
-      return () => {
-        removeEventListener("scroll", again, { capture: true });
-        removeEventListener("resize", again);
-        resizeObserver?.disconnect();
-      };
-    }
-
-    const observer = new MutationObserver(() => {
-      if (!done && look()) {
-        done = true;
-        observer.disconnect();
-      }
-    });
+    const observer = new MutationObserver(sync);
     observer.observe(document.body, { childList: true, subtree: true });
-    const timer = setTimeout(() => {
-      if (!done) {
-        done = true;
+    const onScroll = () => sync();
+    addEventListener("scroll", onScroll, { passive: true, capture: true });
+    addEventListener("resize", onScroll, { passive: true });
+    sync();
+    timer = setTimeout(() => {
+      if (!stopped && !found) {
         observer.disconnect();
         setState("missing");
       }
     }, PATIENCE);
     return () => {
-      done = true;
+      stopped = true;
       observer.disconnect();
-      clearTimeout(timer);
+      resizeObserver?.disconnect();
+      removeEventListener("scroll", onScroll, { capture: true });
+      removeEventListener("resize", onScroll);
+      if (timer) clearTimeout(timer);
     };
   }, [selector, active]);
 

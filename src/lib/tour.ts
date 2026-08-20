@@ -56,14 +56,14 @@ export const steps: Step[] = [
     id: "sidebar",
     // The panel is a drawer on a phone, so its Studio link is not on the page. The button that
     // opens the drawer is, and it is the first thing to press either way.
-    anchor: "[data-tour='studio-link'], [data-tour='menu']",
+    anchor: "[data-tour='nav-work'], [data-tour='studio-link'], [data-tour='menu']",
     route: "/workspace",
     say: "This is where your work lives. Open the Studio.",
-    done: () => location.pathname.endsWith("/studio"),
+    done: () => location.pathname.endsWith("/studio") || location.pathname.endsWith("/workspace"),
   },
   {
     id: "library",
-    anchor: "[data-coach='add']",
+    anchor: "[data-tour='library-card']",
     route: "/studio",
     say: "A demo library is loaded. Press a card to hear it.",
     done: () => !!session().selectedId,
@@ -78,7 +78,7 @@ export const steps: Step[] = [
   {
     id: "cues",
     // The tab on a desk, the pane button on a phone. Only one of the two is ever in the DOM.
-    anchor: "[data-tour='deck-tab'], [data-tour='pane-deck']",
+    anchor: "[data-tour='sequence-select'], [data-tour='add-cue'], [data-tour='deck-tab'], [data-tour='pane-deck']",
     route: "/studio",
     say: "Now put two cues in it, from the library.",
     done: () => sequences().some(s => s.items.length >= 2),
@@ -93,7 +93,7 @@ export const steps: Step[] = [
   },
   {
     id: "fire",
-    anchor: "[data-coach='transport'], [data-tour='armed-banner']",
+    anchor: "[data-coach='fire']",
     route: "/studio",
     say: "Send cue one.",
     done: () => (session().cueIndex ?? -1) >= 0,
