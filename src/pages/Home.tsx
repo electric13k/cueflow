@@ -106,35 +106,40 @@ function BeatRow({ beat }: { beat: Beat }) {
 export default function Home() {
   // Triggers are made top to bottom in page order: the explanation rows, then the held line under them.
   const root = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
   useReveal(root);
   usePinScrub(root);
   return (
     <Page>
       <div ref={root}>
-        <section className="py-14 sm:py-20">
-          <motion.div initial={{ opacity: 0, scale: .8, rotate: -12 }} animate={{ opacity: 1, scale: 1, rotate: 0 }}
+        <section className="relative overflow-hidden py-14 sm:py-20">
+          <motion.div aria-hidden className="hero-grid pointer-events-none absolute inset-0"
+            animate={prefersReducedMotion ? undefined : { backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
+            transition={{ duration: 18, repeat: Infinity, ease: "linear" }} />
+          <div className="relative z-10">
+          <motion.div initial={prefersReducedMotion ? false : { opacity: 0, scale: .8, rotate: -12 }} animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1, rotate: 0 }}
             transition={{ duration: .7, ease: [.16, 1, .3, 1] }}>
             <LogoMark size={40} />
           </motion.div>
-          <motion.h1 initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .8, delay: .1, ease: [.16, 1, .3, 1] }}
+          <motion.h1 initial={prefersReducedMotion ? false : { opacity: 0, y: 28 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .8, delay: .1, ease: [.16, 1, .3, 1] }}
             className="mt-6 max-w-4xl text-[2.75rem] font-bold leading-[.95] sm:text-7xl">
             Run the whole show off one key.
           </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7, delay: .24 }}
+          <motion.p initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .7, delay: .24 }}
             className="mt-5 max-w-xl text-xl leading-snug text-muted sm:text-2xl">
             A cue board in a browser tab. Build the order once, stand by, press once.
           </motion.p>
 
           {/* One way in. The Studio and the tutorial are a tap away in the bar and the footer, and a
               visitor who wants those is not the visitor this button is for. */}
-          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7, delay: .34 }}
+          <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .7, delay: .34 }}
             className="mt-9">
             <Button href="/studio" color="primary" size="lg" startContent={<Radio size={18} />} className="font-semibold">
               Open the Studio
             </Button>
           </motion.div>
 
-          <motion.figure initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
+          <motion.figure initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
             className="glass shot-frame mt-14 overflow-hidden p-2">
             <picture>
               <source media="(max-width: 639px)" srcSet={shot("phone-deck")} />
@@ -143,6 +148,7 @@ export default function Home() {
                 className="shot parallax-on-scroll rounded-2xl bg-black/30" />
             </picture>
           </motion.figure>
+          </div>
         </section>
 
         <section className="border-t border-white/10">

@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "../ui";
 import { Github } from "lucide-react";
 import LogoMark from "./LogoMark";
+import DarkToggle from "./DarkToggle";
 import AuthButton from "./AuthButton";
 import { useSignedIn } from "./RequireAuth";
 
@@ -17,8 +18,8 @@ import { useSignedIn } from "./RequireAuth";
  * survive an item that appears for some people and not others, and it left Nav and Shell
  * contradicting each other in the code.
  *
- * No theme toggle. The page is beige, full stop. Dark is a scope, not a mode, and it belongs to the
- * Studio and the Show where someone is working in a dark room, not to the top of a marketing page.
+ * The public pages share the same persisted theme as the working interface, so visitors can choose
+ * a comfortable reading mode without leaving the page.
  */
 export default function Nav({ inShell }: { inShell?: boolean }) {
   const { pathname } = useLocation();
@@ -43,6 +44,7 @@ export default function Nav({ inShell }: { inShell?: boolean }) {
           <Button href="/features" size="sm" {...link("/features")} className="hidden sm:inline-flex">Features</Button>
           {/* Inside the Shell the sidebar already owns this, so the bar does not repeat it. */}
           {!inShell && <Button data-tour="nav-work" href={work.to} size="sm" {...link(work.to)}>{work.label}</Button>}
+          <DarkToggle className="inline-flex" />
           <AuthButton />
           {/* Repo link is a nicety, drop it before the nav starts wrapping on phones. */}
           <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub" className="hidden sm:inline-flex"><Github size={17} /></Button>

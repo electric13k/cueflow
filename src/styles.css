@@ -503,6 +503,13 @@
     pointer-events: none;
   }
 
+  .hero-grid {
+    background-image: linear-gradient(to right, color-mix(in srgb, var(--accent) 9%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--accent) 9%, transparent) 1px, transparent 1px);
+    background-size: 5rem 5rem;
+    mask-image: linear-gradient(to bottom, black, transparent 78%);
+    opacity: .45;
+  }
+
   /**
    * Scroll-driven motion that costs no JavaScript and no scroll listener, which is the only kind
    * worth running on a phone. Where `view()` is unsupported the element is simply already at its end
@@ -564,6 +571,7 @@
   }
   /* Reduced motion keeps every end state and removes the travel: the underline is simply there. */
   @media (prefers-reduced-motion: reduce) {
+    .hero-grid { opacity: .25; }
     .shot-frame img, .link-rule::after, .beat .cue-mark { transition: none; }
     .beat-scanline { transform: scaleX(1); }
     .link-rule::after { transform: scaleX(1); opacity: .35; }
