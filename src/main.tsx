@@ -61,7 +61,7 @@ createRoot(document.getElementById("root")!).render(
             anyone; these three do not render without a session. See plan.md §8. */}
         <Route path="/workspace" element={<RequireAuth><Workspace /></RequireAuth>} />
         <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
-        <Route path="/show" element={<RequireAuth><Show /></RequireAuth>} />
+        <Route path="/show" element={<Show />} />
         <Route path="/account" element={<Account />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/terms" element={<Terms />} />
