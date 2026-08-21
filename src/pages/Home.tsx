@@ -67,9 +67,8 @@ type Beat = (typeof beats)[number];
 function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
   const src = shot(beat.src, theme);
   const phone = shot(beat.phone, theme);
-  const mobileMockup = beat.n === "1";
-  const phoneFrameClass = beat.n === "4" ? "phone-shot-frame" : mobileMockup ? "mobile-mockup-frame" : "";
-  const phoneImageClass = beat.n === "4" ? "phone-shot" : mobileMockup ? "mobile-mockup" : "shot-wide";
+  const phoneFrameClass = "mobile-visual-frame";
+  const phoneImageClass = "responsive-shot";
   const rowRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
@@ -96,6 +95,8 @@ function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
       <motion.figure
         initial={prefersReducedMotion ? false : { opacity: 0, y: 24, scale: .985 }}
         whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+        whileHover={prefersReducedMotion ? undefined : { y: -7, scale: 1.012 }}
+        whileTap={prefersReducedMotion ? undefined : { scale: .995 }}
         viewport={{ once: true, amount: .22, margin: "0px 0px -8% 0px" }}
         transition={{ duration: .68, delay: .08, ease: [.16, 1, .3, 1] }}
         className={`glass shot-frame relative overflow-hidden p-2 ${phoneFrameClass}`}>
@@ -104,6 +105,7 @@ function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
           <img key={src} src={src} alt={beat.alt} loading="lazy" width={beat.n === "4" ? 900 : 1600} height={beat.n === "4" ? 1600 : 900}
             className={`shot themed-shot ${phoneImageClass} parallax-on-scroll rounded-2xl bg-black/30`} />
         </picture>
+        <span aria-hidden className="beat-halo" />
         <motion.span aria-hidden className="beat-scanline"
           style={{ scaleX: prefersReducedMotion ? 1 : scanProgress }} />
       </motion.figure>
@@ -156,12 +158,12 @@ export default function Home() {
           </motion.div>
 
           <motion.figure initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} whileHover={prefersReducedMotion ? undefined : { y: -5 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
-            className="glass shot-frame hero-mockup-frame mt-14 overflow-hidden p-2">
+            className="glass shot-frame mobile-visual-frame hero-mockup-frame mt-14 overflow-hidden p-2">
             <picture>
               <source media="(max-width: 639px)" srcSet={shot("studio-mockup-phone", theme)} />
               <img key={shot("studio-mockup-desktop", theme)} src={shot("studio-mockup-desktop", theme)} width={2560} height={1440} loading="eager"
                 alt="CueFlow Studio displayed inside a desktop monitor mockup with the Library and cue board visible"
-                className="shot themed-shot hero-mockup parallax-on-scroll rounded-2xl bg-black/30" />
+                className="shot themed-shot responsive-shot hero-mockup parallax-on-scroll rounded-2xl bg-black/30" />
             </picture>
           </motion.figure>
           </div>

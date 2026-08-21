@@ -513,39 +513,33 @@
    */
   .shot { aspect-ratio: 4 / 5; object-fit: cover; object-position: left top; width: 100%; }
   @media (min-width: 640px) { .shot { aspect-ratio: 16 / 9; object-position: center top; } }
-  /* Phone marketing slots use a complete portrait mockup, never a cropped desktop frame. */
-  .phone-shot, .mobile-mockup, .hero-mockup {
-    object-fit: contain;
-    object-position: center;
+  /* Desktop mockups stay wide. Their phone sources switch to a complete, contained portrait frame
+     only below the mobile breakpoint, so a monitor can never be rendered as a phone image. */
+  .responsive-shot {
+    object-fit: cover;
+    object-position: center top;
     background: var(--surface);
   }
+  @media (min-width: 640px) {
+    .responsive-shot { aspect-ratio: 16 / 9; }
+  }
   @media (max-width: 639px) {
-    .mobile-mockup, .hero-mockup { aspect-ratio: 9 / 16; }
-  }
-  .phone-shot { aspect-ratio: 9 / 16; }
-  /* Keep complete portrait mockups readable without letting a full-width mobile column make the
-     device look oversized or pull it off the visual centre line. */
-  .phone-shot-frame, .mobile-mockup-frame, .hero-mockup-frame {
-    width: min(100%, 18rem);
-    aspect-ratio: 9 / 16;
-    margin-inline: auto;
-  }
-  .phone-shot-frame picture,
-  .phone-shot-frame .phone-shot,
-  .mobile-mockup-frame picture,
-  .mobile-mockup-frame .mobile-mockup,
-  .hero-mockup-frame picture,
-  .hero-mockup-frame .hero-mockup {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-  .phone-shot-frame .phone-shot,
-  .mobile-mockup-frame .mobile-mockup,
-  .hero-mockup-frame .hero-mockup {
-    aspect-ratio: auto;
-    object-fit: contain;
-    object-position: center;
+    .responsive-shot {
+      aspect-ratio: 9 / 16;
+      object-fit: contain;
+      object-position: center;
+    }
+    .mobile-visual-frame, .hero-mockup-frame {
+      width: min(100%, 18rem);
+      aspect-ratio: 9 / 16;
+      margin-inline: auto;
+    }
+    .mobile-visual-frame picture, .mobile-visual-frame .responsive-shot,
+    .hero-mockup-frame picture, .hero-mockup-frame .responsive-shot {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
   }
 
   /* Marketing screenshots are light UI captures. In dark mode they become a quiet, low-glare
@@ -583,6 +577,23 @@
     background: var(--accent);
     opacity: .8;
     pointer-events: none;
+  }
+  .beat-halo {
+    position: absolute;
+    inset: .5rem;
+    border: 1px solid color-mix(in srgb, var(--cue-armed) 22%, transparent);
+    border-radius: 1rem;
+    opacity: .42;
+    pointer-events: none;
+    transform: scale(.985);
+    transition: opacity .28s ease, transform .28s cubic-bezier(.23, 1, .32, 1), border-color .28s ease;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .beat-halo { animation: cue-halo 6s ease-in-out infinite; }
+    @keyframes cue-halo {
+      0%, 100% { opacity: .25; transform: scale(.985); }
+      50% { opacity: .62; transform: scale(1); }
+    }
   }
 
   .hero-grid {
@@ -639,6 +650,7 @@
     .theme-dark .shot-frame:hover .themed-shot { filter: brightness(1.04) contrast(1.06) saturate(1.03); }
     .hero-orbit { transition: opacity .3s ease, box-shadow .3s ease; }
     .hero-orbit:hover { opacity: 1; }
+    .beat:hover .beat-halo { opacity: .86; transform: scale(1.006); border-color: color-mix(in srgb, var(--cue-armed) 55%, transparent); }
 
 
     /* An underline that arrives from the left rather than fading in, so it reads as a thing being
@@ -665,7 +677,8 @@
     .feature-card:hover::after { opacity: 0; }
     .workflow-rail { transform: scaleX(1); opacity: .35; }
     .workflow-grid::before { opacity: .5; }
-    .shot-frame img, .link-rule::after, .beat .cue-mark { transition: none; }
+    .shot-frame img, .link-rule::after, .beat .cue-mark, .beat-halo { transition: none; }
+    .beat-halo { animation: none; opacity: .42; transform: none; }
     .theme-dark .shot:not(.themed-shot), .dark .shot:not(.themed-shot) { filter: brightness(.74) contrast(1.1) saturate(.8); }
     .theme-dark .themed-shot, .dark .themed-shot { filter: brightness(.98) contrast(1.04) saturate(.98); }
     .beat-scanline { transform: scaleX(1); }
