@@ -35,7 +35,7 @@ export function RecentsSkeleton({ groups = 2 }: { groups?: number }) {
     ["show", "audio", "image"],
   ];
   return (
-    <div role="status" aria-label="Loading your recent work" className="space-y-8">
+    <div role="status" aria-label="Loading your recent work" aria-busy="true" className="space-y-8">
       {kinds.slice(0, groups).map((row, g) => (
         <section key={g}>
           <Skeleton className="h-3 w-28" />
@@ -54,7 +54,7 @@ export function RecentsSkeleton({ groups = 2 }: { groups?: number }) {
  */
 export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <ul role="status" aria-label="Loading" className="space-y-2">
+    <ul role="status" aria-label="Loading" aria-busy="true" className="space-y-2">
       {Array.from({ length: rows }, (_, i) => (
         <li key={i} className="flex items-center gap-3 rounded-lg bg-surface/25 px-3 py-2.5 ring-1 ring-inset ring-border/40">
           <Skeleton className="h-4 w-4 shrink-0 rounded-full" />
@@ -63,5 +63,55 @@ export function ListSkeleton({ rows = 4 }: { rows?: number }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+export function AuthSkeleton() {
+  return (
+    <div data-app role="status" aria-label="Checking your session" aria-busy="true" className="mx-auto flex min-h-[45vh] max-w-md flex-col justify-center gap-4 p-6">
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="h-9 w-56" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-4/5" />
+      <Skeleton className="mt-2 h-10 w-32 rounded-xl" />
+    </div>
+  );
+}
+
+export function ProjectsSkeleton() {
+  return (
+    <div role="status" aria-label="Loading projects" aria-busy="true" className="space-y-5">
+      <Skeleton className="h-3 w-20" />
+      <Skeleton className="h-10 w-72" />
+      <Skeleton className="h-3 w-full max-w-2xl" />
+      <Skeleton className="h-3 w-4/5 max-w-xl" />
+      <div className="mt-8 space-y-3">
+        {Array.from({ length: 3 }, (_, i) => (
+          <div key={i} className="glass flex min-h-24 flex-wrap items-center justify-between gap-3 p-5">
+            <div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-4 w-40" /><Skeleton className="h-2.5 w-56" /></div>
+            <div className="flex gap-2"><Skeleton className="h-9 w-20 rounded-xl" /><Skeleton className="h-9 w-24 rounded-xl" /></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ShowsSkeleton() {
+  return (
+    <div role="status" aria-label="Loading shows" aria-busy="true" className="mt-3 grid gap-3 sm:grid-cols-2">
+      {Array.from({ length: 2 }, (_, i) => (
+        <div key={i} className="min-h-24 rounded-xl border border-border bg-surface/40 p-3"><Skeleton className="h-4 w-32" /><Skeleton className="mt-3 h-2.5 w-24" /><Skeleton className="mt-2 h-2.5 w-40" /></div>
+      ))}
+    </div>
+  );
+}
+
+export function ScriptSkeleton() {
+  return (
+    <div role="status" aria-label="Loading script" aria-busy="true" className="space-y-3">
+      <div className="flex flex-wrap gap-2"><Skeleton className="h-9 w-32 rounded-xl" /><Skeleton className="h-9 w-20 rounded-xl" /></div>
+      <div className="glass-soft min-h-64 space-y-3 p-5"><Skeleton className="h-5 w-2/5" /><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-11/12" /><Skeleton className="h-3 w-4/5" /><Skeleton className="mt-6 h-3 w-full" /><Skeleton className="h-3 w-10/12" /></div>
+    </div>
   );
 }

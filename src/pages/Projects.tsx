@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Input, Select } from "../ui";
 import { FolderOpen, Pencil, Trash2, UserPlus, Users } from "lucide-react";
 import Shell from "../components/Shell";
+import { ProjectsSkeleton } from "../components/Skeleton";
 import { CoachHelp } from "../components/Coach";
 import { teach } from "../lib/coach";
 import { toast } from "../lib/toast";
@@ -46,7 +47,7 @@ export default function Projects() {
   /** Switching reloads: the open deck and the library both belong to the project you were in. */
   const switchTo = (id: string | null) => { setCurrentProject(id); location.assign("/studio"); };
 
-  if (!ready) return <Shell width="max-w-3xl"><p className="text-muted">Looking up your projects…</p></Shell>;
+  if (!ready) return <Shell width="max-w-3xl"><ProjectsSkeleton /></Shell>;
 
   if (!signedIn) return (
     <Shell width="max-w-3xl">

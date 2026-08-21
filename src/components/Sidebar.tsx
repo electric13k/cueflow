@@ -5,6 +5,7 @@ import { currentProject, listProjects, setCurrentProject, type Project } from ".
 import { useSignedIn } from "./RequireAuth";
 import { teach } from "../lib/coach";
 import { CoachHelp } from "./Coach";
+import { Skeleton } from "./Skeleton";
 
 /**
  * The one place the hierarchy is visible: a project holds a library, its sequences, its script and
@@ -16,13 +17,15 @@ import { CoachHelp } from "./Coach";
  */
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const signedIn = useSignedIn();
   const here = currentProject();
   const { pathname } = useLocation();
 
   useEffect(() => {
-    if (!signedIn) { setProjects([]); return; }
-    void listProjects().then(setProjects).catch(() => setProjects([]));
+    if (!signedIn) { setProjects([]); setProjectsLoading(false); return; }
+    setProjectsLoading(true);
+    void listProjects().then(setProjects).catch(() => setProjects([])).finally(() => setProjectsLoading(false));
   }, [signedIn]);
 
   // The hierarchy explains itself the first time you can see it.
@@ -70,7 +73,12 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <button type="button" onClick={() => { open(null); onNavigate?.(); }} className={`${row} ${here ? off : on}`}>
           <FolderOpen size={16} /> Personal
         </button>
-        {projects.map(p => (
+        {projectsLoading ? (
+          <div role="status" aria-label="Loading workspaces" aria-busy="true" className="space-y-1 px-3 py-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        ) : projects.map(p => (
           <button key={p.id} type="button" onClick={() => { open(p.id); onNavigate?.(); }}
             className={`${row} ${here === p.id ? on : off}`}>
             {here === p.id ? <FolderOpen size={16} /> : <FolderClosed size={16} />}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FileText, GripVertical, Plus, Radio, Trash2 } from "lucide-react";
 import { Button, Input, Tooltip } from "../ui";
 import { CoachHelp } from "./Coach";
+import { ShowsSkeleton, ScriptSkeleton } from "./Skeleton";
 import { useDragList } from "../lib/dragList";
 import { linksOf, type LinkMap } from "../lib/showLinks";
 import type { Show } from "../lib/shows";
@@ -27,6 +28,7 @@ type Props = {
   /** Persisted, not derived: the grid has to be there on the first paint, before the shows arrive. */
   showsGrid: boolean;
   scriptGrid: boolean;
+  loading?: boolean;
   busy?: boolean;
   /** The drop target the page's own drag is over, so a show lights up under a dragged sequence. */
   over?: string | null;
@@ -41,7 +43,7 @@ const panel = (lifted: boolean, dimmed: boolean) =>
   `glass p-4 transition-all duration-300 ${lifted ? "z-10 scale-[1.02] shadow-glass" : ""} ${dimmed ? "opacity-60" : "opacity-100"}`;
 
 export default function ShowsBoard({
-  shows, links, sequences, script, showsGrid, scriptGrid, busy, over,
+  shows, links, sequences, script, showsGrid, scriptGrid, loading, busy, over,
   onCreateShow, onOpenShow, onDeleteShow, onOpenScript, onScriptToShow,
 }: Props) {
   const [focus, setFocus] = useState<"shows" | "script" | null>(null);
@@ -64,7 +66,7 @@ export default function ShowsBoard({
           <CoachHelp id="show" className="ml-auto" />
         </div>
 
-        {!showsGrid && !naming ? (
+        {loading ? <ShowsSkeleton /> : !showsGrid && !naming ? (
           <Button data-coach="show" className="mt-3 h-24 w-full text-base" color="primary" variant="flat" isDisabled={busy}
             startContent={<Plus size={18} />} onPress={() => setNaming(true)}>
             Create a show
@@ -127,7 +129,7 @@ export default function ShowsBoard({
           <CoachHelp id="script" className="ml-auto" />
         </div>
 
-        {!scriptGrid ? (
+        {loading ? <ScriptSkeleton /> : !scriptGrid ? (
           <Button data-coach="script" className="mt-3 h-16 w-full" variant="bordered" startContent={<Plus size={16} />} onPress={onOpenScript}>
             Add a script
           </Button>

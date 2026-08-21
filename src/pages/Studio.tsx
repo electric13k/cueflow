@@ -152,6 +152,7 @@ export default function Studio() {
   // The shows section above the tabs. Shows are an account feature, so signed out there is none.
   const signedIn = useSignedIn();
   const [shows, setShows] = useState<Show[]>([]);
+  const [showsLoading, setShowsLoading] = useState(true);
   const [links, setLinks] = useState<LinkMap>(() => loadLinks(project));
   /**
    * Whether the shows section is a grid or still the one button, persisted rather than derived.
@@ -186,8 +187,9 @@ export default function Studio() {
     setScriptGrid(was => { if (was !== has) local.set(key("grid:script"), has); return has; });
   }, [scriptDoc.html]);
   useEffect(() => onAuth(email => {
-    if (!email) return setShows([]);
-    void listShows(project).then(list => { setShows(list); if (list.length) gridOn(true); }).catch(() => setShows([]));
+    if (!email) { setShows([]); setShowsLoading(false); return; }
+    setShowsLoading(true);
+    void listShows(project).then(list => { setShows(list); if (list.length) gridOn(true); }).catch(() => setShows([])).finally(() => setShowsLoading(false));
   }), []);
   const relink = (next: LinkMap) => { setLinks(next); saveLinks(project, next); };
 
@@ -715,7 +717,7 @@ export default function Studio() {
             is selected -- the toolbar takes their place -- and while a deck is armed. */}
         {!armed && !editingId && !picked.length && (!phone || pane === "shows") && (
           <ShowsBoard shows={shows} links={links} sequences={sequences} script={scriptDoc.html ? scriptDoc : null}
-            showsGrid={showsGrid} scriptGrid={scriptGrid} busy={!signedIn} over={seqDrag.over}
+            showsGrid={showsGrid} scriptGrid={scriptGrid} loading={showsLoading} busy={!signedIn} over={seqDrag.over}
             onCreateShow={addShow} onOpenShow={openShow} onDeleteShow={removeShow}
             onOpenScript={() => openScript(scriptMode === "split" ? "off" : "split")} onScriptToShow={scriptToShow} />
         )}

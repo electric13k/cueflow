@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { onAuth } from "../lib/store";
+import { AuthSkeleton } from "./Skeleton";
 
 /**
  * Signed out, the app is still the app: the Studio, its library and its sequences all work without
@@ -19,7 +20,7 @@ export function useSignedIn(): boolean | null {
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const signedIn = useSignedIn();
-  if (signedIn === null) return null;
+  if (signedIn === null) return <AuthSkeleton />;
   // The Studio is where a signed-out visitor is allowed to be, so that is where they land.
   return signedIn ? <>{children}</> : <Navigate to="/studio" replace />;
 }
