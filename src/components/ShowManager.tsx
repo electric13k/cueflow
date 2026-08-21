@@ -3,7 +3,7 @@ import {
   Clock, ExternalLink, FileText, GripVertical, Layers, ListMusic, MessageSquare, Monitor,
   Play, Radio, Send, Square, Users, X,
 } from "lucide-react";
-import { Button } from "../ui";
+import { Button, Select } from "../ui";
 import DarkToggle from "./DarkToggle";
 import ScriptReader from "./ScriptReader";
 import ShowChat from "./ShowChat";
@@ -330,15 +330,9 @@ export default function ShowManager({
                       <span className="block text-xs capitalize text-muted">{kindOf(t)}</span>
                     </button>
                     {sequences.length > 0 && (
-                      <label className="shrink-0">
-                        <span className="sr-only">Add {t.title} to a sequence</span>
-                        <select value="" aria-label={`Add ${t.title} to a sequence`}
-                          className="max-w-28 rounded-lg border border-border bg-transparent px-1 py-1 text-xs outline-none"
-                          onChange={e => { if (e.target.value) onAddToSequence(e.target.value, t.id); e.target.value = ""; }}>
-                          <option value="">Add to…</option>
-                          {sequences.map(s => <option key={s.id} value={s.id} className="bg-background">{s.name}</option>)}
-                        </select>
-                      </label>
+                      <Select aria-label={`Add ${t.title} to a sequence`} value=""
+                        onChange={value => { if (value) onAddToSequence(value, t.id); }} size="sm" className="max-w-28 shrink-0"
+                        options={[{ value: "", label: "Add to…" }, ...sequences.map(s => ({ value: s.id, label: s.name }))]} />
                     )}
                   </li>
                 ))}

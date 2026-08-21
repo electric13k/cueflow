@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Switch } from "../ui";
+import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Switch } from "../ui";
 import { AlignCenter, AlignLeft, GripVertical, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import {
   addSlide, deckFiles, drawSlide, indexOf, LAYOUTS, moveSlide, newDeck, patchSlide, removeSlide,
@@ -120,13 +120,8 @@ export default function SlideComposer({ open, onClose, onCreate }: {
             <div className="space-y-3">
               <canvas ref={canvas} className="w-full rounded-xl border border-border bg-black" />
               <div className="flex flex-wrap items-center gap-2">
-                <label className="text-xs text-muted">
-                  Layout
-                  <select aria-label="Slide layout" value={current.layout} onChange={e => patch({ layout: e.target.value as Layout })}
-                    className="ml-2 rounded-lg border border-border bg-surface/60 px-2 py-1 text-sm text-foreground outline-none focus:border-accent">
-                    {LAYOUTS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                  </select>
-                </label>
+                <Select aria-label="Slide layout" value={current.layout} onChange={value => patch({ layout: value as Layout })}
+                  options={LAYOUTS.map(l => ({ value: l.id, label: l.name }))} size="sm" className="min-w-36" />
                 <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-border px-2 py-1 text-sm hover:border-accent">
                   <ImagePlus size={14} />{current.image ? "Replace image" : "Image"}
                   <input type="file" accept="image/*" className="hidden" onChange={e => void pick(e.target.files?.[0])} />

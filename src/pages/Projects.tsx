@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Input } from "../ui";
+import { Button, Input, Select } from "../ui";
 import { FolderOpen, Pencil, Trash2, UserPlus, Users } from "lucide-react";
 import Shell from "../components/Shell";
 import { CoachHelp } from "../components/Coach";
@@ -133,11 +133,9 @@ export default function Projects() {
                     <div key={m.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm">
                       <span className="min-w-0 flex-1 truncate">{m.username ? `@${m.username}` : m.displayName ?? "Someone"}</span>
                       <div className="flex items-center gap-2">
-                        <select aria-label={`Role for ${m.username ?? m.displayName ?? "collaborator"}`} value={m.role}
-                          onChange={e => void run(async () => { await setMemberRole(p.id, m.userId, e.target.value as Role); setMembers(await listMembers(p.id)); }, "Role updated.")}
-                          className="rounded-lg border border-border bg-surface/70 px-2 py-1 text-xs outline-none focus:border-accent">
-                          {ROLES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-                        </select>
+                        <Select aria-label={`Role for ${m.username ?? m.displayName ?? "collaborator"}`} value={m.role}
+                          onChange={value => void run(async () => { await setMemberRole(p.id, m.userId, value as Role); setMembers(await listMembers(p.id)); }, "Role updated.")}
+                          options={ROLES.map(r => ({ value: r.key, label: r.label }))} size="sm" className="min-w-24" />
                         <Button isIconOnly size="sm" variant="light" aria-label={`Remove ${m.username ?? m.displayName ?? "collaborator"}`}
                           onPress={() => void run(() => removeMember(p.id, m.userId), "Removed.")}><Trash2 size={14} /></Button>
                       </div>
@@ -145,13 +143,8 @@ export default function Projects() {
                   ))}
                   <div className="flex flex-wrap items-end gap-2">
                     <Input className="min-w-48 flex-1" label="Username or email" value={who} onValueChange={setWho} placeholder="stage_left" />
-                    <label className="min-w-32 text-xs text-muted">
-                      <span className="mb-1 block">Permission</span>
-                      <select value={inviteRole} onChange={e => setInviteRole(e.target.value as Role)}
-                        className="h-10 w-full rounded-xl border border-border bg-surface/70 px-3 text-sm text-foreground outline-none focus:border-accent">
-                        {ROLES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-                      </select>
-                    </label>
+                    <Select label="Permission" value={inviteRole} onChange={value => setInviteRole(value as Role)}
+                      options={ROLES.map(r => ({ value: r.key, label: r.label }))} className="min-w-32" />
                     <Button className="h-10" isLoading={busy} startContent={<UserPlus size={15} />}
                       onPress={() => void run(async () => { await addCollaborator(p.id, who, inviteRole); setWho(""); setMembers(await listMembers(p.id)); }, "Collaborator added.")}>
                       Add collaborator

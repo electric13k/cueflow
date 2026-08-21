@@ -8,7 +8,8 @@ import { Children, createContext, isValidElement, use, useCallback, type ReactEl
 import { useNavigate } from "react-router-dom";
 import {
   Button as B, Card as C, Input as I, Modal as M, Slider as S, Spinner as Sp,
-  Switch as Sw, Tabs as T, Tooltip as Tt, buttonVariants, cn, useOverlayState,
+  Switch as Sw, Tabs as T, Tooltip as Tt, Select as HS, ListBox as HLB, Label as HLabel,
+  buttonVariants, cn, useOverlayState,
 } from "@heroui/react";
 
 type V2Color = "primary" | "secondary" | "default" | "danger" | "current";
@@ -118,6 +119,43 @@ export function Slider({ label, getValue, value, className, ...rest }: {
       )}
       <S.Track><S.Fill /><S.Thumb /></S.Track>
     </S>
+  );
+}
+
+export type SelectOption = { value: string; label: ReactNode; textValue?: string };
+
+export function Select({ value, options, onChange, label, className, size = "md", isDisabled, "aria-label": ariaLabel, "data-coach": dataCoach }: {
+  value: string;
+  options: SelectOption[];
+  onChange?: (value: string) => void;
+  label?: ReactNode;
+  className?: string;
+  size?: "sm" | "md" | "lg";
+  isDisabled?: boolean;
+  "aria-label"?: string;
+  "data-coach"?: string;
+}) {
+  const selected = options.find(option => option.value === value);
+  return (
+    <div className={cn("cue-select", className)}>
+      <HS.Root selectedKey={value || null} onSelectionChange={key => onChange?.(key == null ? "" : String(key))} isDisabled={isDisabled} aria-label={label ? undefined : ariaLabel} data-coach={dataCoach}>
+        {label && <HLabel className="cue-select__label">{label}</HLabel>}
+        <HS.Trigger className={cn("cue-select__trigger", size === "sm" ? "cue-select__trigger--sm" : size === "lg" ? "cue-select__trigger--lg" : undefined)}>
+          <HS.Value>{selected?.label ?? options[0]?.label}</HS.Value>
+          <HS.Indicator className="cue-select__indicator" />
+        </HS.Trigger>
+        <HS.Popover className="cue-select__popover">
+          <HLB className="cue-select__list">
+            {options.map(option => (
+              <HLB.Item key={option.value || "__empty"} id={option.value} textValue={option.textValue ?? (typeof option.label === "string" ? option.label : option.value)} className="cue-select__item">
+                {option.label}
+                <HLB.ItemIndicator className="cue-select__item-indicator" />
+              </HLB.Item>
+            ))}
+          </HLB>
+        </HS.Popover>
+      </HS.Root>
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Slider, Switch, Tab, Tabs, Tooltip } from "../ui";
+import { Button, Select, Slider, Switch, Tab, Tabs, Tooltip } from "../ui";
 import { Crop, Download, FlipHorizontal, Play, RotateCcw, RotateCw, Save, Type } from "lucide-react";
 import Stage from "./Stage";
 import CropBox from "./CropBox";
@@ -137,21 +137,10 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
       <Stage stage={{ url: track.url, kind, visual: v, label: track.title, n: replay }} className="aspect-video w-full rounded-2xl border border-border" />
 
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-        <label className="block">
-          <span className="mb-1 block text-xs text-muted">Transition in</span>
-          <select value={v.transition} onChange={e => set({ transition: e.target.value as Transition })}
-            className="w-full rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm capitalize outline-none focus:border-accent">
-            {TRANSITIONS.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs text-muted">Fill the screen</span>
-          <select value={v.fit} onChange={e => set({ fit: e.target.value as Visual["fit"] })}
-            className="w-full rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent">
-            <option value="contain">Fit inside (letterbox)</option>
-            <option value="cover">Fill and crop</option>
-          </select>
-        </label>
+        <Select label="Transition in" value={v.transition} onChange={value => set({ transition: value as Transition })}
+          options={TRANSITIONS.map(t => ({ value: t, label: t }))} />
+        <Select label="Fill the screen" value={v.fit} onChange={value => set({ fit: value as Visual["fit"] })}
+          options={[{ value: "contain", label: "Fit inside (letterbox)" }, { value: "cover", label: "Fill and crop" }]} />
         <label className="block">
           <span className="mb-1 flex items-center gap-1 text-xs text-muted"><Type size={12} />Caption on the slide</span>
           <input value={v.caption} onChange={e => set({ caption: e.target.value })} placeholder="Optional text over the media"

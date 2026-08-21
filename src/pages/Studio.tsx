@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
+import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy } from "lucide-react";
 import { useIsPhone } from "../lib/layout";
@@ -728,7 +728,9 @@ export default function Studio() {
               <p className="text-xs font-semibold uppercase tracking-widest text-muted">Sequences</p>
               <Button data-tour="new-sequence" size="sm" variant="light" startContent={<Plus size={14} />} onPress={addSequence}>New sequence</Button>
               {selectedSequence && <Button size="sm" variant="light" startContent={<Copy size={14} />} onPress={duplicateSequence.bind(null, selectedSequence)}>Duplicate</Button>}
-              {features.templates.length > 0 && <select aria-label="Create from template" value="" onChange={e => { if (e.target.value) createFromTemplate(e.target.value); }} className="rounded-xl border border-border bg-surface/60 px-2 py-1.5 text-sm outline-none focus:border-accent"><option value="">From template…</option>{features.templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}</select>}
+              {features.templates.length > 0 && <Select aria-label="Create from template" value="" size="sm" className="min-w-40"
+                onChange={value => { if (value) createFromTemplate(value); }}
+                options={[{ value: "", label: "From template…" }, ...features.templates.map(template => ({ value: template.id, label: template.name }))]} />}
               {selectedSequence && <Button size="sm" variant="light" startContent={<FileJson size={14} />} onPress={saveCurrentTemplate}>Save template</Button>}
               <div className="min-w-48 flex-1">
                 <SearchBar query={seqQuery} setQuery={setSeqQuery} sort={seqSort} setSort={setSeqSort} kind={[]} setKind={() => {}} placeholder="Search sequences" />
@@ -769,14 +771,9 @@ export default function Studio() {
           <div className="glass mt-4 flex flex-wrap items-center gap-2 p-3">
             <span className="text-sm font-semibold">{picked.length} selected</span>
             <Button size="sm" variant="flat" startContent={<SlidersHorizontal size={15} />} onPress={() => openEditor(picked[0])}>Edit</Button>
-            <label className="flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
-              <span className="sr-only">Add to sequence</span>
-              <select value="" aria-label="Add to sequence" className="max-w-40 bg-transparent py-2 pr-1 text-sm outline-none"
-                onChange={e => { addTracksTo(e.target.value, picked); e.target.value = ""; }}>
-                <option value="">Add to sequence…</option>
-                {sequences.map(s => <option key={s.id} value={s.id} className="bg-background">{s.name}</option>)}
-              </select>
-            </label>
+            <Select aria-label="Add to sequence" value="" size="sm" className="min-w-40"
+              onChange={value => { if (value) addTracksTo(value, picked); }}
+              options={[{ value: "", label: "Add to sequence…" }, ...sequences.map(s => ({ value: s.id, label: s.name }))]} />
             <Button size="sm" variant="flat" startContent={<Download size={15} />}
               onPress={() => picked.forEach(id => { const t = tracks.find(x => x.id === id); if (t && kindOf(t) !== "embed") void downloadAsset(t.url, t.title); })}>Download</Button>
             <Button size="sm" variant="flat" color="danger" startContent={<Trash2 size={15} />}
@@ -814,16 +811,9 @@ export default function Studio() {
         {(phone ? pane === "script" : scriptMode === "split") && (
           <div className="h-[75vh] min-w-0 xl:sticky xl:top-4">
             {/* Split is where the board opens it; popup and its own tab are still one control away. */}
-            <label className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm">
-              <span className="sr-only">Where the reader sits</span>
-              <select data-coach="script" value={scriptMode} onChange={e => openScript(e.target.value as typeof scriptMode)}
-                className="w-full bg-transparent py-2 text-sm outline-none">
-                <option value="split">Reader: split screen</option>
-                <option value="popup">Reader: popup window</option>
-                <option value="tab">Reader: new tab</option>
-                <option value="off">Close the reader</option>
-              </select>
-            </label>
+            <Select data-coach="script" aria-label="Where the reader sits" value={scriptMode} className="mb-2 w-full"
+              onChange={value => openScript(value as typeof scriptMode)}
+              options={[{ value: "split", label: "Reader: split screen" }, { value: "popup", label: "Reader: popup window" }, { value: "tab", label: "Reader: new tab" }, { value: "off", label: "Close the reader" }]} />
             {/* BroadcastChannel never echoes to the window that posted, so this one raises its own. */}
             <ScriptReader doc={scriptDoc} setDoc={setScriptDoc}
               onAlert={(level, message, cue) => { showAlert(level, message); send({ type: "alert", level, message, cue }); }} />
@@ -938,9 +928,8 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Library view" value={scope} onChange={e => setScope?.(e.target.value)} className="rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent">
-          <option value="">All library items</option><option value="favorites">Favorites</option>{Object.keys(collections).map(name => <option key={name} value={name}>{name}</option>)}
-        </select>
+        <Select aria-label="Library view" value={scope} onChange={value => setScope?.(value)} size="sm"
+          options={[{ value: "", label: "All library items" }, { value: "favorites", label: "Favorites" }, ...Object.keys(collections).map(name => ({ value: name, label: name }))]} />
         <Button size="sm" variant="light" startContent={<FolderPlus size={14} />} onPress={onNewCollection}>New collection</Button>
       </div>
       <SearchBar query={query} setQuery={setQuery} sort={sort} setSort={setSort} kinds={["audio", "image", "video", "embed"]} kind={kind} setKind={setKind} placeholder="Search the library" />
@@ -1051,11 +1040,9 @@ function SearchPanel({ importAsset }: { importAsset: (title: string, url: string
     <div className="glass-soft space-y-3 p-4">
       <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Find media</p>
       <div className="flex flex-wrap gap-2">
-        <select aria-label="Where to search" value={source}
-          onChange={e => { setSource(e.target.value as Source); setHits([]); setNote(""); }}
-          className="rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent">
-          {SOURCES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-        </select>
+        <Select aria-label="Where to search" value={source} size="sm"
+          onChange={value => { setSource(value as Source); setHits([]); setNote(""); }}
+          options={SOURCES.map(s => ({ value: s.id, label: s.label }))} />
         <Input className="min-w-56 flex-1" size="sm" value={q} onValueChange={setQ}
           placeholder={placeholder} onKeyDown={(e: any) => e.key === "Enter" && void run()} />
         <Button size="sm" color="primary" variant="flat" isLoading={loading} endContent={source === "myinstants" ? <ExternalLink size={14} /> : undefined} onPress={() => void run()}>
@@ -1203,10 +1190,9 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                           {rehearsal.active && <input aria-label={`Private rehearsal note for ${item.label}`} defaultValue={rehearsal.notes?.[item.id] ?? ""} onBlur={e => onSaveRehearsalNote?.(item.id, e.target.value)} placeholder="note" className="w-24 rounded-md border border-border bg-surface/60 px-2 py-1 text-xs outline-none focus:border-accent" />}
                         </div>
                         {kind !== "audio" && (
-                          <select aria-label="Transition" value={item.visual?.transition ?? "fade"} onChange={e => setItemTransition(item.id, e.target.value)}
-                            className="order-last w-full shrink-0 rounded-lg border border-border bg-surface/60 px-2 py-1 text-xs capitalize outline-none focus:border-accent sm:order-none sm:w-auto">
-                            {["cut", "fade", "slide", "zoom"].map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
+                          <Select aria-label="Transition" value={item.visual?.transition ?? "fade"} size="sm" className="order-last w-full shrink-0 sm:order-none sm:w-auto"
+                            onChange={value => setItemTransition(item.id, value)}
+                            options={["cut", "fade", "slide", "zoom"].map(t => ({ value: t, label: t }))} />
                         )}
                         <div className="flex shrink-0">
                           {/* Two clicks: chain this cue, then click the one it goes with. */}

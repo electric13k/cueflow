@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { Input } from "../ui";
+import { Input, Select } from "../ui";
 import type { SortKey } from "../lib/search";
 
 /**
@@ -31,10 +31,8 @@ export default function SearchBar({ query, setQuery, sort, setSort, kinds = [], 
         {/* The compat Input takes no startContent, so the icon is positioned over it. */}
         <Input className="[&_input]:pl-8" value={query} onValueChange={setQuery} placeholder={placeholder} />
       </div>
-      <select aria-label="Sort by" value={sort} onChange={e => setSort(e.target.value as SortKey)}
-        className="rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent">
-        {SORTS.map(s => <option key={s.id} value={s.id} className="bg-background">{s.label}</option>)}
-      </select>
+      <Select aria-label="Sort by" value={sort} onChange={v => setSort(v as SortKey)}
+        options={SORTS.map(s => ({ value: s.id, label: s.label }))} size="sm" className="min-w-36" />
       {kinds.length > 1 && (
         <div className="flex flex-wrap gap-1">
           {kinds.map(k => (
