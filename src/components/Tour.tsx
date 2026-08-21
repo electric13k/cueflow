@@ -3,13 +3,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../ui";
 import Spotlight, { findAnchor, useAnchor } from "./Spotlight";
 import { clearDemo, demoPresent, loadDemo } from "../lib/demo";
-import { getTour, setTour, steps } from "../lib/tour";
+import { getTour, setTour, steps, tourSeen } from "../lib/tour";
 import { toast } from "../lib/toast";
 import { useSignedIn } from "./RequireAuth";
 
 const TICK = 400;
 const CLEARED = "cueflow:demo-cleared";
 const FIRST_AUTH = "cueflow:first-auth";
+const TUTORIAL_ACTIVE = "cueflow:tutorial-active";
 
 export const startTour = () => window.dispatchEvent(new Event("cueflow:tour"));
 
@@ -70,7 +71,10 @@ export default function Tour() {
     if (signedIn !== true) return;
     if (localStorage.getItem(FIRST_AUTH)) return;
     localStorage.setItem(FIRST_AUTH, "1");
-    setTour({ done: false, step: 0 });
+    if (!tourSeen()) {
+      localStorage.setItem(TUTORIAL_ACTIVE, "1");
+      setTour({ done: false, step: 0 });
+    }
     if (!pathname.endsWith("/workspace")) navigate("/workspace", { replace: true });
   }, [signedIn, pathname, navigate]);
 
@@ -89,6 +93,8 @@ export default function Tour() {
     clearAdvanceTimer();
     setTour({ done: true, step: 0 });
     setStep(-1);
+    localStorage.removeItem(TUTORIAL_ACTIVE);
+    window.dispatchEvent(new Event("cueflow:tutorial-finished"));
     if (keep || !demoPresent()) return;
     clearDemo();
     sessionStorage.setItem(CLEARED, "1");

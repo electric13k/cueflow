@@ -15,11 +15,22 @@ export default function UsernamePrompt() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => onAuth(email => {
-    if (!email) return setOpen(false);
-    if (localStorage.getItem("cueflow:usernameAsked")) return;
-    void getProfile().then(p => { if (p && !p.username) setOpen(true); });
-  }), []);
+  useEffect(() => {
+    const check = (email: string | null) => {
+      if (!email || localStorage.getItem("cueflow:tutorial-active") || localStorage.getItem("cueflow:usernameAsked")) {
+        setOpen(false);
+        return;
+      }
+      void getProfile().then(p => { if (p && !p.username) setOpen(true); });
+    };
+    const off = onAuth(check);
+    const resume = () => {
+      if (localStorage.getItem("cueflow:tutorial-active") || localStorage.getItem("cueflow:usernameAsked")) return;
+      void getProfile().then(p => { if (p && !p.username) setOpen(true); });
+    };
+    window.addEventListener("cueflow:tutorial-finished", resume);
+    return () => { off(); window.removeEventListener("cueflow:tutorial-finished", resume); };
+  }, []);
 
   const dismiss = () => { localStorage.setItem("cueflow:usernameAsked", "1"); setOpen(false); };
 
