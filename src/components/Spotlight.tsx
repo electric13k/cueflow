@@ -159,20 +159,11 @@ export default function Spotlight({ spot, label, onDismiss: _onDismiss, children
     return () => observer.disconnect();
   }, [spot, children]);
 
-  const targetX = spot ? spot.left + spot.width / 2 : 0;
-  const targetY = spot ? (flip ? spot.top + spot.height : spot.top) : 0;
-  const popupX = cardLeft + cardWidth / 2;
-  const popupY = flip ? cardTop + cardHeight : cardTop;
-
   return (
     <AnimatePresence>
       <div className="pointer-events-none fixed inset-0 z-[60]" role="dialog" aria-label={label}>
         {spot && (
           <>
-            <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
-              <line x1={targetX} y1={targetY} x2={popupX} y2={popupY}
-                stroke="var(--cue-armed)" strokeWidth="2" strokeDasharray="4 5" opacity=".9" />
-            </svg>
             <motion.span aria-hidden
               initial={{ opacity: 0, scale: .94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
               className="pointer-events-none absolute border-2 border-brass"
@@ -182,19 +173,19 @@ export default function Spotlight({ spot, label, onDismiss: _onDismiss, children
                 width: spot.width,
                 height: spot.height,
                 borderRadius: spot.radius,
-                boxShadow: "0 0 0 9999px rgba(12, 9, 8, .74), 0 0 24px color-mix(in srgb, var(--cue-armed) 55%, transparent)",
+                boxShadow: "0 0 0 9999px rgba(12, 9, 8, .50), 0 0 24px color-mix(in srgb, var(--cue-armed) 55%, transparent)",
               }} />
           </>
         )}
         {spot ? (
           <>
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-x-0 top-0 bg-black/70" style={{ height: Math.max(0, spot.top) }} />
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute left-0 bg-black/70" style={{ top: spot.top, width: Math.max(0, spot.left), height: spot.height }} />
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute right-0 bg-black/70" style={{ top: spot.top, left: spot.left + spot.width, height: spot.height }} />
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-x-0 bottom-0 bg-black/70" style={{ top: spot.top + spot.height }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-x-0 top-0 bg-black/50" style={{ height: Math.max(0, spot.top) }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute left-0 bg-black/50" style={{ top: spot.top, width: Math.max(0, spot.left), height: spot.height }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute right-0 bg-black/50" style={{ top: spot.top, left: spot.left + spot.width, height: spot.height }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-x-0 bottom-0 bg-black/50" style={{ top: spot.top + spot.height }} />
           </>
         ) : (
-          <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-0 bg-black/70" />
+          <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-0 bg-black/50" />
         )}
         <motion.div
           ref={cardRef}
