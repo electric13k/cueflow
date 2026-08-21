@@ -15,7 +15,10 @@ import { Button } from "../ui";
  * One button. The page used to offer three at the top and two at the bottom, which is five ways to
  * ask the same question and no answer about which one is the way in.
  */
-const shot = (name: string, theme: Theme) => `${import.meta.env.BASE_URL}shots/${name}-${theme}.svg`;
+const shot = (name: string, theme: Theme) => {
+  const ext = name.startsWith("studio-mockup") ? "png" : "svg";
+  return `${import.meta.env.BASE_URL}shots/${name}-${theme}.${ext}`;
+};
 
 /**
  * What it is, why it beats four windows, what you watch while it runs, who else is holding a screen.
@@ -29,9 +32,9 @@ const beats = [
     n: "1",
     head: "One list. Every sound, every slide.",
     line: "In the order you will call them, numbered the way you will call them.",
-    src: "cue-rail",
-    phone: "cue-rail-phone",
-    alt: "Abstract brass cue rail with four colored cue markers and a translucent waveform ribbon",
+    src: "studio-mockup-desktop",
+    phone: "studio-mockup-phone",
+    alt: "CueFlow Studio displayed inside a desktop monitor mockup with the Library and cue board visible",
   },
   {
     n: "2",
@@ -53,9 +56,9 @@ const beats = [
     n: "4",
     head: "The crew join on their phones.",
     line: "Hand out a key. No install, nothing to hand back at the end.",
-    src: "crew",
-    phone: "crew-phone",
-    alt: "Abstract connected crew signal circles linked by a shared cue line",
+    src: "studio-mockup-desktop",
+    phone: "studio-mockup-deck-phone",
+    alt: "CueFlow Deck displayed inside a portrait phone mockup with the mobile transport visible",
   },
 ];
 
@@ -64,6 +67,9 @@ type Beat = (typeof beats)[number];
 function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
   const src = shot(beat.src, theme);
   const phone = shot(beat.phone, theme);
+  const mobileMockup = beat.n === "1";
+  const phoneFrameClass = beat.n === "4" ? "phone-shot-frame" : mobileMockup ? "mobile-mockup-frame" : "";
+  const phoneImageClass = beat.n === "4" ? "phone-shot" : mobileMockup ? "mobile-mockup" : "shot-wide";
   const rowRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
@@ -92,11 +98,11 @@ function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
         whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
         viewport={{ once: true, amount: .22, margin: "0px 0px -8% 0px" }}
         transition={{ duration: .68, delay: .08, ease: [.16, 1, .3, 1] }}
-        className={`glass shot-frame relative overflow-hidden p-2 ${beat.n === "4" ? "phone-shot-frame" : ""}`}>
+        className={`glass shot-frame relative overflow-hidden p-2 ${phoneFrameClass}`}>
         <picture>
           <source media="(max-width: 639px)" srcSet={phone} />
           <img key={src} src={src} alt={beat.alt} loading="lazy" width={beat.n === "4" ? 900 : 1600} height={beat.n === "4" ? 1600 : 900}
-            className={`shot themed-shot ${beat.n === "4" ? "phone-shot" : "shot-wide"} parallax-on-scroll rounded-2xl bg-black/30`} />
+            className={`shot themed-shot ${phoneImageClass} parallax-on-scroll rounded-2xl bg-black/30`} />
         </picture>
         <motion.span aria-hidden className="beat-scanline"
           style={{ scaleX: prefersReducedMotion ? 1 : scanProgress }} />
@@ -150,12 +156,12 @@ export default function Home() {
           </motion.div>
 
           <motion.figure initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} whileHover={prefersReducedMotion ? undefined : { y: -5 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
-            className="glass shot-frame mt-14 overflow-hidden p-2">
+            className="glass shot-frame hero-mockup-frame mt-14 overflow-hidden p-2">
             <picture>
-              <source media="(max-width: 639px)" srcSet={shot("cue-rail-phone", theme)} />
-              <img key={shot("cue-rail", theme)} src={shot("cue-rail", theme)} width={1600} height={900} loading="eager"
-                alt="Abstract brass cue rail with colored cue markers and a translucent waveform ribbon"
-                className="shot themed-shot parallax-on-scroll rounded-2xl bg-black/30" />
+              <source media="(max-width: 639px)" srcSet={shot("studio-mockup-phone", theme)} />
+              <img key={shot("studio-mockup-desktop", theme)} src={shot("studio-mockup-desktop", theme)} width={2560} height={1440} loading="eager"
+                alt="CueFlow Studio displayed inside a desktop monitor mockup with the Library and cue board visible"
+                className="shot themed-shot hero-mockup parallax-on-scroll rounded-2xl bg-black/30" />
             </picture>
           </motion.figure>
           </div>

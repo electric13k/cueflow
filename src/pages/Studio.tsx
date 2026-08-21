@@ -107,6 +107,13 @@ export default function Studio() {
   const phone = useIsPhone();
   const [pane, setPane] = useState<PaneId>("library");
   const [editingId, setEditingId] = useState(session.tab === "editor" ? session.selectedId : "");
+  // Mobile panes are destinations, not sections in one long document. Reset after the new pane has
+  // committed so Library -> Deck and every other bottom-nav change always starts at its own top.
+  useEffect(() => {
+    if (!phone) return;
+    const frame = requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+    return () => cancelAnimationFrame(frame);
+  }, [pane, phone]);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
