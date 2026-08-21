@@ -128,6 +128,7 @@
     --glass-face-hover: rgba(255, 252, 245, .94);
     /* No blur available: the panel becomes a card, so the face has to carry the page on its own. */
     --glass-solid: #F7F2E7;
+    --glass-ambient: color-mix(in srgb, var(--cue-foolscap) 85%, transparent);
     /* The two halves of the split edge and the highlight that rides on it. Warm is the brass rail,
        cool is the crew's olive -- a prism splits the light that is in the room, and there is no
        blue anywhere in this house. */
@@ -159,9 +160,10 @@
     --glass-face: rgba(239, 231, 216, .045);
     --glass-face-hover: rgba(239, 231, 216, .075);
     --glass-solid: #241F1C;
+    --glass-ambient: color-mix(in srgb, var(--cue-curtain) 24%, transparent);
     --prism-warm: color-mix(in srgb, var(--cue-armed) 85%, transparent);
     --prism-cool: color-mix(in srgb, var(--cue-audio) 70%, transparent);
-    --glass-specular: rgba(255, 250, 240, .16);
+    --glass-specular: color-mix(in srgb, var(--cue-armed) 24%, transparent);
   }
   /* dvh, not vh. `100vh` on a phone is the viewport with the URL bar *retracted*, so a page sized in
      it is taller than the screen the moment the bar is showing and the bottom of every layout is cut
@@ -182,7 +184,7 @@
   body::before {
     content: ""; position: fixed; inset: 0; z-index: -20; pointer-events: none;
     background-image:
-      radial-gradient(70rem 46rem at 50% -18%, color-mix(in srgb, var(--cue-foolscap) 85%, transparent), transparent 68%),
+      radial-gradient(70rem 46rem at 50% -18%, var(--glass-ambient), transparent 68%),
       radial-gradient(56rem 38rem at 90% -8%, color-mix(in srgb, var(--cue-curtain) 13%, transparent), transparent 62%),
       radial-gradient(48rem 36rem at 4% 108%, color-mix(in srgb, var(--cue-audio) 12%, transparent), transparent 64%);
   }
