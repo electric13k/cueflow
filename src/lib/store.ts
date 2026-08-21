@@ -7,7 +7,7 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_UVLFeDFDrx
 export const supabase = createClient(url, key);
 
 // Auth: email + password. Cloud save/hydrate already gate on getUser(), so signing in activates them.
-export async function signUp(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}${import.meta.env.BASE_URL}studio` } }); if (error) throw error; }
+export async function signUp(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}${import.meta.env.BASE_URL}workspace` } }); if (error) throw error; }
 // NOTE: emailRedirectTo only works if the URL is allow-listed in Supabase → Authentication → URL
 // Configuration. Otherwise Supabase falls back to Site URL, which defaults to http://localhost:3000.
 /**

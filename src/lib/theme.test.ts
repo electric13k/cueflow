@@ -6,9 +6,9 @@ beforeEach(() => {
   document.documentElement.className = "";
 });
 
-test("the page is beige unless someone stored otherwise", () => {
-  expect(getTheme()).toBe("light");
-  expect(getStudioTheme()).toBe("light");
+test("the page is dark unless someone stored light mode", () => {
+  expect(getTheme()).toBe("dark");
+  expect(getStudioTheme()).toBe("dark");
 });
 
 test("applyTheme scopes the page and persists it", () => {

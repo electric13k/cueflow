@@ -8,7 +8,7 @@ export const DARK = "theme-dark";
 const PAGE_KEY = "cueflow:theme";
 const STUDIO_KEY = "cueflow:theme:studio";
 
-const stored = (key: string): Theme => (localStorage.getItem(key) === "dark" ? "dark" : "light");
+const stored = (key: string): Theme => (localStorage.getItem(key) === "light" ? "light" : "dark");
 
 /** Class names for a wrapper. The alias is required by HeroUI and Tailwind dark variants. */
 export const themeClass = (t: Theme) => (t === "dark" ? `${DARK} dark` : "");

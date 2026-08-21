@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "../ui";
 import { LogIn, LogOut, User } from "lucide-react";
 import GoogleMark from "./GoogleMark";
@@ -13,6 +14,7 @@ export default function AuthButton() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => onAuth(setEmail), []);
   // The sign-in banner asks for the modal rather than owning a second copy of it.
@@ -31,6 +33,7 @@ export default function AuthButton() {
       } else {
         await signIn(form.email, form.password);
         toast("Signed in", "Your sounds and sequences now sync to this account.", "success");
+        navigate("/workspace", { replace: true });
       }
       modal.onClose();
     } catch (e) { setNote((e as Error).message); } finally { setBusy(false); }

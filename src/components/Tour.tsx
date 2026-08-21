@@ -9,6 +9,7 @@ import { useSignedIn } from "./RequireAuth";
 
 const TICK = 400;
 const CLEARED = "cueflow:demo-cleared";
+const FIRST_AUTH = "cueflow:first-auth";
 
 export const startTour = () => window.dispatchEvent(new Event("cueflow:tour"));
 
@@ -66,6 +67,14 @@ export default function Tour() {
   }, []);
 
   useEffect(() => {
+    if (signedIn !== true) return;
+    if (localStorage.getItem(FIRST_AUTH)) return;
+    localStorage.setItem(FIRST_AUTH, "1");
+    setTour({ done: false, step: 0 });
+    if (!pathname.endsWith("/workspace")) navigate("/workspace", { replace: true });
+  }, [signedIn, pathname, navigate]);
+
+  useEffect(() => {
     if (!pathname.endsWith("/workspace") && !pathname.endsWith("/studio")) return;
     const saved = getTour();
     if (saved.done) return;
@@ -74,7 +83,7 @@ export default function Tour() {
       loadDemo();
       setStep(Math.min(Math.max(saved.step, 0), steps.length - 1));
     }
-  }, [pathname]);
+  }, [pathname, signedIn]);
 
   const finish = (keep: boolean) => {
     clearAdvanceTimer();
