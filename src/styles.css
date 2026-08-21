@@ -213,6 +213,13 @@
   h4, h5, h6 { @apply font-sans font-bold; }
 
   /* Anything you can act on says so under the cursor, and lifts a little when you get there. */
+  .cue-button, .cue-pressable {
+    transition: transform .16s cubic-bezier(.23, 1, .32, 1), box-shadow .16s ease, opacity .16s ease;
+  }
+  .cue-button:active:not(:disabled), .cue-pressable:active:not([aria-disabled="true"]) {
+    transform: scale(.97);
+  }
+  .cue-pressable:hover { transform: translateY(-2px); }
   button:not(:disabled), a[href], label[for], [role="button"], summary { cursor: pointer; }
   /* Kills the 300ms tap delay and double-tap zoom on controls, which on a phone reads as the app
      ignoring you. Text stays zoomable because this is on controls, not the document. */
@@ -221,6 +228,10 @@
     button:not(:disabled), a[href], [role="button"] { transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease; }
     button:not(:disabled):hover, a[href]:hover, [role="button"]:hover { transform: translateY(-1px); }
     button:not(:disabled):active, [role="button"]:active { transform: translateY(0) scale(.98); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cue-button, .cue-pressable { transition: none !important; }
+    .cue-button:active:not(:disabled), .cue-pressable:active:not([aria-disabled="true"]), .cue-pressable:hover { transform: none; }
   }
 }
 

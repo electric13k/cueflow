@@ -5,6 +5,7 @@
 // to `accent`. Rather than spray that composition across ~80 call sites, the app imports these
 // wrappers, which keep the old call shape and do the composition once.
 import { Children, createContext, isValidElement, use, useCallback, type ReactElement, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Button as B, Card as C, Input as I, Modal as M, Slider as S, Spinner as Sp,
@@ -34,12 +35,12 @@ export function Button({
   endContent?: ReactNode; isLoading?: boolean; href?: string; target?: string; children?: ReactNode;
   className?: string; size?: "sm" | "md" | "lg"; isIconOnly?: boolean; isDisabled?: boolean;
   // The press event carries the modifier keys, which the library uses for shift-click range select.
-  title?: string; as?: string; "aria-label"?: string; "data-tour"?: string; "data-coach"?: string; onPress?: (e: { shiftKey?: boolean }) => void; type?: "button" | "submit";
+  title?: string; as?: string; id?: string; "aria-label"?: string; "aria-expanded"?: boolean; "aria-controls"?: string; "data-tour"?: string; "data-coach"?: string; onPress?: (e: { shiftKey?: boolean }) => void; type?: "button" | "submit";
 }) {
   const navigate = useNavigate();
   const inner = <>{isLoading ? <Sp size="sm" /> : startContent}{children}{endContent}</>;
-  const styled = cn(buttonVariants({ variant: toVariant(color, variant), size, isIconOnly }) as string, radius === "full" && "rounded-full", className);
-  const cls = cn(radius === "full" && "rounded-full", className);
+  const styled = cn(buttonVariants({ variant: toVariant(color, variant), size, isIconOnly }) as string, "cue-button", radius === "full" && "rounded-full", className);
+  const cls = cn("cue-button", radius === "full" && "rounded-full", className);
   // External links stay real anchors so target/_blank and middle-click keep working.
   if (href && (/^https?:/.test(href) || target)) {
     return <a {...rest} href={href} target={target} rel={target === "_blank" ? "noreferrer" : undefined} className={styled}>{inner}</a>;
@@ -63,7 +64,7 @@ export function Card({ isPressable, onPress, className, children, "data-tour": d
     <C
       {...rest}
       {...(dataTour ? { "data-tour": dataTour } : {})}
-      className={cn(isPressable && "cursor-pointer text-left", className)}
+      className={cn(isPressable && "cue-pressable cursor-pointer text-left", className)}
       {...(isPressable ? { role: "button", tabIndex: 0, onClick: (e: React.MouseEvent) => { if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return; onPress?.(); }, onKeyDown: (e: React.KeyboardEvent) => { if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPress?.(); } } } : {})}
     >
       {children}
@@ -212,7 +213,13 @@ export function ModalContent({ children }: { children: ReactNode | ((close: () =
       <M.Container placement="center">
         {/* Stop backdrop dismissal from firing when the click lands inside the dialog. */}
         <M.Dialog onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-          {typeof children === "function" ? children(close) : children}
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+          >
+            {typeof children === "function" ? children(close) : children}
+          </motion.div>
         </M.Dialog>
       </M.Container>
     </M.Backdrop>

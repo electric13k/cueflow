@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Backdrop from "./Backdrop";
 import Nav from "./Nav";
@@ -66,42 +67,93 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
     <div data-app className="relative min-h-screen">
       <Backdrop />
       <Nav inShell />
-      <div className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
-        {!collapsed && (
-          <aside className="sticky top-20 hidden h-[calc(100vh-6rem)] w-60 shrink-0 lg:block">
-            {/* The scroll lives on the inner element: the panel's bevel and highlight are absolutely
-                positioned, and in a scroll container those scroll away with the content. */}
-            <div className="glass h-full overflow-hidden"><div className="h-full overflow-y-auto"><Sidebar /></div></div>
-          </aside>
-        )}
+      <motion.div layout className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
+        <AnimatePresence initial={false} mode="popLayout">
+          {!collapsed && (
+            <motion.aside
+              key="desktop-sidebar"
+              data-cue-menu="desktop-sidebar"
+              layout="position"
+              initial={{ opacity: 0, x: -14 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -14 }}
+              transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+              className="sticky top-20 hidden h-[calc(100vh-6rem)] w-60 shrink-0 lg:block"
+            >
+              {/* The scroll lives on the inner element: the panel's bevel and highlight are absolutely
+                  positioned, and in a scroll container those scroll away with the content. */}
+              <div className="glass h-full overflow-hidden"><div className="h-full overflow-y-auto"><Sidebar /></div></div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
         {/* Swipe in from the left edge, the gesture every phone already teaches for a drawer. It is a
             shortcut and never the only way in: the Menu button below does the same thing, and a
             24px strip is narrow enough that nothing under it loses its own taps. */}
         {!open && <div aria-hidden className="fixed inset-y-0 left-0 z-20 w-6 lg:hidden" {...fromEdge} />}
-        {open && (
-          <div className="fixed inset-0 z-40 lg:hidden">
-            <button aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-            <div {...onDrawer}
-              style={{ ...onDrawer.style, paddingTop: "var(--safe-t)", paddingBottom: "var(--safe-b)" }}
-              className="absolute inset-y-0 left-0 w-72 overflow-y-auto border-r border-white/10 bg-background">
-              <div className="flex justify-end p-2"><Button isIconOnly size="sm" variant="light" aria-label="Close" onPress={() => setOpen(false)}><X size={16} /></Button></div>
-              <Sidebar onNavigate={() => setOpen(false)} />
-            </div>
-          </div>
-        )}
-        <main className={`min-w-0 flex-1 py-8 ${width}`}>
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              key="mobile-drawer"
+              className="fixed inset-0 z-40 lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+            >
+              <motion.button
+                aria-label="Close menu"
+                data-cue-menu="scrim"
+                className="absolute inset-0 bg-black/60"
+                onClick={() => setOpen(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              />
+              <motion.aside
+                {...onDrawer}
+                data-cue-menu="drawer"
+                id="workspace-menu"
+                aria-label="Workspace menu"
+                style={{ ...onDrawer.style, paddingTop: "var(--safe-t)", paddingBottom: "var(--safe-b)" }}
+                initial={{ opacity: 0, x: -24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                className="absolute inset-y-0 left-0 w-72 overflow-y-auto border-r border-white/10 bg-background shadow-2xl shadow-black/30"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ delay: 0.08, duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                >
+                  <div className="flex justify-end p-2"><Button isIconOnly size="sm" variant="light" aria-label="Close" onPress={() => setOpen(false)}><X size={16} /></Button></div>
+                  <Sidebar onNavigate={() => setOpen(false)} />
+                </motion.div>
+              </motion.aside>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <motion.main
+          layout="position"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+          className={`min-w-0 flex-1 py-8 ${width}`}
+        >
           <div className="mb-4 flex items-center gap-2">
             {/* min-h-11 on a phone: at `size="sm"` this was a 36px target, under the 44px minimum,
                 and it is the only way to the rest of the app on a small screen. */}
-            <Button className="min-h-11 lg:hidden" size="sm" variant="bordered" startContent={<Menu size={15} />} onPress={() => setOpen(true)}>Menu</Button>
+            <Button className="min-h-11 lg:hidden" size="sm" variant="bordered" startContent={<Menu size={15} />} aria-expanded={open} aria-controls="workspace-menu" onPress={() => setOpen(true)}>Menu</Button>
             <Button className="hidden lg:inline-flex" size="sm" variant="light" isIconOnly
               aria-label={collapsed ? "Show sidebar" : "Hide sidebar"} onPress={() => setLayout({ pane: collapsed ? "panel" : "focus" })}>
               {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
             </Button>
           </div>
           {children}
-        </main>
-      </div>
+        </motion.main>
+      </motion.div>
       <SiteFooter />
     </div>
   );

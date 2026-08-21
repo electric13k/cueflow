@@ -6,7 +6,7 @@ import EnvelopePlugin, { type EnvelopePoint } from "wavesurfer.js/plugins/envelo
 import { Button, Slider, Spinner, Switch, Tooltip } from "../ui";
 import {
   Check, ClipboardPaste, Copy, Crop, Layers, Maximize2, Pause, Play, Repeat, RotateCcw, Save, Scissors,
-  SignalHigh, Spline, Split, TrendingDown, TrendingUp, Undo2, Redo2, Volume1, Volume2, VolumeX, Wand2, X, ZoomIn, ZoomOut,
+  Flag, SignalHigh, Spline, Split, TrendingDown, TrendingUp, Undo2, Redo2, Trash2, Volume1, Volume2, VolumeX, Wand2, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import {
   bufferToWavFile, decodeAudioUrl, fadeRange, gainRange, insertBuffer, mixBuffer, normalizeRange,
@@ -19,6 +19,7 @@ import { useThemeSignal } from "../lib/theme";
 
 type Chan = { gain: number; mute: boolean };
 type Sel = { start: number; end: number; channel: number | null }; // channel null = every channel
+type Marker = { id: string; time: number; label: string };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const fmt = (s: number) => `${s.toFixed(2)}s`;
 const MONO_FONT = `"Courier Prime", ui-monospace, monospace`;
@@ -73,6 +74,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   const [hasClip, setHasClip] = useState(!!clipboard);
   const [zoom, setZoom] = useState(1);          // multiple of the fit-the-window scale
   const [at, setAt] = useState(0);              // where the wavesurfer cursor is, in seconds
+  const [markers, setMarkers] = useState<Marker[]>([]);
   const [ws, setWs] = useState<WaveSurfer | null>(null);
   const regions = useRef<RegionsPlugin | null>(null);
   const region = useRef<Region | null>(null);
@@ -85,7 +87,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   keepSel.current = sel;
 
   useEffect(() => {
-    let alive = true; setLoading(true); setErr(""); setSel(null); setHist(null); setPending(null); setEnv(null);
+    let alive = true; setLoading(true); setErr(""); setSel(null); setHist(null); setPending(null); setEnv(null); setMarkers([]);
     decodeAudioUrl(track.url)
       .then(b => {
         if (!alive) return;
@@ -147,6 +149,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
     w.on("pause", () => setPlaying(false));
     w.on("finish", () => setPlaying(false));
     w.on("timeupdate", t => setAt(t));
+    w.on("interaction", t => setAt(t));
     setWs(w);
     return () => { setWs(null); regions.current = null; region.current = null; envPlugin.current = null; w.destroy(); };
   }, [ready, theme]);
@@ -206,6 +209,15 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
     region.current = rp.addRegion({ start: d * .25, end: d * .75, drag: true, resize: true });
   };
   const scopeTo = (channel: number | null) => setSel(s => (s ? { ...s, channel } : s));
+  const addMarker = () => {
+    if (!buffer) return;
+    const time = clamp(at, 0, buffer.duration);
+    const label = window.prompt("Marker name", `Marker ${markers.length + 1}`)?.trim();
+    if (!label) return;
+    setMarkers(all => [...all, { id: crypto.randomUUID(), time, label }].sort((a, b) => a.time - b.time));
+  };
+  const jumpToMarker = (marker: Marker) => { ws?.setTime(marker.time); setAt(marker.time); };
+  const removeMarker = (id: string) => setMarkers(all => all.filter(marker => marker.id !== id));
 
   // --- envelope -----------------------------------------------------------
   /**
@@ -367,7 +379,24 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
             {env ? "Close envelope" : "Gain envelope"}
           </Button>
         </Tooltip>
+        <Tooltip content="Name the current playhead position for a later cue">
+          <Button size="sm" variant="bordered" startContent={<Flag size={13} />} onPress={addMarker}>Add marker</Button>
+        </Tooltip>
       </div>
+
+      {markers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-armed/30 bg-armed/10 p-2 text-xs">
+          <span className="font-semibold">Markers</span>
+          {markers.map(marker => (
+            <span key={marker.id} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface/70 pl-2">
+              <button type="button" className="py-1 font-mono text-[11px] hover:text-accent" onClick={() => jumpToMarker(marker)}>
+                {marker.label} {fmt(marker.time)}
+              </button>
+              <button type="button" aria-label={`Remove ${marker.label}`} className="p-1 text-muted hover:text-foreground" onClick={() => removeMarker(marker.id)}><Trash2 size={12} /></button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {env && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-curtain/40 bg-curtain/10 p-2 text-xs">

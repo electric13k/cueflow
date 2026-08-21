@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Switch } from "../ui";
-import { AlignCenter, AlignLeft, GripVertical, ImagePlus, Plus, Trash2, X } from "lucide-react";
+import { AlignCenter, AlignLeft, Download, GripVertical, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import {
   addSlide, deckFiles, drawSlide, indexOf, LAYOUTS, moveSlide, newDeck, patchSlide, removeSlide,
   setMaster, slideName, THEMES, wantsImage, type Deck, type Layout, type Master, type Slide,
 } from "../lib/deck";
+import { deckToPptx } from "../lib/pptx";
 import { moved, useDragList } from "../lib/dragList";
 
 /** Images live outside the deck: the document stays plain data, the decoded bitmaps stay here. */
@@ -27,6 +28,7 @@ export default function SlideComposer({ open, onClose, onCreate }: {
   const [currentId, setCurrentId] = useState(() => deck.slides[0].id);
   const [images, setImages] = useState<Record<string, Img>>({});
   const [busy, setBusy] = useState(false);
+  const [pptxBusy, setPptxBusy] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
 
   const at = Math.max(0, indexOf(deck, currentId));
@@ -69,6 +71,18 @@ export default function SlideComposer({ open, onClose, onCreate }: {
       onClose();
     } catch (e) { alert(`Could not make that deck: ${(e as Error).message}`); }
     finally { setBusy(false); }
+  };
+
+  const exportPptx = async () => {
+    setPptxBusy(true);
+    try {
+      const file = await deckToPptx(deck, images, "CueFlow deck");
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement("a");
+      anchor.href = url; anchor.download = file.name; anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { alert(`Could not export PowerPoint: ${(e as Error).message}`); }
+    finally { setPptxBusy(false); }
   };
 
   return (
@@ -163,7 +177,8 @@ export default function SlideComposer({ open, onClose, onCreate }: {
         </ModalBody>
         <ModalFooter>
           <Button variant="light" onPress={onClose}>Cancel</Button>
-          <Button color="primary" isLoading={busy} onPress={create}>
+          <Button variant="bordered" isDisabled={busy || pptxBusy} isLoading={pptxBusy} startContent={<Download size={14} />} onPress={() => void exportPptx()}>Export PPTX</Button>
+          <Button color="primary" isDisabled={busy || pptxBusy} isLoading={busy} onPress={create}>
             Add {deck.slides.length === 1 ? "slide" : `${deck.slides.length} slides`} to library
           </Button>
         </ModalFooter>

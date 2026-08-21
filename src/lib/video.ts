@@ -28,7 +28,10 @@ export function atempoChain(rate: number): number[] {
   return out;
 }
 
-export type TrimOptions = { duration: number; trimIn: number; trimOut: number; rate: number; muted: boolean };
+export type TrimOptions = {
+  duration: number; trimIn: number; trimOut: number; rate: number; muted: boolean;
+  visual?: { brightness: number; contrast: number; saturate: number; blur: number; rotate: number };
+};
 
 /**
  * The command line for one render. `-ss` and `-to` sit after `-i` on purpose: seeking on the input
@@ -42,7 +45,19 @@ export function trimArgs(input: string, output: string, o: TrimOptions): string[
   const start = clamp(o.trimIn, 0, Math.max(0, end - .05));
   const rate = clamp(o.rate || 1, .25, 4);
   const args = ["-i", input, "-ss", start.toFixed(3), "-to", end.toFixed(3)];
-  if (rate !== 1) args.push("-filter:v", `setpts=${(1 / rate).toFixed(4)}*PTS`);
+  const vf: string[] = [];
+  if (rate !== 1) vf.push(`setpts=${(1 / rate).toFixed(4)}*PTS`);
+  if (o.visual) {
+    const visual = o.visual;
+    const brightness = clamp(Number(visual.brightness) || 1, 0, 2) - 1;
+    const contrast = clamp(Number(visual.contrast) || 1, 0, 2);
+    const saturation = clamp(Number(visual.saturate) || 1, 0, 3);
+    if (brightness !== 0 || contrast !== 1 || saturation !== 1) vf.push(`eq=brightness=${brightness.toFixed(3)}:contrast=${contrast.toFixed(3)}:saturation=${saturation.toFixed(3)}`);
+    if (visual.blur > 0) vf.push(`boxblur=luma_radius=${Math.max(1, Math.round(visual.blur))}:luma_power=1`);
+    const degrees = ((Number(visual.rotate) || 0) % 360 + 360) % 360;
+    if (degrees) vf.push(`rotate=${(degrees * Math.PI / 180).toFixed(6)}:fillcolor=black`);
+  }
+  if (vf.length) args.push("-filter:v", vf.join(","));
   if (o.muted) args.push("-an");
   else if (rate !== 1) args.push("-filter:a", atempoChain(rate).map(r => `atempo=${r}`).join(","));
   args.push("-preset", "ultrafast", output);
@@ -62,16 +77,19 @@ export async function renderTrim(url: string, title: string, o: TrimOptions, onP
   ]);
   const ffmpeg = new FFmpeg();
   if (onProgress) ffmpeg.on("progress", ({ progress }) => onProgress(clamp(progress, 0, 1)));
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${CORE}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${CORE}/ffmpeg-core.wasm`, "application/wasm"),
-  });
-  const input = `in.${ext(url)}`, output = "out.mp4";
-  await ffmpeg.writeFile(input, await fetchFile(url));
-  await ffmpeg.exec(trimArgs(input, output, o));
-  const data = await ffmpeg.readFile(output);
-  // readFile hands back a view onto the wasm heap; copy it before the instance is torn down.
-  const bytes = new Uint8Array(data as Uint8Array);
-  ffmpeg.terminate();
-  return new File([bytes], `${title}.mp4`, { type: "video/mp4" });
+  try {
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${CORE}/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${CORE}/ffmpeg-core.wasm`, "application/wasm"),
+    });
+    const input = `in.${ext(url)}`, output = "out.mp4";
+    await ffmpeg.writeFile(input, await fetchFile(url));
+    await ffmpeg.exec(trimArgs(input, output, o));
+    const data = await ffmpeg.readFile(output);
+    // readFile hands back a view onto the wasm heap; copy it before the instance is torn down.
+    const bytes = new Uint8Array(data as Uint8Array);
+    return new File([bytes], `${title}.mp4`, { type: "video/mp4" });
+  } finally {
+    ffmpeg.terminate();
+  }
 }

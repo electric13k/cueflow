@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { MotionConfig } from "framer-motion";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./styles.css";
 import Home from "./pages/Home";
@@ -46,8 +47,9 @@ trackGlassPointer();
 void touchLastSeen();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {/* BASE_URL is "/" everywhere except GitHub Pages, which serves the app from /<repo>/. */}
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <MotionConfig reducedMotion="user">
+      {/* BASE_URL is "/" everywhere except GitHub Pages, which serves the app from /<repo>/. */}
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/features" element={<Features />} />
@@ -74,7 +76,8 @@ createRoot(document.getElementById("root")!).render(
       <SignInPrompt />
       <UsernamePrompt />
       <Coach />
-      <Tour />
-    </BrowserRouter>
+        <Tour />
+      </BrowserRouter>
+    </MotionConfig>
   </StrictMode>
 );

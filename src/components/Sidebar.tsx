@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
 import { FolderClosed, FolderOpen, Home, LogIn, Plus, Radio, Settings, SlidersHorizontal, UserRound } from "lucide-react";
 import { currentProject, listProjects, setCurrentProject, type Project } from "../lib/projects";
@@ -6,6 +7,15 @@ import { useSignedIn } from "./RequireAuth";
 import { teach } from "../lib/coach";
 import { CoachHelp } from "./Coach";
 import { Skeleton } from "./Skeleton";
+
+const sidebarVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { delayChildren: 0.03, staggerChildren: 0.045 } },
+} as const;
+const sidebarItemVariants = {
+  hidden: { opacity: 0, y: 6 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.18, ease: "easeOut" as const } },
+} as const;
 
 /**
  * The one place the hierarchy is visible: a project holds a library, its sequences, its script and
@@ -42,30 +52,34 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const off = "text-muted hover:bg-white/5 hover:text-foreground";
 
   if (!signedIn) return (
-    <nav data-coach="sidebar" aria-label="Workspace" className="flex h-full flex-col gap-6 p-4">
-      <Link data-tour="studio-link" to="/studio" onClick={onNavigate} className={`${row} ${pathname === "/studio" ? on : off}`}>
-        <SlidersHorizontal size={16} /> Studio
-      </Link>
-      <div className="space-y-2 rounded-md border border-dashed border-white/15 p-3">
+    <motion.nav data-coach="sidebar" aria-label="Workspace" variants={sidebarVariants} initial="hidden" animate="show" className="flex h-full flex-col gap-6 p-4">
+      <motion.div variants={sidebarItemVariants}>
+        <Link data-tour="studio-link" to="/studio" onClick={onNavigate} className={`${row} ${pathname === "/studio" ? on : off}`}>
+          <SlidersHorizontal size={16} /> Studio
+        </Link>
+      </motion.div>
+      <motion.div variants={sidebarItemVariants} className="space-y-2 rounded-md border border-dashed border-white/15 p-3">
         <p className="text-xs text-muted">Your sounds and sequences live in this browser. An account gives them a workspace that follows you.</p>
         {/* One auth modal in the app, and the nav owns it. This asks for it rather than cloning it. */}
         <button type="button" className={`${row} ${off}`} onClick={() => { onNavigate?.(); window.dispatchEvent(new Event("cueflow:signin")); }}>
           <LogIn size={16} /> Sign in
         </button>
-      </div>
-      <div className="mt-auto space-y-1">
+      </motion.div>
+      <motion.div variants={sidebarItemVariants} className="mt-auto space-y-1">
         <Link to="/settings" onClick={onNavigate} className={`${row} ${pathname === "/settings" ? on : off}`}><Settings size={16} /> Settings</Link>
-      </div>
-    </nav>
+      </motion.div>
+    </motion.nav>
   );
 
   return (
-    <nav data-coach="sidebar" aria-label="Workspace" className="flex h-full flex-col gap-6 p-4">
-      <Link to="/workspace" onClick={onNavigate} className={`${row} ${pathname === "/workspace" ? on : off}`}>
-        <Home size={16} /> Recents
-      </Link>
+    <motion.nav data-coach="sidebar" aria-label="Workspace" variants={sidebarVariants} initial="hidden" animate="show" className="flex h-full flex-col gap-6 p-4">
+      <motion.div variants={sidebarItemVariants}>
+        <Link to="/workspace" onClick={onNavigate} className={`${row} ${pathname === "/workspace" ? on : off}`}>
+          <Home size={16} /> Recents
+        </Link>
+      </motion.div>
 
-      <div className="space-y-1">
+      <motion.div variants={sidebarItemVariants} className="space-y-1">
         <div className="flex items-center justify-between pb-1 pl-3 pr-1">
           <p className="font-mono text-[10px] uppercase tracking-[.28em] text-muted">Workspaces</p>
           <CoachHelp id="sidebar" />
@@ -86,14 +100,14 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </button>
         ))}
         <Link to="/projects" onClick={onNavigate} className={`${row} ${pathname === "/projects" ? on : off}`}><Plus size={16} /> New project</Link>
-      </div>
+      </motion.div>
 
-      <div className="mt-auto space-y-1">
+      <motion.div variants={sidebarItemVariants} className="mt-auto space-y-1">
         <Link data-tour="studio-link" to="/studio" onClick={onNavigate} className={`${row} ${pathname === "/studio" ? on : off}`}><SlidersHorizontal size={16} /> Studio</Link>
         <Link to="/show" onClick={onNavigate} className={`${row} ${pathname === "/show" ? on : off}`}><Radio size={16} /> Join a show</Link>
         <Link to="/settings" onClick={onNavigate} className={`${row} ${pathname === "/settings" ? on : off}`}><Settings size={16} /> Settings</Link>
         <Link to="/account" onClick={onNavigate} className={`${row} ${pathname === "/account" ? on : off}`}><UserRound size={16} /> Account</Link>
-      </div>
-    </nav>
+      </motion.div>
+    </motion.nav>
   );
 }

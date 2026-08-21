@@ -30,6 +30,21 @@ const TOOLS: Credit[] = [
   },
 ];
 
+const EDITOR_TOOLS: Credit[] = [
+  {
+    name: "wavesurfer.js", url: "https://github.com/katspaugh/wavesurfer.js", licence: "BSD-3-Clause",
+    what: "Interactive waveform rendering, regions, timeline, envelope controls and audio playback visualization used by the CueFlow audio editor.",
+  },
+  {
+    name: "Cropper.js", url: "https://github.com/fengyuanchen/cropperjs", licence: "MIT",
+    what: "Browser crop and transform interaction used by the image editor’s crop workspace.",
+  },
+  {
+    name: "FFmpeg.wasm", url: "https://github.com/ffmpegwasm/ffmpeg.wasm", licence: "MIT wrapper, FFmpeg build terms apply",
+    what: "The browser worker used to render derived video files without uploading source media. The distributed FFmpeg core is licensed separately and must retain its applicable notices.",
+  },
+];
+
 const SOURCES: Credit[] = [
   { name: "Internet Archive", url: "https://archive.org/", licence: "Varies per item", what: "Public-domain and Creative Commons recordings, searchable in the importer." },
   { name: "Wikimedia Commons", url: "https://commons.wikimedia.org/", licence: "Varies per item", what: "Freely licensed sound, stills and footage." },
@@ -79,6 +94,15 @@ export default function Credits() {
       </div>
 
       <div className="glass mt-6 p-6 sm:p-8">
+        <h2 className="text-2xl font-black tracking-tight">Editor software credits</h2>
+        <p className="mt-2 text-sm text-muted">
+          These projects power or inform CueFlow’s browser editor workflows. Their license notices remain part
+          of the shipped application and should be reviewed before redistribution.
+        </p>
+        <ul className="mt-6">{EDITOR_TOOLS.map(c => <Row key={c.name} c={c} />)}</ul>
+      </div>
+
+      <div className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-black tracking-tight">Where the media comes from</h2>
         <p className="mt-2 text-sm text-muted">
           Licences vary per item and several require attribution. Checking what you are about to perform in
@@ -90,8 +114,10 @@ export default function Credits() {
       <div className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-black tracking-tight">Built with</h2>
         <p className="mt-2 text-sm text-muted">
-          React, Vite, Tailwind CSS, HeroUI, react-aria-components, Lucide icons, Supabase, and the Web
-          Audio API, which does all the sound work here, in your browser, with nothing uploaded to process it.
+          React, Vite, Tailwind CSS, HeroUI, react-aria-components, Lucide icons, wavesurfer.js, Cropper.js,
+          FFmpeg.wasm, Supabase, and the Web Audio API, which does the sound work here, in your browser, with
+          nothing uploaded to process it. PowerPoint export uses CueFlow’s slide model and a self-contained
+          Open XML adapter built on the app’s credited ZIP utility.
         </p>
       </div>
     </Page>

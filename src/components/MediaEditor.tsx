@@ -10,8 +10,15 @@ import {
   type Bypassed, type ImageModule,
 } from "../lib/image";
 import { defaultVisual, kindOf, type Track, type Transition, type Visual } from "../types";
+import { renderTrim } from "../lib/video";
 
 const TRANSITIONS: Transition[] = ["cut", "fade", "slide", "zoom"];
+const PRESETS: { name: string; patch: Partial<Visual> }[] = [
+  { name: "Clean", patch: { brightness: 1, contrast: 1, saturate: 1, blur: 0, temp: 0, vignette: 0 } },
+  { name: "Stage", patch: { brightness: 0.92, contrast: 1.12, saturate: 0.92, blur: 0, temp: 8, vignette: 0.22 } },
+  { name: "Monochrome", patch: { brightness: 1.02, contrast: 1.08, saturate: 0, blur: 0, temp: 0, vignette: 0.1 } },
+  { name: "Soft focus", patch: { brightness: 1.04, contrast: 0.96, saturate: 1.05, blur: 2, temp: 10, vignette: 0.08 } },
+];
 
 /**
  * One panel of the adjustment stack: a switch that bypasses it, a reset that touches nothing else,
@@ -54,15 +61,12 @@ function ModulePanel({ m, v, off, onVisual, onToggle, children }: {
   );
 }
 
-/**
- * Basic editing panel for a slide, image or video. Everything is non-destructive: the settings ride
- * with the asset and the presenter applies them. Images can additionally be flattened into a new
- * file (ponytail: video export would need ffmpeg.wasm or WebCodecs, and a trimmed cue plays the
- * same either way, so it stays a setting rather than a render).
- *
- * The look is a stack of ordered modules, not a wall of sliders, and the pane split is Krita's:
- * what changes the frame is separate from what changes the pixels.
- */
+  /**
+   * Basic editing panel for a slide, image or video. Everything is non-destructive: the settings ride
+   * with the asset and the presenter applies them. Images can be flattened and video can be rendered
+   * locally into a new file. The look is a stack of ordered modules, not a wall of sliders, and the
+   * pane split is Krita's: what changes the frame is separate from what changes the pixels.
+   */
 export default function MediaEditor({ track, cues = [], onChange, onSave }: {
   track: Track;
   /** Trim edges cues already made from this track, for the filmstrip handles to snap to. */
@@ -75,6 +79,7 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
   const [replay, setReplay] = useState(0);
   const [duration, setDuration] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
   const [cropping, setCropping] = useState(false);
   const [pane, setPane] = useState("geometry");
   const [off, setOff] = useState<Bypassed>({});
@@ -112,6 +117,22 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
     finally { setBusy(false); }
   };
 
+  const renderVideo = async () => {
+    if (kind !== "video" || !duration) return;
+    setBusy(true); setRenderProgress(0);
+    try {
+      const file = await renderTrim(track.url, track.title, {
+        duration, trimIn: v.trimIn, trimOut: v.trimOut, rate: v.rate, muted: v.muted,
+        visual: { brightness: v.brightness, contrast: v.contrast, saturate: v.saturate, blur: v.blur, rotate: v.rotate },
+      }, setRenderProgress);
+      await onSave(file, `${track.title} (rendered)`);
+    } catch (e) {
+      alert(`Could not render this video: ${(e as Error).message}`);
+    } finally {
+      setBusy(false); setRenderProgress(0);
+    }
+  };
+
   const stack = (which: ImageModule["pane"]) => MODULES.filter(m => m.pane === which).map(m => (
     <ModulePanel key={m.id} m={m} v={v} off={off} onVisual={onChange} onToggle={() => toggle(m)}>
       {m.id === "orientation" && (
@@ -135,6 +156,13 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
       </div>
 
       <Stage stage={{ url: track.url, kind, visual: v, label: track.title, n: replay }} className="aspect-video w-full rounded-2xl border border-border" />
+
+      <div className="glass-soft flex flex-wrap items-center gap-2 p-3">
+        <span className="mr-1 text-xs font-semibold text-muted">Looks</span>
+        {PRESETS.map(preset => (
+          <Button key={preset.name} size="sm" variant="flat" onPress={() => set(preset.patch)}>{preset.name}</Button>
+        ))}
+      </div>
 
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
         <Select label="Transition in" value={v.transition} onChange={value => set({ transition: value as Transition })}
@@ -168,7 +196,13 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
 
       {kind === "video" && (
         <div className="glass-soft space-y-4 p-4">
-          <p className="text-sm font-semibold">Trim</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Trim and render</p>
+            <Button size="sm" color="primary" variant="flat" isDisabled={busy || !duration} isLoading={busy} startContent={<Save size={14} />} onPress={() => void renderVideo()}>
+              {busy ? `Rendering ${Math.round(renderProgress * 100)}%` : "Render video"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted">Creates a new MP4 in your library. Processing runs locally in your browser.</p>
           <Filmstrip url={track.url} duration={duration} trimIn={v.trimIn} trimOut={v.trimOut} cues={cues} onChange={set} />
           <Slider size="sm" color="primary" label="Speed" minValue={.25} maxValue={2} step={.05} value={v.rate}
             onChange={n => set({ rate: Array.isArray(n) ? n[0] : n })} getValue={n => `${Number(n).toFixed(2)}x`} />
