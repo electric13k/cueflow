@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "../ui";
-import { FolderOpen, Trash2, UserPlus, Users } from "lucide-react";
+import { FolderOpen, Pencil, Trash2, UserPlus, Users } from "lucide-react";
 import Shell from "../components/Shell";
 import { CoachHelp } from "../components/Coach";
 import { teach } from "../lib/coach";
@@ -8,8 +8,9 @@ import { toast } from "../lib/toast";
 import { onAuth } from "../lib/store";
 import {
   addCollaborator, createProject, currentProject, deleteProject, listMembers, listProjects,
-  removeMember, setCurrentProject, updateProject, type Member, type Project,
+  removeMember, setCurrentProject, setMemberRole, updateProject, type Member, type Project,
 } from "../lib/projects";
+import { ROLES, type Role } from "../lib/collab";
 
 export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -18,6 +19,7 @@ export default function Projects() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [who, setWho] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("editor");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [fresh, setFresh] = useState("");
@@ -30,7 +32,7 @@ export default function Projects() {
   useEffect(() => onAuth(email => { setSignedIn(!!email); if (email) load(); else setReady(true); }), []);
 
   const open = (p: Project) => {
-    setOpenId(p.id); setName(p.name); setCode(p.code); setMembers([]); setWho("");
+    setOpenId(p.id); setName(p.name); setCode(p.code); setMembers([]); setWho(""); setInviteRole("editor");
     void listMembers(p.id).then(setMembers).catch(() => setMembers([]));
   };
 
@@ -101,12 +103,18 @@ export default function Projects() {
                 <Button size="sm" variant={here === p.id ? "flat" : "bordered"} onPress={() => switchTo(p.id)}>
                   {here === p.id ? "Working here" : "Work here"}
                 </Button>
-                {p.role === "owner" && <Button size="sm" variant="light" onPress={() => (openId === p.id ? setOpenId(null) : open(p))}>Manage</Button>}
+                {p.role === "owner" && <Button size="sm" variant="light" startContent={<Pencil size={14} />} onPress={() => (openId === p.id ? setOpenId(null) : open(p))}>
+                  {openId === p.id ? "Close manager" : "Edit and share"}
+                </Button>}
               </div>
             </div>
 
             {openId === p.id && (
               <div className="mt-5 space-y-5 border-t border-white/10 pt-5">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-bold"><Pencil size={15} className="text-accent" />Edit project</p>
+                  <p className="mt-1 text-xs text-muted">Change the project name or room code at any time. Existing collaborators keep access.</p>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Input className="min-w-40 flex-1" label="Name" value={name} onValueChange={setName} />
                   <Input className="min-w-40 flex-1" label="Code" value={code} onValueChange={v => setCode(v.trim())} />
@@ -120,19 +128,33 @@ export default function Projects() {
 
                 <div className="space-y-2">
                   <h3 className="flex items-center gap-2 text-sm font-bold"><Users size={15} className="text-accent" />People</h3>
-                  {members.length === 0 && <p className="text-sm text-muted">Nobody else yet.</p>}
+                  {members.length === 0 && <p className="text-sm text-muted">Nobody else yet. Add a collaborator below.</p>}
                   {members.map(m => (
-                    <div key={m.userId} className="flex items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm">
-                      <span>{m.username ? `@${m.username}` : m.displayName ?? "Someone"} <span className="text-muted">· {m.role}</span></span>
-                      <Button isIconOnly size="sm" variant="light" aria-label="Remove"
-                        onPress={() => void run(() => removeMember(p.id, m.userId), "Removed.")}><Trash2 size={14} /></Button>
+                    <div key={m.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm">
+                      <span className="min-w-0 flex-1 truncate">{m.username ? `@${m.username}` : m.displayName ?? "Someone"}</span>
+                      <div className="flex items-center gap-2">
+                        <select aria-label={`Role for ${m.username ?? m.displayName ?? "collaborator"}`} value={m.role}
+                          onChange={e => void run(async () => { await setMemberRole(p.id, m.userId, e.target.value as Role); setMembers(await listMembers(p.id)); }, "Role updated.")}
+                          className="rounded-lg border border-border bg-surface/70 px-2 py-1 text-xs outline-none focus:border-accent">
+                          {ROLES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                        </select>
+                        <Button isIconOnly size="sm" variant="light" aria-label={`Remove ${m.username ?? m.displayName ?? "collaborator"}`}
+                          onPress={() => void run(() => removeMember(p.id, m.userId), "Removed.")}><Trash2 size={14} /></Button>
+                      </div>
                     </div>
                   ))}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-end gap-2">
                     <Input className="min-w-48 flex-1" label="Username or email" value={who} onValueChange={setWho} placeholder="stage_left" />
-                    <Button className="self-end" isLoading={busy} startContent={<UserPlus size={15} />}
-                      onPress={() => void run(async () => { await addCollaborator(p.id, who, "editor"); setWho(""); setMembers(await listMembers(p.id)); }, "Added.")}>
-                      Add
+                    <label className="min-w-32 text-xs text-muted">
+                      <span className="mb-1 block">Permission</span>
+                      <select value={inviteRole} onChange={e => setInviteRole(e.target.value as Role)}
+                        className="h-10 w-full rounded-xl border border-border bg-surface/70 px-3 text-sm text-foreground outline-none focus:border-accent">
+                        {ROLES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                      </select>
+                    </label>
+                    <Button className="h-10" isLoading={busy} startContent={<UserPlus size={15} />}
+                      onPress={() => void run(async () => { await addCollaborator(p.id, who, inviteRole); setWho(""); setMembers(await listMembers(p.id)); }, "Collaborator added.")}>
+                      Add collaborator
                     </Button>
                   </div>
                 </div>

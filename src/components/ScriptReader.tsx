@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Input, Tooltip } from "../ui";
+import { Button, Input, Slider, Tooltip } from "../ui";
 import { Bell, ChevronDown, ChevronUp, FileUp, Minus, Pause, Play, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { send } from "../lib/bus";
 import { cueAlert, emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Armed, type Cue, type ScriptDoc } from "../lib/script";
@@ -227,12 +227,23 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
               <Button size="sm" variant="light" isIconOnly onPress={() => setCues(doc.cues.filter(x => x.id !== c.id))}><Trash2 size={14} /></Button>
             </div>
           ))}
-          <label className="flex items-center gap-2 text-xs text-muted">
-            Warn this far ahead
-            <input type="range" min={80} max={800} step={20} value={doc.lookahead}
-              onChange={e => { const next = { ...doc, lookahead: Number(e.target.value) }; saveScript(next); setDoc(next); }} />
-            <span className="tabular-nums">{doc.lookahead}px</span>
-          </label>
+          <div className="mt-4 max-w-xl rounded-2xl border border-border/70 bg-surface/35 px-4 py-3">
+            <Slider
+              label="Warn this far before a script cue word"
+              aria-label="Warn this far before a script cue word"
+              minValue={80}
+              maxValue={800}
+              step={20}
+              value={doc.lookahead}
+              getValue={n => `${Number(n)}px`}
+              onChange={n => {
+                const next = { ...doc, lookahead: Array.isArray(n) ? n[0] : n };
+                saveScript(next);
+                setDoc(next);
+              }}
+              className="script-lookahead-slider"
+            />
+          </div>
         </div>
       )}
 
