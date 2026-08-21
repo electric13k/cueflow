@@ -21,12 +21,19 @@ export default function Account() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [exporting, setExporting] = useState("");
   const [identities, setIdentities] = useState<Identity[]>([]);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
 
   const load = () => void getProfile().then(p => {
     setProfile(p); setReady(true);
     setName(p?.username ?? ""); setDisplay(p?.displayName ?? "");
-    void listIdentities().then(setIdentities);
+    void listIdentities().then(setIdentities).catch(e => setNote((e as Error).message));
   });
+
+  const connectGoogle = async () => {
+    setLinkingGoogle(true); setNote("");
+    try { await linkGoogle(); }
+    catch (e) { setNote((e as Error).message); setLinkingGoogle(false); }
+  };
 
   const unlink = async (id: string) => {
     setBusy(true); setNote("");
@@ -37,6 +44,15 @@ export default function Account() {
     } catch (e) { setNote((e as Error).message); }
     finally { setBusy(false); }
   };
+  // OAuth errors return to this page as query parameters. Surface them instead of leaving the user
+  // on an unchanged account screen that looks like the button did nothing.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error_description") || params.get("error");
+    if (!error) return;
+    setNote(`Google connection failed: ${error}`);
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash}`);
+  }, []);
   // Reload on sign-in/out too: this page is reachable from the password-reset email, which lands
   // here already authenticated.
   useEffect(() => onAuth(() => load()), []);
@@ -145,9 +161,9 @@ export default function Account() {
         {identities.some(i => i.provider === "google") ? (
           <p className="text-xs text-muted">Google is connected. The button in the sign-in box will bring you straight here.</p>
         ) : (
-          <Button variant="bordered" startContent={<GoogleMark />} isDisabled={busy}
-            onPress={() => void linkGoogle().catch(e => setNote((e as Error).message))}>
-            Connect Google
+          <Button variant="bordered" startContent={<GoogleMark />} isDisabled={busy || linkingGoogle} isLoading={linkingGoogle}
+            onPress={() => void connectGoogle()}>
+            {linkingGoogle ? "Opening Google…" : "Connect Google"}
           </Button>
         )}
       </section>

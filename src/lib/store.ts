@@ -58,10 +58,22 @@ export async function signInWith(provider: "google" | "github") {
  */
 export async function linkGoogle() {
   if (!supabase) throw new Error("Cloud not configured");
-  const { error } = await supabase.auth.linkIdentity({
-    provider: "google", options: { redirectTo: `${location.origin}${import.meta.env.BASE_URL}account` },
+  const { data, error } = await supabase.auth.linkIdentity({
+    provider: "google",
+    options: {
+      redirectTo: `${location.origin}${import.meta.env.BASE_URL}account`,
+      skipBrowserRedirect: true,
+    },
   });
-  if (error) throw new Error(/manual linking/i.test(error.message) ? "Linking accounts is switched off for this project." : error.message);
+  if (error) {
+    if (/manual linking|linking identities/i.test(error.message)) throw new Error("Google account linking is disabled for this project.");
+    if (/provider.*(not enabled|unsupported)|google.*(not enabled|disabled)/i.test(error.message)) throw new Error("Google sign-in is disabled for this project.");
+    if (/redirect|allow.?list|not allowed/i.test(error.message)) throw new Error("This account page is not an approved Google redirect URL.");
+    if (/already linked|identity.*exists/i.test(error.message)) throw new Error("That Google account is already connected to another CueFlow account.");
+    throw new Error(error.message);
+  }
+  if (!data?.url) throw new Error("Google did not return an authorization URL. Try again.");
+  window.location.assign(data.url);
 }
 
 export type Identity = { id: string; provider: string; email?: string };
