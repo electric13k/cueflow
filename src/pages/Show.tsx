@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, Input } from "../ui";
-import { Lock, Maximize, MessageSquare, Send, Unlock } from "lucide-react";
+import { Lock, Maximize, MessageSquare, Send, Unlock, X } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import DarkToggle from "../components/DarkToggle";
 import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
@@ -22,7 +23,7 @@ function Flash({ text }: { text: string }) {
   );
 }
 
-function Door({ onIn }: { onIn: (t: Ticket) => void }) {
+function Door({ onIn, onClose }: { onIn: (t: Ticket) => void; onClose: () => void }) {
   const [key, setKey] = useState("");
   const [name, setName] = useState(() => localStorage.getItem("cueflow:showName") ?? "");
   const [note, setNote] = useState("");
@@ -38,22 +39,32 @@ function Door({ onIn }: { onIn: (t: Ticket) => void }) {
   };
 
   return (
-    <div data-app className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Join a show</p>
-      <h1 className="text-3xl font-black tracking-tight">Type your key</h1>
-      <p className="text-sm text-muted">
-        No account needed. Whoever is running the show gives you a key, and the key is the job, type
-        it and you are on followspot, or on sound, or holding the whole thing. Nothing to choose.
-      </p>
-      <Input autoFocus label="Your key" value={key} onValueChange={v => setKey(v.trim())}
-        className="font-mono" placeholder="K7QM2X" onKeyDown={e => { if (e.key === "Enter") void go(); }} />
-      <Input label="Your name" value={name} onValueChange={setName} placeholder="Sam on sound" />
-      {note && <p className="text-sm text-live">{note}</p>}
-      <Button color="primary" isLoading={busy} isDisabled={key.trim().length < 4} onPress={go}>Go in</Button>
-      <p className="text-xs text-muted">
-        Lost it, or it stopped working? Ask whoever is running the show, they can hand out a new one,
-        and the old one dies the moment they do.
-      </p>
+    <div className="show-join-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div data-app role="dialog" aria-modal="true" aria-labelledby="join-show-title" aria-describedby="join-show-description"
+        tabIndex={-1} className="show-join-dialog glass relative mx-4 my-6 w-full max-w-xl p-6 sm:p-8"
+        onKeyDown={e => { if (e.key === "Escape") { e.preventDefault(); onClose(); } }}>
+        <Button isIconOnly size="sm" variant="light" aria-label="Close join a show" title="Close" className="absolute right-3 top-3 z-10"
+          onPress={onClose}><X size={17} /></Button>
+        <div className="pr-10">
+          <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Join a show</p>
+          <h1 id="join-show-title" className="mt-2 text-3xl font-black tracking-tight">Type your key</h1>
+          <p id="join-show-description" className="mt-2 text-sm text-muted">
+            No account needed. Whoever is running the show gives you a key, and the key is the job, type
+            it and you are on followspot, or on sound, or holding the whole thing. Nothing to choose.
+          </p>
+        </div>
+        <div className="mt-5 space-y-4">
+          <Input autoFocus label="Your key" value={key} onValueChange={v => setKey(v.trim())}
+            className="font-mono" placeholder="K7QM2X" onKeyDown={e => { if (e.key === "Enter") void go(); }} />
+          <Input label="Your name" value={name} onValueChange={setName} placeholder="Sam on sound" />
+          {note && <p className="text-sm text-live">{note}</p>}
+          <Button color="primary" isLoading={busy} isDisabled={key.trim().length < 4} onPress={go}>Go in</Button>
+          <p className="text-xs text-muted">
+            Lost it, or it stopped working? Ask whoever is running the show, they can hand out a new one,
+            and the old one dies the moment they do.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -61,6 +72,8 @@ function Door({ onIn }: { onIn: (t: Ticket) => void }) {
 export default function Show() {
   // Whatever job you hold, the screen you hold it on is yours: the toggle is on this page for every
   // role, not just the host, and what it writes never leaves the device.
+  const navigate = useNavigate();
+  const closeDoor = () => { if (window.history.length > 1) navigate(-1); else navigate("/studio"); };
   const [theme] = useStudioTheme();
   const [ticket, setTicket] = useState<Ticket | null>(savedTicket);
   const [cues, setCues] = useState<DeckCue[]>([]);
@@ -116,7 +129,7 @@ export default function Show() {
   }, [started]);
 
   const marked = useMemo(() => doc, [doc]);
-  if (!ticket) return <Door onIn={t => { setTicket(t); setStarted(t.started); }} />;
+  if (!ticket) return <Door onClose={closeDoor} onIn={t => { setTicket(t); setStarted(t.started); }} />;
 
   const sendFlash = () => {
     if (!outgoing.trim()) return;

@@ -477,6 +477,35 @@
     border-color: rgba(var(--glass-tint), .12);
   }
 
+  .show-join-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    overflow-y: auto;
+    padding: 1.5rem;
+    background: rgba(8, 6, 6, .72);
+    backdrop-filter: blur(7px) saturate(.72);
+    animation: show-join-fade .2s ease-out both;
+  }
+  .show-join-dialog {
+    max-height: calc(100dvh - 3rem);
+    overflow-y: auto;
+    border-color: color-mix(in srgb, var(--accent) 28%, rgba(var(--glass-tint), .2));
+    box-shadow: 0 26px 90px rgba(0, 0, 0, .42), 0 0 0 1px rgba(var(--glass-tint), .07);
+    animation: show-join-rise .24s cubic-bezier(.16, 1, .3, 1) both;
+  }
+  @keyframes show-join-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes show-join-rise { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @media (max-width: 639px) {
+    .show-join-scrim { align-items: start; padding: .75rem; }
+    .show-join-dialog { max-height: calc(100dvh - 1.5rem); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .show-join-scrim, .show-join-dialog { animation: none; }
+  }
+
   /* Shared dropdown language: a quiet glass trigger and a proper in-app menu instead of the browser's
      light system popup. The same tokens keep it legible in both themes and on a narrow phone. */
   .cue-select { min-width: 0; }
