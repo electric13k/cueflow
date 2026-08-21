@@ -2,15 +2,15 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 
-export type Screen = { shot: string; alt: string; title: string; body: string; points: string[]; fit?: "cover" | "contain" };
+export type Screen = { shot: string; alt: string; title: string; body: string; points: string[]; fit?: "cover" | "contain"; mobileOnly?: boolean };
 
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 22 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-80px" }, transition: { duration: .5, delay: d } });
 
 /** Flip card: the screenshot on the front, what it does on the back. */
-export default function ScreenCard({ shot, alt, title, body, points, fit = "cover", delay = 0 }: Screen & { delay?: number }) {
+export default function ScreenCard({ shot, alt, title, body, points, fit = "cover", mobileOnly = false, delay = 0 }: Screen & { delay?: number }) {
   const [flipped, setFlipped] = useState(false);
   return (
-    <motion.div {...fade(delay)} style={{ perspective: "1400px" }}>
+    <motion.div {...fade(delay)} className={mobileOnly ? "tutorial-phone-only" : undefined} style={{ perspective: "1400px" }}>
       <button
         onClick={() => setFlipped(f => !f)}
         aria-label={`${title}, flip for details`}

@@ -498,6 +498,9 @@
     gap: var(--grid-gap, .75rem);
     grid-template-columns: repeat(auto-fill, minmax(min(var(--grid-min, 16rem), 100%), 1fr));
   }
+  /* The phone screen explains the phone layout, so it belongs only to phone-sized views. */
+  .tutorial-phone-only { display: none; }
+  @media (max-width: 639px) { .tutorial-phone-only { display: block; } }
   /* The density choice is only offered where it is a real choice. Above this width a phone setting
      has no business shrinking a desk layout, so the rule simply is not there. */
   @media (max-width: 639px) {

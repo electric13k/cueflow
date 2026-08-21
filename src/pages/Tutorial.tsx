@@ -38,7 +38,7 @@ const screens: Screen[] = [
     points: ["Sound and screens in one order", "Link a slide to the sound under it", "Arm it and the frame turns amber"],
   },
   {
-    shot: `${import.meta.env.BASE_URL}shots/phone.png`, title: "On a phone", fit: "contain",
+    shot: `${import.meta.env.BASE_URL}shots/phone.png`, title: "On a phone", fit: "contain", mobileOnly: true,
     alt: "CueFlow running on a phone",
     body: "The same board, sized for one thumb.",
     points: ["No install, no app store", "Runs from the back of the room"],
