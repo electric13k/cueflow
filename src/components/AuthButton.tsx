@@ -40,8 +40,8 @@ export default function AuthButton() {
   };
 
   if (email) return (
-    <Button size="sm" variant="light" startContent={<LogOut size={15} />} onPress={() => void signOut()} title={email}>
-      <span className="max-w-[10rem] truncate">{email}</span>
+    <Button size="sm" variant="light" isIconOnly className="sm:w-auto sm:px-3" startContent={<LogOut size={15} />} onPress={() => void signOut()} title={`Sign out ${email}`} aria-label={`Sign out ${email}`}>
+      <span className="sr-only sm:not-sr-only sm:max-w-[10rem] sm:truncate">{email}</span>
     </Button>
   );
   return (

@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /features
+Allow: /tutorial
+Allow: /contact
+Allow: /credits
+Allow: /terms
+Allow: /privacy
+Allow: /show
+Allow: /studio
+Disallow: /workspace
+Disallow: /projects
+Disallow: /account
+Disallow: /settings
+Disallow: /audience
+
+Sitemap: https://cueflow.pages.dev/sitemap.xml

@@ -168,7 +168,11 @@
   /* dvh, not vh. `100vh` on a phone is the viewport with the URL bar *retracted*, so a page sized in
      it is taller than the screen the moment the bar is showing and the bottom of every layout is cut
      off. `dvh` is the viewport that is actually there. */
-  body { @apply m-0 min-h-dvh bg-background text-foreground font-sans antialiased; }
+  body { @apply m-0 min-h-dvh bg-background text-foreground font-sans antialiased; overflow-x: hidden; }
+  #root { min-width: 0; max-width: 100%; overflow-x: hidden; }
+  @media (max-width: 639px) {
+    nav > div { width: 100%; min-width: 0; }
+  }
 
   /**
    * The beige wash: house glow off the top, curtain in the upper corner, olive off the floor.

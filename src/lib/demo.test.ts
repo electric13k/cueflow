@@ -70,6 +70,21 @@ describe("demo kit", () => {
     expect(kept.items[0].trackId).toBe("a1b2c3d4-e5f6-4777-8888-99990000aaaa");
   });
 
+  it("cleans demo material from project-scoped storage too", () => {
+    localStorage.setItem("cueflow:tracks:project-1", JSON.stringify([...demoTracks(), mine("a1b2c3d4-e5f6-4777-8888-99990000aaaa")]));
+    localStorage.setItem("cueflow:sequences:project-1", JSON.stringify([{
+      id: "demo:sequence", name: "Demo sequence", createdAt: "2026-01-01T00:00:00.000Z",
+      items: [{ id: "demo:item", trackId: "demo:door", label: "Door", effects: defaultEffects() }],
+    }]));
+    expect(demoPresent()).toBe(true);
+    clearDemo();
+    const tracks = JSON.parse(localStorage.getItem("cueflow:tracks:project-1") || "[]") as Track[];
+    const sequences = JSON.parse(localStorage.getItem("cueflow:sequences:project-1") || "[]") as Sequence[];
+    expect(tracks).toHaveLength(1);
+    expect(sequences).toHaveLength(0);
+    expect(demoPresent()).toBe(false);
+  });
+
   it("is a no-op on a board that never saw the tutorial", () => {
     const own = [mine("a1b2c3d4-e5f6-4777-8888-99990000aaaa")];
     local.set("tracks", own);

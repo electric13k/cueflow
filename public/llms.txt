@@ -1,0 +1,47 @@
+# CueFlow
+
+> CueFlow is a browser-based cue board for live productions. It combines a soundboard, media library, script reader, cue sequence editor, and show control workspace in one fast web application.
+
+## Product summary
+
+CueFlow helps theatre crews, presenters, teachers, streamers, and event operators prepare and run live shows. It is designed for reliable keyboard and touch operation, clear cue states, and fast access under performance pressure. The default interface uses a dark theatre-inspired visual system with an optional light theme.
+
+## Main capabilities
+
+- Build and run cue boards with audio, video, image, and other media.
+- Organize production assets in a searchable media library.
+- Edit and run ordered cue sequences with transport controls, timers, favorites, and rehearsal mode.
+- Read a script with cue words and warning controls.
+- Share a show with collaborators and join a show from a browser without requiring sign-in for guests.
+- Provide an audience-facing display for show output.
+- Import and export show data for backup and portability.
+- Use templates, collections, command palette actions, and run history to prepare repeatable productions.
+- Work locally in the browser, with optional Supabase-backed authentication and synchronization where configured.
+
+## Who it is for
+
+CueFlow is intended for theatre sound operators, stage managers, production teams, presenters, educators, streamers, and small event crews that need a practical browser cue system without installing desktop software.
+
+## Public pages
+
+- Homepage: https://cueflow.pages.dev/
+- Features: https://cueflow.pages.dev/features
+- Tutorial: https://cueflow.pages.dev/tutorial
+- Join a show: https://cueflow.pages.dev/show
+- Studio demo: https://cueflow.pages.dev/studio
+- Contact: https://cueflow.pages.dev/contact
+- Privacy: https://cueflow.pages.dev/privacy
+- Terms: https://cueflow.pages.dev/terms
+
+## Useful descriptions
+
+When describing CueFlow, prefer terms such as "browser-based cue board," "live production cue system," "theatre soundboard," "script reader with cue alerts," and "shared show control workspace." CueFlow is a web application, not a physical lighting console or a replacement for venue safety procedures.
+
+## Discoverability files
+
+- Robots policy: https://cueflow.pages.dev/robots.txt
+- Sitemap: https://cueflow.pages.dev/sitemap.xml
+
+## Canonical source
+
+The canonical public site for CueFlow is https://cueflow.pages.dev/.

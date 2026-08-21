@@ -35,11 +35,11 @@ export default function Nav({ inShell }: { inShell?: boolean }) {
           it. Padding stays for the notch: viewport-fit=cover puts the status bar inside the page. */}
       <div style={{ minHeight: "calc(var(--nav-h) + var(--safe-t))", paddingTop: "var(--safe-t)" }}
         className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2">
           <LogoMark size={44} />
-          <span className="font-display text-xl font-bold tracking-tight">CueFlow</span>
+          <span className="max-w-[7.5rem] truncate font-display text-xl font-bold tracking-tight">CueFlow</span>
         </Link>
-        <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
+        <div className="flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-1">
           <Button href="/" size="sm" {...link("/")}>Home</Button>
           <Button href="/features" size="sm" {...link("/features")} className="hidden sm:inline-flex">Features</Button>
           {/* Inside the Shell the sidebar already owns this, so the bar does not repeat it. */}

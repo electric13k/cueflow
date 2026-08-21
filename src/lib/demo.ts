@@ -17,7 +17,17 @@ import { local } from "./store";
  */
 
 export const DEMO_PREFIX = "demo:";
+const DEMO_LOADED = "demo-loaded";
 export const isDemo = (id: string) => id.startsWith(DEMO_PREFIX);
+
+const stored = <T,>(key: string, fallback: T): T => {
+  try { return JSON.parse(localStorage.getItem(`cueflow:${key}`) || "") as T; } catch { return fallback; }
+};
+const keysFor = (name: string) => Object.keys(localStorage)
+  .filter(key => key === `cueflow:${name}` || key.startsWith(`cueflow:${name}:`))
+  .map(key => key.slice("cueflow:".length));
+const trackKeys = () => [...new Set(keysFor("tracks"))];
+const sequenceKeys = () => [...new Set(keysFor("sequences"))];
 
 /** The demo script's name, which is how teardown recognises its own script and not yours. */
 const SCRIPT_NAME = "A Winter's Tale (demo)";
@@ -81,6 +91,7 @@ export function loadDemo() {
   // Only if there is no script already. Someone replaying the tutorial three weeks in has a real
   // script loaded, and overwriting it to teach them about scripts would be its own punchline.
   if (!loadScript().html) saveScript(demoScript());
+  local.set(DEMO_LOADED, true);
 }
 
 /**
@@ -89,12 +100,22 @@ export function loadDemo() {
  * would otherwise be cues that play nothing.
  */
 export function clearDemo() {
-  local.set("tracks", local.get<Track[]>("tracks", []).filter(t => !isDemo(t.id)));
-  local.set("sequences", local.get<Sequence[]>("sequences", [])
-    .filter(s => !isDemo(s.id))
-    .map(s => ({ ...s, items: s.items.filter(i => !isDemo(i.trackId)) })));
+  for (const key of trackKeys()) {
+    const tracks = stored<Track[]>(key, []);
+    local.set(key, tracks.filter(t => !isDemo(t.id)));
+  }
+  for (const key of sequenceKeys()) {
+    const sequences = stored<Sequence[]>(key, []);
+    local.set(key, sequences
+      .filter(s => !isDemo(s.id))
+      .map(s => ({ ...s, items: s.items.filter(i => !isDemo(i.trackId)) })));
+  }
   if (loadScript().name === SCRIPT_NAME) saveScript(emptyDoc());
+  local.set(DEMO_LOADED, false);
 }
 
-/** Whether any of it is currently on the board, which is what the teardown offer keys off. */
-export const demoPresent = () => local.get<Track[]>("tracks", []).some(t => isDemo(t.id));
+/** Whether any demo marker or sample material remains and needs teardown. */
+export const demoPresent = () => local.get<boolean>(DEMO_LOADED, false)
+  || trackKeys().some(key => stored<Track[]>(key, []).some(t => isDemo(t.id)))
+  || sequenceKeys().some(key => stored<Sequence[]>(key, []).some(s => isDemo(s.id) || s.items.some(i => isDemo(i.trackId))))
+  || loadScript().name === SCRIPT_NAME;
