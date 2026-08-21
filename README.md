@@ -44,6 +44,17 @@ you in as a collaborator. Messages between devices flash on screen and are silen
 **Projects.** A separate library, sequences, script and shows per production, with collaborators
 added by username or email.
 
+## Screens
+
+CueFlow is designed for dark rooms, quick handoffs and screens that stay legible when the show is moving.
+These are the working app screens in the dark theme.
+
+![CueFlow desktop cue board in dark mode](public/shots/studio-mockup-desktop-dark.png)
+
+![CueFlow phone workspace in dark mode](public/shots/studio-mockup-phone-dark.png)
+
+![CueFlow phone deck in dark mode](public/shots/studio-mockup-deck-phone-dark.png)
+
 ## Running it yourself
 
 ```bash
