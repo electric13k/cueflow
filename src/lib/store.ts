@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Sequence, SequenceItem, Track } from "../types";
-const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const supabase = url && key ? createClient(url, key) : null;
+// Supabase publishable credentials are safe to ship in a browser build. The fallback keeps the
+// static Pages deployment functional when its build environment is not injected by Cloudflare.
+const url = import.meta.env.VITE_SUPABASE_URL || "https://uumbvunbgcbkzoenupay.supabase.co";
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_UVLFeDFDrxvAeVesqdEeHw_pdQRrzLb";
+export const supabase = createClient(url, key);
 
 // Auth: email + password. Cloud save/hydrate already gate on getUser(), so signing in activates them.
 export async function signUp(email: string, password: string) { if (!supabase) throw new Error("Cloud not configured"); const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}${import.meta.env.BASE_URL}studio` } }); if (error) throw error; }
