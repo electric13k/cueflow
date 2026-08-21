@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../ui";
 import Spotlight, { findAnchor, useAnchor } from "./Spotlight";
 import { clearDemo, demoPresent, loadDemo } from "../lib/demo";
-import { getTour, setTour, steps, tourSeen } from "../lib/tour";
+import { getTour, setTour, steps } from "../lib/tour";
+import { onAuth } from "../lib/store";
 import { toast } from "../lib/toast";
 import { useSignedIn } from "./RequireAuth";
 
@@ -19,6 +20,7 @@ export default function Tour() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const signedIn = useSignedIn();
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
   const active = step >= 0 && step < steps.length;
   const current = active ? steps[step] : undefined;
   const { spot, state } = useAnchor(current?.anchor, active);
@@ -67,16 +69,17 @@ export default function Tour() {
     toast("Demo material cleared", "The sounds, pictures and script the tutorial loaded have gone. Anything you made is still here.", "info");
   }, []);
 
+  useEffect(() => onAuth(setAuthEmail), []);
+
   useEffect(() => {
-    if (signedIn !== true) return;
-    if (localStorage.getItem(FIRST_AUTH)) return;
-    localStorage.setItem(FIRST_AUTH, "1");
-    if (!tourSeen()) {
-      localStorage.setItem(TUTORIAL_ACTIVE, "1");
-      setTour({ done: false, step: 0 });
-    }
+    if (!authEmail) return;
+    const firstAuthKey = `${FIRST_AUTH}:${authEmail.trim().toLowerCase()}`;
+    if (localStorage.getItem(firstAuthKey)) return;
+    localStorage.setItem(firstAuthKey, "1");
+    localStorage.setItem(TUTORIAL_ACTIVE, "1");
+    setTour({ done: false, step: 0 });
     if (!pathname.endsWith("/workspace")) navigate("/workspace", { replace: true });
-  }, [signedIn, pathname, navigate]);
+  }, [authEmail, pathname, navigate]);
 
   useEffect(() => {
     if (!pathname.endsWith("/workspace") && !pathname.endsWith("/studio")) return;
