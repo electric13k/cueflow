@@ -7,9 +7,10 @@
 @source "./**/*.{ts,tsx}";
 
 @theme {
-  /* Serif throughout. A prompt book is paper and a playbill is a Didone; neither has ever been set
-     in a grotesk. Courier is not a stylistic choice either -- it is the font scripts are typed in. */
+  /* Corbel is the reading face. The playbill display face is reserved for headings, Source Serif is
+     reserved for controls, and Courier Prime is used for scripts, cue numbers and timecodes. */
   --font-sans: Corbel, sans-serif;
+  --font-control: "Source Serif 4", Georgia, serif;
   --font-display: "Bodoni Moda", "Source Serif 4", Georgia, serif;
   --font-mono: "Courier Prime", ui-monospace, "Courier New", monospace;
   --shadow-glass: 0 10px 34px -14px rgba(36, 31, 28, .5), inset 0 1px 0 rgba(255, 255, 255, .05);
@@ -174,7 +175,10 @@
      it is taller than the screen the moment the bar is showing and the bottom of every layout is cut
      off. `dvh` is the viewport that is actually there. */
   body { @apply m-0 min-h-dvh bg-background text-foreground font-sans antialiased; overflow-x: hidden; }
-  #root { min-width: 0; max-width: 100%; overflow-x: hidden; }
+  /* `hidden` on one axis promotes the other axis to `auto`, making #root a nested scroll container
+     and preventing the desktop sidebar's sticky position from tracking document scroll. `clip` keeps
+     the horizontal guard without creating a second scrolling ancestor. */
+  #root { min-width: 0; max-width: 100%; overflow-x: clip; }
   @media (max-width: 639px) {
     nav > div { width: 100%; min-width: 0; }
   }
@@ -213,8 +217,11 @@
      and `Stage` only ever asks for it while nothing is up. */
   [data-stage="white"] { background: #FFF !important; color-scheme: light; }
   h1, h2, h3 { @apply font-display; letter-spacing: -.015em; }
+  /* Corbel is the reading face only. Buttons retain the established Source Serif control face, while
+     the handful of cue-leather actions below may intentionally use Bodoni. */
+  button, [role="button"], .cue-button { font-family: var(--font-control); }
   /* Bodoni's thin strokes shatter at small sizes, so the display face is for headings only and
-     everything under ~20px falls back to the body serif. */
+     everything under ~20px stays on the Corbel reading face. */
   h4, h5, h6 { @apply font-sans font-bold; }
 
   /* Anything you can act on says so under the cursor, and lifts a little when you get there. */
@@ -737,6 +744,12 @@
     object-fit: cover;
     object-position: center top;
     background: var(--surface);
+    display: block;
+  }
+  .shot-fallback {
+    min-height: 12rem;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--cue-curtain) 20%, var(--surface)), var(--surface));
+    border: 1px solid color-mix(in srgb, var(--cue-forest) 42%, var(--border));
   }
   @media (min-width: 640px) {
     .responsive-shot { aspect-ratio: 16 / 9; }
@@ -770,6 +783,17 @@
   }
   .theme-dark .themed-shot, .dark .themed-shot {
     filter: brightness(.98) contrast(1.04) saturate(.98);
+  }
+  @media (min-width: 1024px) {
+    /* Keep the workspace rail attached to the viewport. The previous sticky rail ended at the flex
+       row's content boundary, so it visibly disappeared before the document reached its bottom. */
+    .desktop-sidebar {
+      position: fixed;
+      top: calc(var(--nav-h) + var(--safe-t) + 1rem);
+      bottom: 1rem;
+      left: max(2rem, calc((100vw - 1280px) / 2 + 2rem));
+      height: auto;
+    }
   }
   .forest-outline { border-color: color-mix(in srgb, var(--cue-forest) 46%, var(--border)); }
   .scroll-progress { background: var(--cue-curtain) !important; }
@@ -849,7 +873,7 @@
 
   /* The progress indicator is rendered inside Nav and receives a spring-smoothed Motion value. Keeping
      only its visual contract here prevents a second CSS timeline from fighting the inline transform. */
-  .scroll-progress { transform-origin: 0 50%; box-shadow: 0 0 12px color-mix(in srgb, var(--cue-emerald) 42%, transparent); }
+  .scroll-progress { transform-origin: 0 50%; background: var(--cue-curtain) !important; box-shadow: 0 0 12px color-mix(in srgb, var(--cue-curtain) 42%, transparent); }
 
   /**
    * Hover, and only where hovering is a thing that happens. Without the `pointer: fine` gate a

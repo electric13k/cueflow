@@ -89,15 +89,23 @@ export default function Backdrop() {
     const dpr = Math.min(devicePixelRatio || 1, 1.5);
     const resize = () => { el.width = innerWidth * dpr; el.height = innerHeight * dpr; gl.viewport(0, 0, el.width, el.height); };
     resize(); addEventListener("resize", resize);
-    let raf = 0; const t0 = performance.now();
-    const render = () => {
-      gl.uniform2f(uRes, el.width, el.height);
-      gl.uniform1f(uTime, (performance.now() - t0) / 1000);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    let raf = 0; let lastFrame = 0; const t0 = performance.now();
+    const render = (now: number) => {
+      if (now - lastFrame >= 33) {
+        lastFrame = now;
+        gl.uniform2f(uRes, el.width, el.height);
+        gl.uniform1f(uTime, (now - t0) / 1000);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
       raf = requestAnimationFrame(render);
     };
-    render();
-    return () => { cancelAnimationFrame(raf); removeEventListener("resize", resize); };
+    const onVisibility = () => {
+      cancelAnimationFrame(raf);
+      raf = document.visibilityState === "visible" ? requestAnimationFrame(render) : 0;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    raf = requestAnimationFrame(render);
+    return () => { cancelAnimationFrame(raf); removeEventListener("resize", resize); document.removeEventListener("visibilitychange", onVisibility); };
   }, [animateBackdrop, theme]);
 
   if (!animateBackdrop) return null;

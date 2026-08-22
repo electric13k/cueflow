@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { useState } from "react";
 import { Radio } from "lucide-react";
 import LogoMark from "../components/LogoMark";
 import Page from "../components/Page";
@@ -15,10 +16,12 @@ import { Button } from "../ui";
  * One button. The page used to offer three at the top and two at the bottom, which is five ways to
  * ask the same question and no answer about which one is the way in.
  */
-const PNG_SHOTS = new Set(["soundboard", "sequences", "editor", "phone", "phone-deck", "phone-editor", "studio-mockup-desktop", "studio-mockup-phone"]);
+const PLAIN_PNG_SHOTS = new Set(["soundboard", "sequences", "editor", "phone", "phone-deck", "phone-editor"]);
+const THEMED_PNG_SHOTS = new Set(["studio-mockup-desktop", "studio-mockup-phone", "studio-mockup-deck-phone"]);
 const shot = (name: string, theme: Theme) => {
-  const ext = PNG_SHOTS.has(name) || name.endsWith("-new") || name.startsWith("studio-mockup") ? "png" : "svg";
-  return `${import.meta.env.BASE_URL}shots/${name}-${theme}.${ext}`;
+  const themedPng = THEMED_PNG_SHOTS.has(name) || name.endsWith("-new");
+  const filename = themedPng ? `${name}-${theme}.png` : PLAIN_PNG_SHOTS.has(name) ? `${name}.png` : `${name}-${theme}.svg`;
+  return `${import.meta.env.BASE_URL}shots/${filename}`;
 };
 
 /**
@@ -65,6 +68,16 @@ const beats = [
 
 type Beat = (typeof beats)[number];
 
+function ShotImage({ desktopSrc, mobileSrc, alt, className, width, height, loading = "lazy", fetchPriority }: { desktopSrc: string; mobileSrc: string; alt: string; className: string; width: number; height: number; loading?: "eager" | "lazy"; fetchPriority?: "high" | "low" | "auto" }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <div role="img" aria-label={alt} className={`${className} shot-fallback flex items-center justify-center p-6 text-center text-sm text-muted`}>{alt}</div>;
+  return <picture>
+    <source media="(max-width: 639px)" srcSet={mobileSrc} />
+    <img key={`${desktopSrc}|${mobileSrc}`} src={desktopSrc} alt={alt} loading={loading} decoding="async" fetchPriority={fetchPriority}
+      width={width} height={height} onError={() => setFailed(true)} className={className} />
+  </picture>;
+}
+
 function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
   const src = shot(beat.src, theme);
   const phone = shot(beat.phone, theme);
@@ -101,11 +114,8 @@ function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
         viewport={{ once: true, amount: .22, margin: "0px 0px -8% 0px" }}
         transition={{ duration: .68, delay: .08, ease: [.16, 1, .3, 1] }}
         className={`glass shot-frame relative overflow-hidden p-2 ${phoneFrameClass}`}>
-        <picture>
-          <source media="(max-width: 639px)" srcSet={phone} />
-          <img key={src} src={src} alt={beat.alt} loading="lazy" width={beat.n === "4" ? 900 : 1600} height={beat.n === "4" ? 1600 : 900}
+          <ShotImage desktopSrc={src} mobileSrc={phone} alt={beat.alt} width={1600} height={900}
             className={`shot themed-shot ${phoneImageClass} parallax-on-scroll rounded-2xl bg-black/30`} />
-        </picture>
         <span aria-hidden className="beat-halo" />
         <motion.span aria-hidden className="beat-scanline"
           style={{ scaleX: prefersReducedMotion ? 1 : scanProgress }} />
@@ -160,12 +170,9 @@ export default function Home() {
 
           <motion.figure initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} whileHover={prefersReducedMotion ? undefined : { y: -5 }} transition={{ duration: .9, delay: .42, ease: [.16, 1, .3, 1] }}
             className="glass shot-frame mobile-visual-frame hero-mockup-frame mt-14 overflow-hidden p-2">
-            <picture>
-              <source media="(max-width: 639px)" srcSet={shot("studio-mockup-phone", theme)} />
-              <img key={shot("studio-mockup-desktop", theme)} src={shot("studio-mockup-desktop", theme)} width={2560} height={1440} loading="eager"
-                alt="CueFlow Studio displayed inside a desktop monitor mockup with the Library and cue board visible"
-                className="shot themed-shot responsive-shot hero-mockup parallax-on-scroll rounded-2xl bg-black/30" />
-            </picture>
+            <ShotImage desktopSrc={shot("studio-mockup-desktop", theme)} mobileSrc={shot("studio-mockup-phone", theme)} width={2560} height={1440} loading="eager" fetchPriority="high"
+              alt="CueFlow Studio displayed inside a desktop monitor mockup with the Library and cue board visible"
+              className="shot themed-shot responsive-shot hero-mockup parallax-on-scroll rounded-2xl bg-black/30" />
           </motion.figure>
           </div>
         </section>

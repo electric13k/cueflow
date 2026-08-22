@@ -70,7 +70,8 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
     <div data-app className="relative min-h-screen">
       <Backdrop />
       <Nav inShell />
-      <motion.div layout={layoutMotion} className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
+      <div className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
+
         <AnimatePresence initial={false} mode="popLayout">
           {!collapsed && (
             <motion.aside
@@ -81,11 +82,11 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -14 }}
               transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-              className="sticky top-20 hidden h-[calc(100vh-6rem)] w-60 shrink-0 lg:block"
+              className="desktop-sidebar hidden w-60 shrink-0 lg:block"
             >
               {/* The scroll lives on the inner element: the panel's bevel and highlight are absolutely
                   positioned, and in a scroll container those scroll away with the content. */}
-              <div className="glass h-full overflow-hidden"><div className="h-full overflow-y-auto"><Sidebar /></div></div>
+              <div className="glass h-full min-h-0 overflow-hidden"><div className="h-full min-h-0 overflow-y-auto overscroll-contain"><Sidebar /></div></div>
             </motion.aside>
           )}
         </AnimatePresence>
@@ -143,7 +144,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: device.isPhone ? 0.18 : 0.24, ease: [0.23, 1, 0.32, 1] }}
-          className={`min-w-0 flex-1 py-8 ${width}`}
+          className={`min-w-0 flex-1 py-8 ${collapsed ? "" : "lg:ml-[16.5rem]"} ${width}`}
         >
           <div className="mb-4 flex items-center gap-2">
             {/* min-h-11 on a phone: at `size="sm"` this was a 36px target, under the 44px minimum,
@@ -156,7 +157,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
           </div>
           {children}
         </motion.main>
-      </motion.div>
+      </div>
       <SiteFooter />
     </div>
   );
