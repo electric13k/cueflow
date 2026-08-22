@@ -90,6 +90,14 @@ export default function Tour() {
 
   useEffect(() => {
     if (!pathname.endsWith("/workspace") && !pathname.endsWith("/studio")) return;
+    // Keep the pre-existing completion flag compatible with the current tour store. This matters
+    // for returning operators and for deep links into Script, where an old flag must not resurrect
+    // a spotlight over an unrelated consent or editor control.
+    if (localStorage.getItem("cueflow:tutorial:complete") === "1") {
+      setTour({ done: true, step: 0 });
+      setStep(-1);
+      return;
+    }
     const saved = getTour();
     if (saved.done) return;
     if (localStorage.getItem("cueflow:tour") === null) begin(0);

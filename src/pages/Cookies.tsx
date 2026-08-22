@@ -17,7 +17,7 @@ export default function Cookies() {
         <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><Cookie size={20} className="text-accent" />How CueFlow stores information</h2>
 
         <Section title="Necessary storage">
-          CueFlow uses first-party local storage for media references, sequences, scripts, keybinds, layout preferences, theme preferences, tutorial state, and demo ownership markers. A first-party cookie stores the analytics preference. Authentication may use Supabase session storage when you sign in. These mechanisms are required for the application to operate and are not used for advertising.
+          CueFlow uses first-party local storage for media references, sequences, scripts, keybinds, layout preferences, theme preferences, tutorial state, and demo ownership markers. First-party consent storage records your analytics and performance-cache choices. Authentication may use Supabase session storage when you sign in. These mechanisms are not used for advertising.
         </Section>
 
         <Section title="Optional analytics">
@@ -25,11 +25,11 @@ export default function Cookies() {
         </Section>
 
         <Section title="Your choice">
-          You can choose Only necessary or Allow analytics in the consent notice. You can change the decision later from Settings. Choosing Only necessary does not disable the cue board, script reader, media editors, show controls, sign-in, or local project storage. Clearing site data also clears the local preference and shows the notice again.
+          You can choose Only necessary or Allow analytics in the consent notice. Performance caching is enabled by default as a first-party loading preference and can be switched off later in Settings. You can change either choice from Settings. Choosing Only necessary does not disable the cue board, script reader, media editors, show controls, sign-in, or local project storage. Clearing site data also clears the local preference and shows the notice again.
         </Section>
 
-        <Section title="Cache and service worker">
-          CueFlow may cache the public application shell and static assets so the interface starts quickly and can recover from a brief network interruption. The cache does not intentionally store authentication tokens, private project records, or uploaded media. A new application version invalidates the old shell cache. Browser cache controls and site-data deletion remain available through your browser.
+        <Section title="Performance cache and service worker">
+          When performance caching is allowed, CueFlow caches the public application shell and static assets so the interface starts quickly and can recover from a brief network interruption. It does not intentionally store authentication tokens, private project records, or uploaded media. The performance preference is stored in the first-party consent cookie and can be changed in Settings. Turning it off unregisters the CueFlow service worker and clears its shell cache. A new application version invalidates the old shell cache. Browser cache controls and site-data deletion remain available through your browser.
         </Section>
 
         <Section title="Third-party services">

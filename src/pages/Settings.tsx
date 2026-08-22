@@ -89,10 +89,16 @@ export default function Settings() {
         <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Cookie size={18} className="text-accent" />Cookies and analytics</h2>
         <p className="mt-2 text-sm text-muted">Necessary storage keeps Cueflow working. Optional analytics is off unless you choose to allow it, and you can change this choice later.</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Switch isSelected={consent.analytics === "accepted"} onValueChange={allowed => { const next = { analytics: allowed ? "accepted" : "declined" } as ConsentState; setConsent(next); saveConsent(next); }}>
+          <Switch isSelected={consent.analytics === "accepted"} onValueChange={allowed => { const next = { ...consent, analytics: allowed ? "accepted" : "declined" } as ConsentState; setConsent(next); saveConsent(next); }}>
             Allow optional analytics
           </Switch>
           <span className="text-xs text-muted">Current choice: {consent.analytics === "accepted" ? "allowed" : consent.analytics === "declined" ? "only necessary" : "not chosen"}</span>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Switch isSelected={consent.performance !== "declined"} onValueChange={allowed => { const next = { ...consent, performance: allowed ? "accepted" : "declined" } as ConsentState; setConsent(next); saveConsent(next); window.location.reload(); }}>
+            Allow performance caching
+          </Switch>
+          <span className="text-xs text-muted">Improves shell loading and offline recovery. Stored only as a first-party preference.</span>
         </div>
         <p className="mt-3 text-xs text-muted">Analytics is intended for aggregated route, feature, performance, and error signals. It does not need script contents, media files, passwords, access tokens, or private project data.</p>
         <p className="mt-3 text-xs text-muted"><a href={`${import.meta.env.BASE_URL}cookies`} className="text-accent underline-offset-2 hover:underline">Read the Cookies policy</a></p>

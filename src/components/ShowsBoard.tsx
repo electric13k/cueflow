@@ -82,7 +82,7 @@ export default function ShowsBoard({
                   <button type="button" className="flex-1 text-left" onClick={() => onOpenShow(s)}>
                     <span className="block truncate font-bold">{s.name}</span>
                     <span className="mt-1 block font-mono text-[11px] uppercase tracking-widest text-muted">
-                      {s.startedAt ? "live" : s.password ?? "no key"}
+                      {s.startedAt ? "live" : "open manager"}
                     </span>
                     <span className="mt-1 block text-xs text-muted">
                       {s.sequenceId ? seqName(s.sequenceId) : "no sequence yet"}

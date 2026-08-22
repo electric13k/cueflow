@@ -1,4 +1,4 @@
-const CACHE_NAME = "cueflow-shell-v2";
+const CACHE_NAME = "cueflow-shell-v3";
 const SHELL = ["./", "./index.html"];
 
 const isCacheableAsset = url => url.origin === self.location.origin &&

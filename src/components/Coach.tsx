@@ -37,8 +37,14 @@ export default function Coach() {
 
   useEffect(() => {
     const open = (e: Event) => {
-      const next = lessons[(e as CustomEvent<string>).detail];
-      if (!next || showing.current) return;
+      const detail = (e as CustomEvent<string | { id: string; force?: boolean }>).detail;
+      const id = typeof detail === "string" ? detail : detail?.id;
+      const force = (typeof detail === "object" && detail?.force === true) || (e as Event & { force?: boolean }).force === true;
+      const next = lessons[id];
+      // A completed first-run tutorial must not resurrect an automatic coach over a deep-linked
+      // control. Explicitly pressing a question-mark help button still uses force and can replay it.
+      const consentOpen = !!document.querySelector('[role="dialog"][aria-label="Cookie consent"]');
+      if (!next || showing.current || (!force && (consentOpen || localStorage.getItem("cueflow:tutorial:complete") === "1"))) return;
       showing.current = true;
       setLesson(next);
     };

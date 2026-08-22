@@ -83,7 +83,11 @@ export const forgetLessons = () => localStorage.removeItem(KEY);
 /** Un-learn one lesson and give it again. Every other lesson stays learned. */
 export function replay(id: keyof typeof lessons) {
   localStorage.setItem(KEY, JSON.stringify(taught().filter(x => x !== id)));
-  teach(id);
+  if (lessons[id]) {
+    const event = new CustomEvent("cueflow:teach", { detail: id });
+    Object.defineProperty(event, "force", { value: true });
+    window.dispatchEvent(event);
+  }
 }
 
 /** Ask for a lesson. Silently does nothing if it has already been given. */

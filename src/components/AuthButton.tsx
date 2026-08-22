@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from "../ui";
-import { LogIn, LogOut, User } from "lucide-react";
+import { LogIn, LogOut, MoreHorizontal, User } from "lucide-react";
 import GoogleMark from "./GoogleMark";
 import { onAuth, signIn, signInWith, signOut, signUp } from "../lib/store";
 import { toast } from "../lib/toast";
@@ -14,7 +14,14 @@ export default function AuthButton() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [accountMenu, setAccountMenu] = useState(false);
   const navigate = useNavigate();
+  useEffect(() => {
+    if (!accountMenu) return;
+    const close = () => setAccountMenu(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [accountMenu]);
 
   useEffect(() => onAuth(setEmail), []);
   // The sign-in banner asks for the modal rather than owning a second copy of it.
@@ -40,9 +47,13 @@ export default function AuthButton() {
   };
 
   if (email) return (
-    <Button size="sm" variant="light" isIconOnly className="sm:w-auto sm:px-3" startContent={<LogOut size={15} />} onPress={() => void signOut()} title={`Sign out ${email}`} aria-label={`Sign out ${email}`}>
-      <span className="sr-only sm:not-sr-only sm:max-w-[10rem] sm:truncate">{email}</span>
-    </Button>
+    <div className="group/account relative" onContextMenu={event => { event.preventDefault(); setAccountMenu(true); }}>
+      <Button size="sm" variant="light" isIconOnly aria-label="Account menu" title="Account menu" onPress={() => setAccountMenu(open => !open)}><MoreHorizontal size={17} /></Button>
+      <div className={`absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-surface p-2 shadow-glass ${accountMenu ? "block" : "hidden group-hover/account:block"}`}>
+        <p className="truncate px-3 py-2 text-xs text-muted" title={email}>{email}</p>
+        <Button size="sm" variant="light" className="w-full justify-start" startContent={<LogOut size={15} />} onPress={() => void signOut()}>Sign out</Button>
+      </div>
+    </div>
   );
   return (
     <>

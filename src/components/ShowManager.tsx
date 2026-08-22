@@ -48,6 +48,8 @@ type Props = {
   onAddToSequence: (seqId: string, trackId: string) => void;
   /** Fires a cue of the armed sequence, by its index in that sequence. */
   onFire: (index: number) => void;
+  /** Arms the show’s first sequence on the operator surface without opening an audience window. */
+  onArmSequence?: (seqId: string) => void;
   /** The audience screen as its own window. The desk keeps the keys; that window forwards them. */
   onOpenAudience: () => void;
 };
@@ -69,7 +71,7 @@ type Props = {
 export default function ShowManager({
   show, setShow, projectId, sequences, tracks, script, links, stage, armedSequenceId, cueIndex,
   onClose, onFlash, onResend, onAddSequence, onAddScript, onRunSequence, onStage, onAddToSequence,
-  onFire, onOpenAudience,
+  onFire, onArmSequence, onOpenAudience,
 }: Props) {
   const [theme] = useStudioTheme();
   const [audience, setAudience] = useState(false);
@@ -126,7 +128,10 @@ export default function ShowManager({
       setShow({ ...show, startedAt: at, sequenceId: deck ?? show.sequenceId });
       if (curtainTimer.current) window.clearTimeout(curtainTimer.current);
       setCurtain(live);
-      if (live) curtainTimer.current = window.setTimeout(() => setCurtain(false), 1400);
+      if (live) {
+        curtainTimer.current = window.setTimeout(() => setCurtain(false), 1400);
+        if (deck) onArmSequence?.(deck);
+      }
       logChat(show.id, { from: "show", text: live ? "Live. Every device is locked in." : "Show ended.", kind: "event" });
     } catch (e) { toast("That did not work", (e as Error).message, "warn"); }
     finally { setBusy(false); }

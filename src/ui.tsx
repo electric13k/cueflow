@@ -59,11 +59,12 @@ export function Button({
   );
 }
 
-export function Card({ isPressable, onPress, className, children, "data-tour": dataTour, ...rest }: { isPressable?: boolean; onPress?: () => void; className?: string; children?: ReactNode; "data-tour"?: string }) {
+export function Card({ isPressable, onPress, onContextMenu, className, children, "data-tour": dataTour, ...rest }: { isPressable?: boolean; onPress?: () => void; onContextMenu?: (e: React.MouseEvent) => void; className?: string; children?: ReactNode; "data-tour"?: string }) {
   return (
     <C
       {...rest}
       {...(dataTour ? { "data-tour": dataTour } : {})}
+      {...(onContextMenu ? { onContextMenu } : {})}
       className={cn(isPressable && "cue-pressable cursor-pointer text-left", className)}
       {...(isPressable ? { role: "button", tabIndex: 0, onClick: (e: React.MouseEvent) => { if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return; onPress?.(); }, onKeyDown: (e: React.KeyboardEvent) => { if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPress?.(); } } } : {})}
     >

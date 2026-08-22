@@ -1,7 +1,8 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal } from "lucide-react";
 import { useDeviceCapabilities, useIsPhone } from "../lib/layout";
 import LogoMark from "../components/LogoMark";
 import MediaEditor from "../components/MediaEditor";
@@ -19,11 +20,11 @@ import DarkToggle, { WorkSurface } from "../components/DarkToggle";
 import { useSignedIn } from "../components/RequireAuth";
 import { currentProject } from "../lib/projects";
 import { createShow, deleteShow, listShows, SCRIPT_LIMIT, showChannel, updateShow, type Show, type ShowMsg } from "../lib/shows";
-import { loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
+import { linksOf, loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
 import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
-import { AudioEngine, makeReversedFile } from "../lib/audio";
+import { AudioEngine, decodeAudioUrl, makeReversedFile, peaks } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
 import { moved, useDragList } from "../lib/dragList";
 import CommandPalette, { type PaletteCommand } from "../components/CommandPalette";
@@ -114,8 +115,10 @@ export default function Studio() {
   // committed so Library -> Deck and every other bottom-nav change always starts at its own top.
   useEffect(() => {
     if (!phone) return;
-    const frame = requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
-    return () => cancelAnimationFrame(frame);
+    let second: number | null = null;
+    const reset = () => { document.documentElement.scrollTop = 0; document.body.scrollTop = 0; window.scrollTo({ top: 0, left: 0, behavior: "auto" }); };
+    const frame = requestAnimationFrame(() => { reset(); second = requestAnimationFrame(reset); });
+    return () => { cancelAnimationFrame(frame); if (second !== null) cancelAnimationFrame(second); };
   }, [pane, phone]);
   useEffect(() => {
     const onTourPane = (event: Event) => {
@@ -157,6 +160,13 @@ export default function Studio() {
   const renameModal = useDisclosure();
   const historyModal = useDisclosure();
   const [draft, setDraft] = useState<{ kind: "track" | "sequence"; id: string; value: string }>({ kind: "track", id: "", value: "" });
+  const [sequenceMenuFor, setSequenceMenuFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sequenceMenuFor) return;
+    const close = () => setSequenceMenuFor(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [sequenceMenuFor]);
 
   // The show: one performance across every device in the room. The channel lives here rather than in
   // the host panel because the things worth broadcasting -- a cue going out, the stage changing --
@@ -549,7 +559,31 @@ export default function Studio() {
   const unlinkCue = (id: string) => applySequences(all => all.map(s => s.id !== sequenceId ? s : ({
     ...s, items: s.items.map(it => (it.id === id || it.link === id ? { ...it, link: undefined } : it)),
   })), "Unlink cues");
-  const advance = (dir: 1 | -1) => { if (!selectedSequence) return; const n = selectedSequence.items.length; if (!n) return; const i = loopSeq ? (cueIndex + dir + n) % n : clamp(cueIndex + dir, 0, n - 1); playCue(i); };
+  const showSequenceIds = () => {
+    if (!liveShow) return [] as string[];
+    const linked = linksOf(links, liveShow.id).seqs;
+    return [...new Set([liveShow.sequenceId, ...linked].filter((id): id is string => !!id))];
+  };
+  const armSequence = (seq: Sequence, clearStage = true) => {
+    if (!seq.items.length) return false;
+    setSequenceId(seq.id); setTab("sequence"); setCueIndex(-1); setArmed(true); audio.current.pause(); setPlaying(false);
+    if (clearStage) setStage(null);
+    updateFeatures(state => ({ ...state, runHistory: [...state.runHistory, { id: crypto.randomUUID(), at: new Date().toISOString(), type: "start" as const, sequenceId: seq.id, sequenceName: seq.name }].slice(-500) }));
+    return true;
+  };
+  const advance = (dir: 1 | -1) => {
+    if (!selectedSequence) return;
+    const n = selectedSequence.items.length; if (!n) return;
+    if (dir === 1 && !loopSeq && cueIndex >= n - 1) {
+      const ids = showSequenceIds();
+      const nextId = ids[ids.indexOf(sequenceId) + 1];
+      const next = sequences.find(s => s.id === nextId);
+      if (next && armSequence(next, false)) { toast("Next sequence armed", `${next.name} is ready to run.`, "success"); return; }
+      return;
+    }
+    const i = loopSeq ? (cueIndex + dir + n) % n : clamp(cueIndex + dir, 0, n - 1);
+    playCue(i);
+  };
   useEffect(() => {
     if (!armed || !selectedSequence || cueIndex < 0) { setTimerLeft(0); return; }
     const item = selectedSequence.items[cueIndex];
@@ -585,13 +619,12 @@ export default function Studio() {
   const startSequence = (audience: boolean, seq = selectedSequence) => {
     teach(matchMedia("(max-width: 1023px)").matches ? "transport" : "armed");
     if (!seq?.items.length) return;
-    setSequenceId(seq.id);
     if (audience) openAudience();
-    setTab("sequence"); setCueIndex(-1); setStage(null); setArmed(true); audio.current.pause(); setPlaying(false);
-    updateFeatures(state => ({ ...state, runHistory: [...state.runHistory, { id: crypto.randomUUID(), at: new Date().toISOString(), type: "start" as const, sequenceId: seq.id, sequenceName: seq.name }].slice(-500) }));
+    armSequence(seq);
   };
   /** From the manager: leave the show's screen, arm that sequence, put it up in presenter mode. */
   const runSequence = (seqId: string) => { setManaging(false); startSequence(true, sequences.find(s => s.id === seqId)); };
+  const armShowSequence = (seqId: string) => { const seq = sequences.find(s => s.id === seqId); if (seq) { teach(phone ? "transport" : "armed"); armSequence(seq); } };
   // Stand down puts the room back to black and the studio back to a normal editing screen.
   const standDown = () => { setArmed(false); setCueIndex(0); setStage(null); audio.current.pause(); setPlaying(false); updateFeatures(state => ({ ...state, runHistory: [...state.runHistory, { id: crypto.randomUUID(), at: new Date().toISOString(), type: "end" as const, sequenceId: sequenceId, sequenceName: selectedSequence?.name }].slice(-500) })); };
 
@@ -799,8 +832,8 @@ export default function Studio() {
             ) : (
               <ol ref={seqDrag.list} className="flex flex-wrap gap-2">
                 {shownSequences.map((s, i) => (
-                  <li key={s.id} data-drop={`seq:${s.id}`}
-                    className={`flex items-center gap-1 rounded-full border pr-1 transition-colors ${libDrag.over === `seq:${s.id}` ? "border-accent bg-accent/25" : s.id === sequenceId ? "border-accent bg-accent/15" : "border-border bg-surface/50"}`}>
+                  <li key={s.id} data-drop={`seq:${s.id}`} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setSequenceMenuFor(s.id); }}
+                    className={`group relative flex items-center gap-1 rounded-full border pr-1 transition-colors ${sequenceMenuFor === s.id ? "z-30" : "z-0"} ${libDrag.over === `seq:${s.id}` ? "border-accent bg-accent/25" : s.id === sequenceId ? "border-accent bg-accent/15" : "border-border bg-surface/50"}`}>
                     <span role="button" tabIndex={-1} aria-label={`Drag ${s.name} onto a show`}
                       className="flex min-w-9 cursor-grab touch-pan-y items-center justify-center self-stretch text-muted hover:text-foreground active:cursor-grabbing"
                       onPointerDown={seqDrag.start(i)} onPointerMove={seqDrag.move} onPointerUp={seqDrag.end} onPointerCancel={seqDrag.end}>
@@ -813,9 +846,14 @@ export default function Studio() {
                     <Button isIconOnly size="sm" variant="light" aria-label={`Run ${s.name} in presenter mode`}
                       title="Run this sequence on its own, in presenter mode" isDisabled={!s.items.length}
                       onPress={() => startSequence(true, s)}><Play size={13} fill="currentColor" /></Button>
-                    <Button isIconOnly size="sm" variant="light" aria-label={`Duplicate ${s.name}`} onPress={() => duplicateSequence(s)}><Copy size={13} /></Button>
-                    <Button isIconOnly size="sm" variant="light" aria-label={`Rename ${s.name}`} onPress={() => openRename("sequence", s.id, s.name)}><Pencil size={13} /></Button>
-                    <Button isIconOnly size="sm" variant="light" color="danger" aria-label={`Delete ${s.name}`} onPress={() => deleteSequence(s.id)}><Trash2 size={13} /></Button>
+                    <div className="relative">
+                      <Button isIconOnly size="sm" variant="light" className="sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" aria-label={`More actions for ${s.name}`} title="More actions" onPress={() => setSequenceMenuFor(sequenceMenuFor === s.id ? null : s.id)}><MoreHorizontal size={13} /></Button>
+                      {sequenceMenuFor === s.id && <div className="absolute right-0 top-full z-40 mt-1 flex w-40 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass">
+                        <Button size="sm" variant="light" className="justify-start" onPress={() => { setSequenceMenuFor(null); duplicateSequence(s); }}><Copy size={14} />Duplicate</Button>
+                        <Button size="sm" variant="light" className="justify-start" onPress={() => { setSequenceMenuFor(null); openRename("sequence", s.id, s.name); }}><Pencil size={14} />Rename</Button>
+                        <Button size="sm" variant="light" color="danger" className="justify-start" onPress={() => { setSequenceMenuFor(null); deleteSequence(s.id); }}><Trash2 size={14} />Delete</Button>
+                      </div>}
+                    </div>
                   </li>
                 ))}
               </ol>
@@ -858,7 +896,7 @@ export default function Studio() {
             onSelectionChange={k => { setTab(k as string); teach(k as "library" | "sequence"); }}
             classNames={{ tabList: armed || phone ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
-              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
+              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
               <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
@@ -896,7 +934,7 @@ export default function Studio() {
           {PANES.map(p => {
             const on = pane === p.id;
             return (
-              <button key={p.id} type="button" data-tour={`pane-${p.id}`} aria-current={on} onClick={() => setPane(p.id)}
+              <button key={p.id} type="button" data-tour={`pane-${p.id}`} aria-current={on} onPointerDown={(event) => event.preventDefault()} onClick={() => setPane(p.id)}
                 className={`flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 pt-2 text-[11px] font-semibold transition-colors ${on ? "text-accent" : "text-muted"}`}>
                 <p.icon size={19} aria-hidden />
                 {p.label}
@@ -964,7 +1002,7 @@ export default function Studio() {
           onAddSequence={seqId => sequenceToShow(seqId, liveShow.id)} onAddScript={() => scriptToShow(liveShow.id)}
           onRunSequence={runSequence} onStage={t => show(t)}
           onAddToSequence={(seqId, trackId) => addTracksTo(seqId, [trackId])}
-          onFire={playCue} onOpenAudience={openAudience} />
+          onFire={playCue} onArmSequence={armShowSequence} onOpenAudience={openAudience} />
       )}
 
       <SlideComposer open={slideOpen} onClose={() => setSlideOpen(false)} onCreate={addProcessedFile} />
@@ -973,9 +1011,16 @@ export default function Studio() {
   );
 }
 
-function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onRename, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
+function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onRename, onDeleteTrack, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
   const shown: Track[] = tracks;
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const device = useDeviceCapabilities();
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = () => setMenuFor(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [menuFor]);
   const hoverPreview = device.canHover && device.hasFinePointer && !device.isTouch;
   return (
     <div className="mt-5 space-y-6">
@@ -1008,7 +1053,7 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
             const kind = kindOf(t), Icon = kindIcon[kind];
             return (
             <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={hoverPreview ? { y: -3 } : undefined}>
-              <Card data-tour={i === 0 ? "library-card" : undefined} isPressable onPress={() => onPlay(t)} className={`media-card media-card--${kind} w-full overflow-hidden border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
+              <Card data-tour={i === 0 ? "library-card" : undefined} isPressable onPress={() => { setMenuFor(null); onPlay(t); }} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setMenuFor(t.id); }} className={`group media-card media-card--${kind} relative z-0 w-full border ${menuFor === t.id ? "z-20" : ""} ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
                 <TrackPreview track={t} kind={kind} playOnHover={hoverPreview} />
                 <CardBody className="gap-2">
                   <div className="flex items-start gap-2">
@@ -1029,10 +1074,16 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
                           {isChecked ? <span className="text-xs font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
                         </Button>
                       </Tooltip>
-                      <Tooltip content={favorites.includes(t.id) ? "Remove favorite" : "Add favorite"}><Button isIconOnly size="sm" variant={favorites.includes(t.id) ? "solid" : "light"} color={favorites.includes(t.id) ? "primary" : "default"} aria-label={favorites.includes(t.id) ? `Remove ${t.title} from favorites` : `Favorite ${t.title}`} onPress={() => onToggleFavorite?.(t.id)}><Star size={14} fill={favorites.includes(t.id) ? "currentColor" : "none"} /></Button></Tooltip>
-                      <Tooltip content="Add to a collection"><Button isIconOnly size="sm" variant="light" aria-label={`Add ${t.title} to a collection`} onPress={() => onAddToCollection?.(t.id)}><FolderPlus size={14} /></Button></Tooltip>
-                      <Tooltip content="Open in the editor"><Button isIconOnly size="sm" variant="light" aria-label={`Open ${t.title} in the editor`} onPress={() => onOpenEditor(t.id)}><SlidersHorizontal size={14} /></Button></Tooltip>
-                      <Tooltip content="Rename"><Button isIconOnly size="sm" variant="light" aria-label={`Rename ${t.title}`} onPress={() => onRename(t.id)}><Pencil size={14} /></Button></Tooltip>
+                      <div className="relative">
+                        <Button isIconOnly size="sm" variant="light" className="sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" aria-label={`More actions for ${t.title}`} title="More actions" onPress={() => setMenuFor(menuFor === t.id ? null : t.id)}><MoreHorizontal size={14} /></Button>
+                        {menuFor === t.id && <div className="absolute right-0 top-full z-40 mt-1 flex w-44 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass">
+                          <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onToggleFavorite?.(t.id); }}><Star size={14} />{favorites.includes(t.id) ? "Remove favorite" : "Favorite"}</Button>
+                          <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onAddToCollection?.(t.id); }}><FolderPlus size={14} />Add to collection</Button>
+                          <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onOpenEditor(t.id); }}><SlidersHorizontal size={14} />Open editor</Button>
+                          <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onRename(t.id); }}><Pencil size={14} />Rename</Button>
+                          <Button size="sm" variant="light" color="danger" className="justify-start" onPress={() => { setMenuFor(null); if (confirm(`Delete ${t.title}?`)) onDeleteTrack?.(t.id); }}><Trash2 size={14} />Delete</Button>
+                        </div>}
+                      </div>
                     </div>
                   </div>
                   {t.error
@@ -1063,7 +1114,41 @@ function TrackPreview({ track, kind, playOnHover }: { track: Track; kind: Kind; 
   if (kind === "image") return <div className={cls}><img src={track.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /></div>;
   if (kind === "video") return <div className={cls} onPointerEnter={enter} onPointerLeave={leave}><video ref={video} src={track.url} muted playsInline preload="metadata" className="h-full w-full object-cover" /></div>;
   if (kind === "embed") return <div className={cls}><iframe src={track.url} title={`${track.title} preview`} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full border-0" /></div>;
-  return <div className={`${cls} media-preview-audio`}><div className="media-audio-bars" aria-hidden><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div><span className="sr-only">Audio preview for {track.title}</span></div>;
+  return <div className={`${cls} media-preview-audio`}><AudioPreview url={track.url} title={track.title} /></div>;
+}
+
+function AudioPreview({ url, title }: { url: string; title: string }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el) return;
+    let cancelled = false;
+    void decodeAudioUrl(url).then(buffer => {
+      if (cancelled || !el.isConnected) return;
+      const rect = el.getBoundingClientRect();
+      const width = Math.max(40, Math.round(rect.width));
+      const height = Math.max(24, Math.round(rect.height));
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      el.width = Math.round(width * dpr); el.height = Math.round(height * dpr);
+      const ctx = el.getContext("2d"); if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const style = getComputedStyle(el);
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, style.getPropertyValue("--cue-armed").trim() || "#D4A957");
+      gradient.addColorStop(1, style.getPropertyValue("--cue-forest").trim() || "#285B43");
+      ctx.fillStyle = gradient;
+      const values = peaks(buffer, 0, 0, buffer.duration, Math.max(16, Math.floor(width / 2)));
+      const mid = height / 2;
+      for (let i = 0; i < values.length / 2; i++) {
+        const top = mid - Math.abs(values[i * 2 + 1]) * mid * .88;
+        const bottom = mid + Math.abs(values[i * 2]) * mid * .88;
+        ctx.fillRect(i * 2, top, 1, Math.max(1, bottom - top));
+      }
+    }).catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [url]);
+  return failed ? <span className="flex h-full items-center px-4 text-xs text-muted">Audio preview unavailable</span> : <><canvas ref={canvas} className="h-full w-full" aria-hidden /><span className="sr-only">Audio waveform preview for {title}</span></>;
 }
 
 // "My library" is gone: the library has its own search box above this one, and two boxes that both
@@ -1184,6 +1269,13 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
 function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage, cueTimers = {}, setCueTimer, rehearsal = { active: false, completed: [], notes: {} }, onToggleRehearsal, onSaveRehearsalNote }: any) {
   // Which cue is waiting to be paired. Linking is two clicks, so the second one has to know.
   const [linking, setLinking] = useState("");
+  const [cueMenuFor, setCueMenuFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!cueMenuFor) return;
+    const close = () => setCueMenuFor(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [cueMenuFor]);
   const seq = sequences.find((s: Sequence) => s.id === sequenceId);
   const cueDrag = useDragList(reorder);
   // Rendered order is the drag preview while a drag is in flight, and the real order otherwise.
@@ -1233,8 +1325,9 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                     return (
                     // Layout animation is off mid-drag: an animating row reports a moving rectangle,
                     // and the drop target is computed from those rectangles.
-                    <motion.li key={item.id} layout={!cueDrag.dragging} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
-                      <div className={`flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5 ${held ? "border-accent bg-accent/15 shadow-lg" : i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
+                    <motion.li key={item.id} layout={!cueDrag.dragging} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setCueMenuFor(item.id); }}>
+
+                      <div className={`relative flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5 ${cueMenuFor === item.id ? "z-30" : "z-0"} ${held ? "border-accent bg-accent/15 shadow-lg" : i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
                         {/* A 15px icon is a 15px target. The grip fills the row's height and is wide
                             enough to hit without looking, which is how it actually gets used --
                             negative margins keep the row's own spacing unchanged. */}
@@ -1290,6 +1383,15 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                             <Tooltip content="Move down"><Button isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
                           </span>
                           <Tooltip content="Remove cue"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteItem(item.id)}><Trash2 size={14} /></Button></Tooltip>
+                          <div className="relative">
+                            <Button isIconOnly size="sm" variant="light" aria-label={`More actions for ${item.label}`} title="More actions" onPress={() => setCueMenuFor(cueMenuFor === item.id ? null : item.id)}><MoreHorizontal size={14} /></Button>
+                            {cueMenuFor === item.id && <div className="absolute right-0 top-full z-40 mt-1 flex w-44 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass">
+                              <Button size="sm" variant="light" className="justify-start" onPress={() => { setCueMenuFor(null); moveItem(i, -1); }} isDisabled={i === 0}><ChevronUp size={14} />Move up</Button>
+                              <Button size="sm" variant="light" className="justify-start" onPress={() => { setCueMenuFor(null); moveItem(i, 1); }} isDisabled={i === seq.items.length - 1}><ChevronDown size={14} />Move down</Button>
+                              {kind !== "audio" && <Button size="sm" variant="light" className="justify-start" onPress={() => { const order = ["cut", "fade", "slide", "zoom"]; setItemTransition(item.id, order[(order.indexOf(item.visual?.transition ?? "fade") + 1) % order.length]); setCueMenuFor(null); }}><Repeat size={14} />Cycle transition</Button>}
+                              <Button size="sm" variant="light" color="danger" className="justify-start" onPress={() => { setCueMenuFor(null); deleteItem(item.id); }}><Trash2 size={14} />Remove cue</Button>
+                            </div>}
+                          </div>
                         </div>
                       </div>
                     </motion.li>

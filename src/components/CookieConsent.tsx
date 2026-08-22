@@ -6,7 +6,7 @@ import { getConsent, saveConsent, type ConsentState } from "../lib/cookies";
 
 // Necessary storage keeps CueFlow usable. Optional analytics is off until the user explicitly opts in.
 export default function CookieConsent() {
-  const [, setConsent] = useState<ConsentState>(() => ({ analytics: "unset" }));
+  const [, setConsent] = useState<ConsentState>(() => ({ analytics: "unset", performance: "accepted" }));
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function CookieConsent() {
   }, []);
 
   const choose = (analytics: "accepted" | "declined") => {
-    saveConsent({ analytics });
+    saveConsent({ analytics, performance: "accepted" });
     setShow(false);
   };
 
@@ -36,7 +36,7 @@ export default function CookieConsent() {
         >
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent/15 text-accent"><Cookie size={18} /></div>
           <p className="flex-1 text-sm text-muted">
-            CueFlow uses necessary local storage and cookies to keep your work, preferences, and sign-in working. Optional analytics is off by default. If enabled, it helps us understand which screens need improvement and can be turned off later in Settings.{" "}
+            CueFlow uses necessary local storage and performance caching to keep your work, preferences, sign-in, and loading experience working. Optional analytics is off by default. If enabled, it helps us understand which screens need improvement and can be turned off later in Settings.{" "}
             <a href={`${import.meta.env.BASE_URL}cookies`} className="text-accent underline-offset-2 hover:underline">Cookies</a>{" "}
             and <a href={`${import.meta.env.BASE_URL}privacy`} className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>.
           </p>

@@ -1,24 +1,24 @@
-import { StrictMode } from "react";
+import { lazy, Suspense, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "framer-motion";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./styles.css";
-import Home from "./pages/Home";
-import Features from "./pages/Features";
-import Studio from "./pages/Studio";
-import Audience from "./pages/Audience";
-import Contact from "./pages/Contact";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
-import Cookies from "./pages/Cookies";
-import Tutorial from "./pages/Tutorial";
-import Credits from "./pages/Credits";
-import Script from "./pages/Script";
-import Account from "./pages/Account";
-import Settings from "./pages/Settings";
-import Projects from "./pages/Projects";
-import Workspace from "./pages/Workspace";
-import Show from "./pages/Show";
+const Home = lazy(() => import("./pages/Home"));
+const Features = lazy(() => import("./pages/Features"));
+const Studio = lazy(() => import("./pages/Studio"));
+const Audience = lazy(() => import("./pages/Audience"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Cookies = lazy(() => import("./pages/Cookies"));
+const Tutorial = lazy(() => import("./pages/Tutorial"));
+const Credits = lazy(() => import("./pages/Credits"));
+const Script = lazy(() => import("./pages/Script"));
+const Account = lazy(() => import("./pages/Account"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Projects = lazy(() => import("./pages/Projects"));
+const Workspace = lazy(() => import("./pages/Workspace"));
+const Show = lazy(() => import("./pages/Show"));
 import RequireAuth from "./components/RequireAuth";
 import UsernamePrompt from "./components/UsernamePrompt";
 import Coach from "./components/Coach";
@@ -33,6 +33,10 @@ import { touchLastSeen } from "./lib/retention";
 import { registerCueflowCache } from "./lib/cache";
 
 /** /legal was one page with two anchors; keep old links working now that it is two pages. */
+function RouteLoading() {
+  return <div className="min-h-dvh bg-background p-6 text-foreground"><div className="mx-auto max-w-7xl animate-pulse rounded-2xl border border-border bg-surface/50 p-8"><div className="h-4 w-24 rounded bg-surface-secondary" /><div className="mt-5 h-10 w-2/3 rounded bg-surface-secondary" /><div className="mt-3 h-4 w-full max-w-xl rounded bg-surface-secondary" /></div></div>;
+}
+
 function LegalRedirect() {
   const { hash } = useLocation();
   return <Navigate to={hash === "#privacy" ? "/privacy" : "/terms"} replace />;
@@ -53,6 +57,7 @@ createRoot(document.getElementById("root")!).render(
     <MotionConfig reducedMotion="user">
       {/* BASE_URL is "/" everywhere except GitHub Pages, which serves the app from /<repo>/. */}
       <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <Suspense fallback={<RouteLoading />}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/features" element={<Features />} />
@@ -75,6 +80,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/legal" element={<LegalRedirect />} />
         <Route path="*" element={<Home />} />
       </Routes>
+      </Suspense>
       <Toaster />
       <CookieConsent />
       <SignInPrompt />
