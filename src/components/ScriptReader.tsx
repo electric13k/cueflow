@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button, Input, Slider, Tooltip } from "../ui";
-import { Bell, ChevronDown, ChevronUp, FileUp, Minus, Pause, Play, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Button, Input, Slider, Switch, Tooltip } from "../ui";
+import { Bell, ChevronDown, ChevronUp, FileUp, ListPlus, Minus, MousePointer2, Pause, Play, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { send } from "../lib/bus";
-import { cueAlert, emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Armed, type Cue, type ScriptDoc } from "../lib/script";
+import { cueAlert, directionOf, emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Armed, type Cue, type ScriptDoc } from "../lib/script";
 import type { AlertScope } from "../lib/alerts";
 
 /** Where on screen the line you are reading sits. Not the very top: you need to see what is coming. */
@@ -41,6 +41,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
   const [size, setSize] = useState(() => Number(localStorage.getItem("cueflow:scriptSize")) || 18);
   const [colour, setColour] = useState(() => localStorage.getItem("cueflow:scriptColour") || "");
   const [speed, setSpeed] = useState(() => Number(localStorage.getItem("cueflow:scriptSpeed")) || 60);
+  const [yellowEnabled, setYellowEnabled] = useState(() => localStorage.getItem("cueflow:yellowAlerts") !== "0");
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [query, setQuery] = useState("");
@@ -49,21 +50,33 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
   const [error, setError] = useState("");
   const [flash, setFlash] = useState<"warn" | "hit" | null>(null);
   const [message, setMessage] = useState("");
+  const [selectedPhrase, setSelectedPhrase] = useState("");
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [scan, setScan] = useState<{ top: number; start: number; travel: number; key: string } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const speedRef = useRef(speed);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   speedRef.current = speed;
   const fired = useRef<Armed>({ warn: new Set(), hit: new Set() });
   const accrued = useRef(0);
+  const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanKey = useRef("");
 
   const marked = useMemo(() => markKeywords(doc.html, doc.cues), [doc.html, doc.cues]);
   const found = useMemo(() => findInScript(marked.html, query), [marked.html, query]);
   useEffect(() => { localStorage.setItem("cueflow:scriptSize", String(size)); }, [size]);
   useEffect(() => { localStorage.setItem("cueflow:scriptSpeed", String(speed)); }, [speed]);
   useEffect(() => { localStorage.setItem("cueflow:scriptColour", colour); }, [colour]);
+  useEffect(() => { localStorage.setItem("cueflow:yellowAlerts", yellowEnabled ? "1" : "0"); }, [yellowEnabled]);
   // A changed script or cue list makes every past alert irrelevant.
   useEffect(() => { fired.current = { warn: new Set(), hit: new Set() }; }, [marked.html]);
   useEffect(() => { setAt(0); }, [query]);
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [contextMenu]);
 
   const raise = (level: "warn" | "hit", cue: Cue) => {
     const text = cue.message || (level === "warn" ? `${keywordsOf(cue)[0] ?? "Cue"} coming up` : `${keywordsOf(cue)[0] ?? "Cue"} now`);
@@ -81,12 +94,27 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
     const box = scroller.current;
     if (!box) return;
     const line = box.getBoundingClientRect().top + box.clientHeight * READ_LINE;
+    const groups = new Map<Element, HTMLElement[]>();
     for (const mark of box.querySelectorAll<HTMLElement>("mark[data-hit]")) {
-      const cue = doc.cues.find(c => c.id === mark.dataset.cue);
-      if (!cue) continue;
-      const ahead = mark.getBoundingClientRect().top - line;
-      const level = cueAlert(ahead, doc.lookahead, mark.dataset.hit!, fired.current);
-      if (level) raise(level, cue);
+      const block = mark.closest("p,li,h1,h2,h3,h4,h5,h6") ?? mark.parentElement ?? box;
+      const list = groups.get(block) ?? [];
+      list.push(mark);
+      groups.set(block, list);
+    }
+    for (const marks of groups.values()) {
+      const isMultiCueLine = new Set(marks.map(mark => mark.dataset.cue)).size > 1;
+      const lineNearGuide = marks.some(mark => {
+        const ahead = mark.getBoundingClientRect().top - line;
+        return ahead <= doc.lookahead && ahead >= -48;
+      });
+      if (isMultiCueLine && lineNearGuide) scanLine(marks, marks.map(mark => mark.dataset.hit).join("|"));
+      for (const mark of marks) {
+        const cue = doc.cues.find(c => c.id === mark.dataset.cue);
+        if (!cue) continue;
+        const ahead = mark.getBoundingClientRect().top - line;
+        const level = cueAlert(ahead, doc.lookahead, mark.dataset.hit!, fired.current, isMultiCueLine ? false : yellowEnabled && cue.warn !== false);
+        if (level) raise(level, cue);
+      }
     }
   };
 
@@ -134,6 +162,8 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
     if (scroller.current) scroller.current.scrollTop = 0;
     // Back to the top means back to the top: the cues ahead have not happened yet.
     fired.current = { warn: new Set(), hit: new Set() };
+    scanKey.current = "";
+    setScan(null);
   };
 
   // Stepping through the finds. Also runs when the marked-up HTML changes, because replacing the
@@ -150,6 +180,53 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
 
   const step = (d: number) => setAt(a => (found.hits ? (a + d + found.hits) % found.hits : 0));
 
+  const selectedFromWindow = () => window.getSelection()?.toString().trim().replace(/\s+/g, " ") || "";
+  const selectNodes = (nodes: HTMLElement[]) => {
+    if (!nodes.length) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.setStartBefore(nodes[0]);
+    range.setEndAfter(nodes[nodes.length - 1]);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+  const selectCurrentMatch = () => selectNodes([scroller.current?.querySelector<HTMLElement>(".find-hit.current")].filter(Boolean) as HTMLElement[]);
+  const selectAllMatches = () => selectNodes([...scroller.current?.querySelectorAll<HTMLElement>(".find-hit") ?? []]);
+  const addCueForText = (text: string, instances: "first" | "all" = "all") => {
+    const words = text.trim().replace(/\s+/g, " ");
+    if (!words) return;
+    setCues([...doc.cues, { id: crypto.randomUUID(), words, message: "", match: "phrase", instances }]);
+    setSelectedPhrase("");
+    setContextMenu(null);
+  };
+  const addCue = () => addCueForText(selectedPhrase || query.trim(), "all");
+  const addAllInstances = () => addCueForText(selectedPhrase || query.trim(), "all");
+  const addSelectedCue = () => addCueForText(selectedPhrase || query.trim(), "first");
+  const openSelectionMenu = (event: ReactMouseEvent) => {
+    const text = selectedFromWindow();
+    if (!text) return;
+    event.preventDefault();
+    setSelectedPhrase(text);
+    setContextMenu({ x: Math.min(event.clientX, window.innerWidth - 220), y: Math.min(event.clientY, window.innerHeight - 120), text });
+  };
+  const scanLine = (marks: HTMLElement[], key: string) => {
+    const box = scroller.current;
+    if (!box || marks.length < 2 || scanKey.current === key) return;
+    const frame = box.parentElement?.getBoundingClientRect() ?? box.getBoundingClientRect();
+    const rects = marks.map(mark => mark.getBoundingClientRect());
+    const rtl = directionOf(doc.html) === "rtl" || getComputedStyle(marks[0]).direction === "rtl";
+    const left = rtl ? Math.max(...rects.map(rect => rect.right)) : Math.min(...rects.map(rect => rect.left));
+    const right = rtl ? Math.min(...rects.map(rect => rect.left)) : Math.max(...rects.map(rect => rect.right));
+    const start = left - frame.left;
+    const travel = right - left;
+    const top = Math.min(...rects.map(rect => rect.top)) - frame.top;
+    scanKey.current = key;
+    setScan({ top, start, travel, key });
+    if (scanTimer.current) clearTimeout(scanTimer.current);
+    scanTimer.current = setTimeout(() => { scanKey.current = ""; setScan(null); }, Math.min(2200, 700 + Math.abs(travel) * 1.5));
+  };
+
   const load = async (file: File) => {
     setBusy(true); setError("");
     try {
@@ -162,7 +239,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
   };
 
   const setCues = (cues: Cue[]) => { const next = { ...doc, cues }; try { saveScript(next); setDoc(next); send({ type: "script" }); } catch (e) { setError((e as Error).message); } };
-  const addCue = () => setCues([...doc.cues, { id: crypto.randomUUID(), words: "", message: "" }]);
+  const addBlankCue = () => setCues([...doc.cues, { id: crypto.randomUUID(), words: "", message: "" }]);
   const editCue = (id: string, patch: Partial<Cue>) => setCues(doc.cues.map(c => (c.id === id ? { ...c, ...patch } : c)));
 
   return (
@@ -190,7 +267,8 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
                 className="h-8 w-9 cursor-pointer rounded-lg border border-border bg-transparent p-0.5" />
             </label>
             {colour && <Button size="sm" variant="light" onPress={() => setColour("")}>Theme colour</Button>}
-            <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addCue}>Alert word</Button>
+            <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addBlankCue}>Alert word</Button>
+            <Switch size="sm" isSelected={yellowEnabled} onValueChange={setYellowEnabled}>Yellow alerts</Switch>
             {marked.hits > 0 && <span className="text-xs text-muted">{marked.hits} marked</span>}
           </div>
         </div>
@@ -218,16 +296,20 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
         <div className="flex w-full items-center gap-1 sm:ml-auto sm:w-auto">
           <Search size={14} className="text-muted" />
           <Input className="min-w-0 flex-1 sm:w-44 sm:flex-none" size="sm" placeholder="Find in script" value={query} onValueChange={setQuery}
-            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); } }} />
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCueForText(selectedPhrase || query, "all"); } }} />
           <span className="w-14 text-center text-xs tabular-nums text-muted">
             {found.hits ? `${at + 1}/${found.hits}` : query.trim() ? "none" : ""}
           </span>
           <Button size="sm" variant="light" isIconOnly aria-label="Previous match" onPress={() => step(-1)}><ChevronUp size={14} /></Button>
           <Button size="sm" variant="light" isIconOnly aria-label="Next match" onPress={() => step(1)}><ChevronDown size={14} /></Button>
+          <Button size="sm" variant="light" isIconOnly aria-label="Select current match" onPress={selectCurrentMatch}><MousePointer2 size={14} /></Button>
+          <Button size="sm" variant="light" isIconOnly aria-label="Select all matches" onPress={selectAllMatches}><ListPlus size={14} /></Button>
+          {query.trim() && <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addAllInstances}>Add all occurrences</Button>}
         </div>
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
+      {selectedPhrase && <p className="text-xs text-muted">Selected phrase: <b className="text-foreground">{selectedPhrase}</b>. Press Enter to assign it as a cue.</p>}
 
       {editable && doc.cues.length > 0 && (
         <div className="space-y-2">
@@ -235,6 +317,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
             <div key={c.id} className="flex flex-wrap items-center gap-2">
               <Input className="min-w-40 flex-1" size="sm" placeholder="Words, comma separated" value={c.words} onValueChange={v => editCue(c.id, { words: v })} />
               <Input className="min-w-40 flex-1" size="sm" placeholder="Message to flash (optional)" value={c.message} onValueChange={v => editCue(c.id, { message: v })} />
+              <Switch size="sm" isSelected={c.warn !== false} onValueChange={enabled => editCue(c.id, { warn: enabled })}>Yellow</Switch>
               <Button size="sm" variant="light" isIconOnly onPress={() => setCues(doc.cues.filter(x => x.id !== c.id))}><Trash2 size={14} /></Button>
             </div>
           ))}
@@ -265,10 +348,19 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
             tags and of attributes by name -- six layout properties, four align values, the classes
             the importer itself emits -- and it runs again on load. The only things added after that
             are <mark> and <span class="find-hit">, both built here. */}
-        <div ref={scroller} onScroll={check}
+        <div ref={scroller} dir={directionOf(doc.html)} onScroll={check} onMouseUp={() => setSelectedPhrase(selectedFromWindow())} onContextMenu={openSelectionMenu}
           className="script-prose h-full overflow-y-auto rounded-2xl border border-border bg-surface/30 px-5 py-4"
           style={{ fontSize: size, color: colour || undefined }}
           dangerouslySetInnerHTML={{ __html: found.html || "<p>Open a Word or PDF script. The text comes across with the shape the writer gave it; the page it was printed on does not.</p>" }} />
+        {scan && <motion.span aria-hidden key={scan.key} className="script-line-scan" style={{ top: scan.top, left: scan.start }} initial={{ opacity: 0, x: 0 }} animate={{ opacity: [0, 1, 1, 0], x: scan.travel }} transition={{ duration: Math.min(2.2, .7 + Math.abs(scan.travel) / 160), ease: "linear" }} />}
+        {contextMenu && (
+          <motion.div initial={{ opacity: 0, scale: .96, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="absolute z-30 w-56 rounded-xl border border-border bg-surface p-2 shadow-glass" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onClick={e => e.stopPropagation()}>
+            <p className="truncate px-2 py-1 text-xs text-muted">{contextMenu.text}</p>
+            <Button size="sm" variant="light" className="w-full justify-start" onPress={() => addCueForText(contextMenu.text, "first")}>Assign selected cue</Button>
+            <Button size="sm" variant="light" className="w-full justify-start" onPress={() => addCueForText(contextMenu.text, "all")}>Assign all occurrences</Button>
+            <Button size="sm" variant="light" className="w-full justify-start" onPress={() => setContextMenu(null)}><X size={14} />Close</Button>
+          </motion.div>
+        )}
       </div>
 
       <AnimatePresence mode="wait">

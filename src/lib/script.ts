@@ -175,7 +175,17 @@ export async function parseScript(file: File): Promise<string> {
 }
 
 // --- Keyword alerts ---------------------------------------------------------------------------
-export type Cue = { id: string; words: string; message: string };
+export type Cue = {
+  id: string;
+  words: string;
+  message: string;
+  /** Phrase cues keep a selected multi-word span together instead of splitting it at commas. */
+  match?: "words" | "phrase";
+  /** first is used for a single selected occurrence; all preserves the legacy behavior. */
+  instances?: "first" | "all";
+  /** false suppresses the yellow warning but never suppresses the red hit. */
+  warn?: boolean;
+};
 
 /**
  * The script lives in localStorage rather than in React state, because the reader can be a popup or
@@ -201,7 +211,13 @@ export function saveScript(doc: ScriptDoc) {
 }
 
 /** Splits "lights, LX 4" into the words that each count as a hit on their own. */
-export const keywordsOf = (cue: Cue) => cue.words.split(",").map(w => w.trim().toLowerCase()).filter(Boolean);
+export const keywordsOf = (cue: Cue) => cue.match === "phrase"
+  ? [cue.words.trim().toLowerCase()].filter(Boolean)
+  : cue.words.split(",").map(w => w.trim().toLowerCase()).filter(Boolean);
+
+/** Detect the dominant writing direction without changing the imported document’s markup. */
+export const directionOf = (html: string): "ltr" | "rtl" =>
+  /[\u0590-\u08ff\ufb1d-\ufdfd\ufe70-\ufefc]/.test(html.replace(/<[^>]*>/g, " ")) ? "rtl" : "ltr";
 
 /**
  * Wraps every keyword occurrence in a marker the reader can find and scroll to. Done on the HTML
@@ -216,6 +232,7 @@ export function markKeywords(html: string, cues: Cue[]) {
   })));
   if (!pairs.length) return { html, hits: 0 };
   let hits = 0;
+  const firstInstance = new Set<string>();
 
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   const queue: Text[] = [];
@@ -227,6 +244,7 @@ export function markKeywords(html: string, cues: Cue[]) {
     const node = queue.shift()!;
     // Earliest match wins; on a tie the longer word does, so "LX 4" beats "LX" when both are listed.
     const found = pairs
+      .filter(p => p.cue.instances !== "first" || !firstInstance.has(p.cue.id))
       .map(p => ({ ...p, at: node.data.search(p.re) }))
       .filter(p => p.at >= 0)
       .sort((a, b) => a.at - b.at || b.word.length - a.word.length)[0];
@@ -238,6 +256,7 @@ export function markKeywords(html: string, cues: Cue[]) {
     mark.setAttribute("data-hit", String(hits++));
     mark.textContent = hit.data;
     hit.replaceWith(mark);
+    firstInstance.add(found.cue.id);
     queue.unshift(rest);
   }
   return { html: doc.body.innerHTML, hits };
@@ -261,14 +280,14 @@ export const REARM_SLACK = 24;
  * button or by a hand on the scrollbar. Only forgetting on rewind is what left manual scrolling
  * silent for the rest of the run.
  */
-export function cueAlert(ahead: number, lookahead: number, id: string, fired: Armed): "warn" | "hit" | null {
+export function cueAlert(ahead: number, lookahead: number, id: string, fired: Armed, warnEnabled = true): "warn" | "hit" | null {
   if (ahead > lookahead + REARM_SLACK) { fired.warn.delete(id); fired.hit.delete(id); return null; }
   if (ahead <= 0) {
     if (fired.hit.has(id)) return null;
     fired.hit.add(id); fired.warn.add(id);
     return "hit";
   }
-  if (ahead <= lookahead && !fired.warn.has(id)) { fired.warn.add(id); return "warn"; }
+  if (ahead <= lookahead && warnEnabled && !fired.warn.has(id)) { fired.warn.add(id); return "warn"; }
   return null;
 }
 

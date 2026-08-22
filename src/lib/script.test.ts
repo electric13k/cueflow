@@ -178,3 +178,28 @@ describe("cueAlert", () => {
     expect(fired.hit.has("1")).toBe(false);
   });
 });
+
+describe("cue configuration", () => {
+  it("keeps a selected multi-word phrase together as one keyword", () => {
+    const phrase = { ...cue("door slams"), match: "phrase" as const };
+    expect(keywordsOf(phrase)).toEqual(["door slams"]);
+    expect(markKeywords("<p>door slams, then door slams</p>", [phrase]).hits).toBe(2);
+  });
+
+  it("can mark only the first occurrence when a selected cue requests it", () => {
+    const first = { ...cue("door slams"), match: "phrase" as const, instances: "first" as const };
+    expect(markKeywords("<p>door slams, then door slams</p>", [first]).hits).toBe(1);
+  });
+
+  it("detects RTL script content", async () => {
+    const { directionOf } = await import("./script");
+    expect(directionOf("<p>مرحبا بالعالم</p>")).toBe("rtl");
+    expect(directionOf("<p>Hello stage</p>")).toBe("ltr");
+  });
+
+  it("skips yellow warnings but still emits the red hit", () => {
+    const fired = { warn: new Set<string>(), hit: new Set<string>() };
+    expect(cueAlert(120, 260, "cue", fired, false)).toBe(null);
+    expect(cueAlert(-1, 260, "cue", fired, false)).toBe("hit");
+  });
+});

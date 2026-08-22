@@ -12,6 +12,7 @@
     "check:mobile-scroll": "node scripts/check-mobile-scroll.mjs",
     "check:menu-motion": "node scripts/check-menu-motion.mjs",
     "check:alerts-consent": "node scripts/check-alerts-consent.mjs",
+    "check:script-find-mode": "node scripts/check-script-find-mode.mjs",
     "auth:probe": "node scripts/probe-production-auth.mjs",
     "auth:smoke": "node scripts/check-production-auth-flow.mjs"
   },

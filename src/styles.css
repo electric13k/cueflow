@@ -311,6 +311,17 @@
   .script-prose .script-indent-1 { margin-left: 2em; }
   .script-prose .script-indent-2 { margin-left: 4em; }
   .script-prose .script-indent-3 { margin-left: 6em; }
+  .script-line-scan {
+    position: absolute;
+    z-index: 15;
+    width: 2px;
+    height: 1.8rem;
+    pointer-events: none;
+    border-radius: 999px;
+    background: var(--cue-live);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--cue-live) 72%, transparent), 0 0 2px var(--cue-foolscap);
+    transform-origin: 50% 50%;
+  }
 
   /* Find in script. Every match is tinted; the one you are standing on is the only one outlined,
      because the whole point is telling it apart from the others at a glance. */
