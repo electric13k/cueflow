@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 /**
  * Layout is two settings, not one, because a phone and a desk are not asking the same question.
@@ -65,13 +65,80 @@ export function setLayout(next: Partial<Layout>) {
  * The same 640px the stylesheet calls `sm`, written once here so the two cannot drift.
  */
 const PHONE = "(max-width: 639px)";
+const TABLET = "(min-width: 640px) and (max-width: 1023px)";
+const TOUCH = "(any-pointer: coarse)";
+const HOVER = "(hover: hover)";
+const FINE = "(pointer: fine)";
+const REDUCE_MOTION = "(prefers-reduced-motion: reduce)";
+const REDUCE_DATA = "(prefers-reduced-data: reduce)";
+
+type DeviceKey = `${"phone" | "tablet" | "desktop"}|${0 | 1}|${0 | 1}|${0 | 1}|${0 | 1}|${0 | 1}`;
+export type DeviceKind = "phone" | "tablet" | "desktop";
+export type DeviceCapabilities = {
+  kind: DeviceKind;
+  isPhone: boolean;
+  isTablet: boolean;
+  isDesktop: boolean;
+  isTouch: boolean;
+  canHover: boolean;
+  hasFinePointer: boolean;
+  reducedMotion: boolean;
+  reducedData: boolean;
+};
+
+const media = (query: string) => typeof window !== "undefined" && typeof window.matchMedia === "function"
+  ? window.matchMedia(query).matches : false;
+
+function getDeviceKey(): DeviceKey {
+  if (typeof window === "undefined") return "desktop|0|0|1|0|0";
+  const kind: DeviceKind = media(PHONE) ? "phone" : media(TABLET) ? "tablet" : "desktop";
+  const touch = media(TOUCH) || ("ontouchstart" in window) || (navigator.maxTouchPoints ?? 0) > 0;
+  return `${kind}|${touch ? 1 : 0}|${media(HOVER) ? 1 : 0}|${media(FINE) ? 1 : 0}|${media(REDUCE_MOTION) ? 1 : 0}|${media(REDUCE_DATA) ? 1 : 0}` as DeviceKey;
+}
+
+const deviceQueries = [PHONE, TABLET, TOUCH, HOVER, FINE, REDUCE_MOTION, REDUCE_DATA];
+function subscribeDevice(listener: () => void) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};
+  const lists = deviceQueries.map(query => window.matchMedia(query));
+  lists.forEach(m => m.addEventListener("change", listener));
+  window.addEventListener("resize", listener, { passive: true });
+  return () => {
+    lists.forEach(m => m.removeEventListener("change", listener));
+    window.removeEventListener("resize", listener);
+  };
+}
+
+function readDevice(key: DeviceKey): DeviceCapabilities {
+  const [kind, touch, hover, fine, reducedMotion, reducedData] = key.split("|");
+  return {
+    kind: kind as DeviceKind,
+    isPhone: kind === "phone",
+    isTablet: kind === "tablet",
+    isDesktop: kind === "desktop",
+    isTouch: touch === "1",
+    canHover: hover === "1",
+    hasFinePointer: fine === "1",
+    reducedMotion: reducedMotion === "1",
+    reducedData: reducedData === "1",
+  };
+}
+
+export function useDeviceCapabilities(): DeviceCapabilities {
+  const key = useSyncExternalStore(subscribeDevice, getDeviceKey, () => "desktop|0|0|1|0|0" as DeviceKey);
+  const caps = readDevice(key);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.device = caps.kind;
+    root.dataset.input = caps.isTouch ? "touch" : "pointer";
+    root.dataset.hover = caps.canHover ? "yes" : "no";
+    root.dataset.motion = caps.reducedMotion ? "reduced" : "full";
+    root.dataset.data = caps.reducedData ? "reduced" : "full";
+  }, [key]);
+  return caps;
+}
 
 export function useIsPhone() {
-  return useSyncExternalStore(
-    f => { const m = matchMedia(PHONE); m.addEventListener("change", f); return () => m.removeEventListener("change", f); },
-    () => matchMedia(PHONE).matches,
-    () => false,
-  );
+  return useDeviceCapabilities().isPhone;
 }
 
 const subs = new Set<() => void>();

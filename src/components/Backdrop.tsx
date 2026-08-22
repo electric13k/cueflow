@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { DARK, useThemeSignal } from "../lib/theme";
+import { useDeviceCapabilities } from "../lib/layout";
 
 /**
  * The house wash behind every page: warm beige, a soft glow off the top as if the house lights are
@@ -61,11 +62,13 @@ export default function Backdrop() {
   // Subscribing re-renders this component on every theme change, so reading the class here is
   // reading a value we are already synchronised to rather than sampling the DOM blind.
   const theme = useThemeSignal();
+  const device = useDeviceCapabilities();
   const light = !document.documentElement.classList.contains(DARK);
+  const animateBackdrop = light && !device.isPhone && !device.reducedMotion && !device.reducedData;
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!light) return;
+    if (!animateBackdrop) return;
     const el = canvas.current;
     const gl = el?.getContext("webgl", { antialias: false, depth: false });
     if (!el || !gl) return;
@@ -95,8 +98,8 @@ export default function Backdrop() {
     };
     render();
     return () => { cancelAnimationFrame(raf); removeEventListener("resize", resize); };
-  }, [light, theme]);
+  }, [animateBackdrop, theme]);
 
-  if (!light) return null;
+  if (!animateBackdrop) return null;
   return <canvas ref={canvas} id="bg" aria-hidden className="fixed inset-0 -z-10 h-full w-full" />;
 }

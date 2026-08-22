@@ -18,7 +18,8 @@ gsap.registerPlugin(useGSAP, ScrollTrigger);
 type Scope = RefObject<HTMLElement | null>;
 
 const REDUCE = "(prefers-reduced-motion: reduce)";
-const MOTION = "(prefers-reduced-motion: no-preference)";
+const PHONE_MOTION = "(prefers-reduced-motion: no-preference) and (max-width: 639px)";
+const DESKTOP_MOTION = "(prefers-reduced-motion: no-preference) and (min-width: 640px)";
 
 /**
  * Reveal-on-enter for a row of repeated things, mark them `data-reveal`.
@@ -31,14 +32,25 @@ export function useReveal(scope: Scope) {
 
     const mm = gsap.matchMedia();
     mm.add(REDUCE, () => { gsap.set(els, { autoAlpha: 1, y: 0 }); });
-    mm.add(MOTION, () => {
+    mm.add(PHONE_MOTION, () => {
+      gsap.set(els, { autoAlpha: 0, y: 14 });
+      ScrollTrigger.batch(els, {
+        start: "top 92%",
+        once: true,
+        onEnter: batch => gsap.to(batch, {
+          autoAlpha: 1, y: 0, duration: .34, stagger: .03, ease: "power2.out", overwrite: true,
+          // hand the node back to CSS once it has arrived, so :hover transforms still bite
+          clearProps: "transform,opacity,visibility",
+        }),
+      });
+    });
+    mm.add(DESKTOP_MOTION, () => {
       gsap.set(els, { autoAlpha: 0, y: 24 });
       ScrollTrigger.batch(els, {
         start: "top 88%",
         once: true,
         onEnter: batch => gsap.to(batch, {
           autoAlpha: 1, y: 0, duration: .5, stagger: .06, ease: "power2.out", overwrite: true,
-          // hand the node back to CSS once it has arrived, so :hover transforms still bite
           clearProps: "transform,opacity,visibility",
         }),
       });
@@ -60,7 +72,7 @@ export function usePinScrub(scope: Scope) {
 
     const mm = gsap.matchMedia();
     mm.add(`${REDUCE}, (max-width: 767px)`, () => { gsap.set(inner, { autoAlpha: 1, y: 0 }); });
-    mm.add(`${MOTION} and (min-width: 768px)`, () => {
+    mm.add(`${DESKTOP_MOTION} and (min-width: 768px)`, () => {
       gsap.timeline({
         scrollTrigger: { trigger: pin, start: "center center", end: "+=55%", pin, scrub: .6 },
       }).fromTo(inner, { autoAlpha: .3, y: 18 }, { autoAlpha: 1, y: 0, ease: "none" });

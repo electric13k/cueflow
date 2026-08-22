@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { FileText, Film, Image as ImageIcon, ListMusic, Pencil, Presentation, Radio, Volume2 } from "lucide-react";
 import { decodeAudioUrl, peaks } from "../lib/audio";
 import { cellStyle, type RecentEntry, type RecentKind } from "./recents";
+import { useDeviceCapabilities } from "../lib/layout";
 
 const ICON: Record<RecentKind, typeof Volume2> = {
   session: Pencil, sequence: ListMusic, audio: Volume2, image: ImageIcon,
@@ -18,14 +19,7 @@ const LABEL: Record<RecentKind, string> = {
   video: "Clip", deck: "Deck", show: "Show", script: "Script",
 };
 
-/**
- * Hover, and only where hover exists. A touch screen synthesises a mouse enter on tap, so a preview
- * gated on that alone would open on every tap and have no way to close, on the one class of device
- * that also has the least bandwidth to spend loading it. Both the media query and the pointer type
- * have to agree before anything is fetched.
- */
-const hoverable = () => typeof window !== "undefined" && typeof window.matchMedia === "function"
-  && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+/** Touch devices keep previews closed: tapping a tile should navigate, not fetch an overlay. */
 
 /** Long enough that dragging the cursor across the grid does not decode eight sounds on the way. */
 const INTENT_MS = 200;
@@ -41,10 +35,11 @@ const INTENT_MS = 200;
 export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; delay?: number }) {
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const device = useDeviceCapabilities();
   const Icon = ICON[entry.kind];
 
   const enter = (e: React.PointerEvent) => {
-    if (e.pointerType !== "mouse" || !hoverable()) return;
+    if (e.pointerType !== "mouse" || !device.canHover || !device.hasFinePointer || device.isTouch) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setOpen(true), INTENT_MS);
   };

@@ -6,7 +6,7 @@ import Nav from "./Nav";
 import Sidebar from "./Sidebar";
 import { SiteFooter } from "./Page";
 import { Button } from "../ui";
-import { useLayout } from "../lib/layout";
+import { useDeviceCapabilities, useLayout } from "../lib/layout";
 
 /**
  * The chrome every working page wears: hierarchy down the left, the site footer underneath so no
@@ -56,6 +56,9 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
   // The panel button is a shortcut into the same setting Settings offers, not a second one: it
   // toggles between the two states someone reaches for mid-work and leaves `wide` to the picker.
   const [{ pane }, setLayout] = useLayout();
+  const device = useDeviceCapabilities();
+  const layoutMotion = device.isPhone || device.reducedMotion ? false : "position" as const;
+  const drawerDuration = device.isPhone ? .2 : .26;
   const collapsed = pane === "focus";
   const fromEdge = useSwipe(dx => { if (dx > 0) setOpen(true); });
   const onDrawer = useSwipe(dx => { if (dx < 0) setOpen(false); });
@@ -67,7 +70,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
     <div data-app className="relative min-h-screen">
       <Backdrop />
       <Nav inShell />
-      <motion.div layout className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
+      <motion.div layout={layoutMotion} className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
         <AnimatePresence initial={false} mode="popLayout">
           {!collapsed && (
             <motion.aside
@@ -98,7 +101,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+              transition={{ duration: device.isPhone ? 0.14 : 0.18, ease: [0.23, 1, 0.32, 1] }}
             >
               <motion.button
                 aria-label="Close menu"
@@ -119,7 +122,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
                 initial={{ opacity: 0, x: -24 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -24 }}
-                transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                transition={{ duration: drawerDuration, ease: [0.23, 1, 0.32, 1] }}
                 className="absolute inset-y-0 left-0 w-72 overflow-y-auto border-r border-white/10 bg-background shadow-2xl shadow-black/30"
               >
                 <motion.div
@@ -136,10 +139,10 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
           )}
         </AnimatePresence>
         <motion.main
-          layout="position"
+          layout={layoutMotion}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+          transition={{ duration: device.isPhone ? 0.18 : 0.24, ease: [0.23, 1, 0.32, 1] }}
           className={`min-w-0 flex-1 py-8 ${width}`}
         >
           <div className="mb-4 flex items-center gap-2">

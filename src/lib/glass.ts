@@ -22,8 +22,10 @@ function flush() {
 
 export function trackGlassPointer() {
   // The stylesheet freezes the sweep at rest under reduced motion; skip the listener too so the
-  // preference costs nothing rather than writing a property nothing reads.
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  // preference costs nothing rather than writing a property nothing reads. Touch screens also skip
+  // it because they have no stable hover point and the root style write invalidates every glass panel.
+  const query = (q: string) => window.matchMedia?.(q).matches ?? false;
+  if (query("(prefers-reduced-motion: reduce)") || query("(any-pointer: coarse)") || !query("(hover: hover) and (pointer: fine)")) return;
   window.addEventListener("pointermove", e => {
     x = e.clientX;
     y = e.clientY;
