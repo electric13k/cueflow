@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { motion, useScroll, useSpring } from "framer-motion";
 import { Button } from "../ui";
 import { Github } from "lucide-react";
 import LogoMark from "./LogoMark";
@@ -23,6 +24,8 @@ import { useSignedIn } from "./RequireAuth";
  */
 export default function Nav({ inShell }: { inShell?: boolean }) {
   const { pathname } = useLocation();
+  const { scrollYProgress } = useScroll();
+  const progress = useSpring(scrollYProgress, { stiffness: 180, damping: 30, restDelta: .001 });
   const signedIn = useSignedIn();
   // Pending reads as signed out: the Studio is a live link for everyone, so the worst case is a
   // label that settles a beat later, not a link that goes nowhere.
@@ -50,6 +53,7 @@ export default function Nav({ inShell }: { inShell?: boolean }) {
           <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub" className="hidden sm:inline-flex"><Github size={17} /></Button>
         </div>
       </div>
+      <motion.div aria-hidden className="scroll-progress pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[2px] origin-left bg-emerald" style={{ scaleX: progress }} />
     </nav>
   );
 }

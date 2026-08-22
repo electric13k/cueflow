@@ -95,7 +95,7 @@ export default function Features() {
                 <span className="pointer-events-none absolute -right-3 -top-8 font-display text-[8rem] font-bold leading-none text-accent/10">{feature.number}</span>
                 <div className="relative">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="feature-icon flex h-11 w-11 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
+                    <span className={`feature-icon flex h-11 w-11 items-center justify-center rounded-full border ${feature.number === "03" || feature.number === "06" ? "border-emerald/35 bg-emerald/10 text-emerald" : "border-accent/30 bg-accent/10 text-accent"}`}>
                       <Icon size={20} aria-hidden />
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-[.28em] text-brass">{feature.eyebrow}</span>
@@ -103,7 +103,7 @@ export default function Features() {
                   <h2 className="mt-7 max-w-md text-2xl font-bold leading-tight sm:text-3xl">{feature.title}</h2>
                   <p className="mt-3 max-w-xl leading-relaxed text-muted">{feature.body}</p>
                   <div className="mt-6 flex flex-wrap gap-2">
-                    {feature.tags.map(tag => <span key={tag} className="rounded-full border border-white/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[.15em] text-muted">{tag}</span>)}
+                    {feature.tags.map(tag => <span key={tag} className={`rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-[.15em] ${feature.number === "03" || feature.number === "06" ? "border-emerald/25 text-emerald/80" : "border-white/10 text-muted"}`}>{tag}</span>)}
                   </div>
                 </div>
               </motion.article>
@@ -122,7 +122,7 @@ export default function Features() {
               const Icon = step.icon;
               return (
                 <motion.div key={step.title} {...rise(index * .08)} data-reveal className="margin-rule">
-                  <Icon size={20} className="text-accent" aria-hidden />
+                  <Icon size={20} className={step.title === "Operate" ? "text-emerald" : "text-accent"} aria-hidden />
                   <h3 className="mt-4 text-2xl font-bold">{step.title}</h3>
                   <p className="mt-3 leading-relaxed text-muted">{step.body}</p>
                 </motion.div>

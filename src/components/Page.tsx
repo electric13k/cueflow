@@ -58,11 +58,6 @@ export default function Page({ children, width = "max-w-7xl" }: { children: Reac
     <div className="relative min-h-screen">
       <Backdrop />
       <Nav />
-      {/* Marketing only: `Page` is what the public pages wear and `Shell` is what the working ones
-          wear, so this never appears over a cue board. Sits directly under the bar, which is why it
-          reads off the same --nav-h the bar sizes itself from. */}
-      <div aria-hidden className="scroll-progress fixed inset-x-0 z-40 h-[2px] origin-left bg-accent"
-        style={{ top: "calc(var(--nav-h) + var(--safe-t))" }} />
       <motion.main
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

@@ -16,7 +16,7 @@ import { Button } from "../ui";
  * ask the same question and no answer about which one is the way in.
  */
 const shot = (name: string, theme: Theme) => {
-  const ext = name.startsWith("studio-mockup") ? "png" : "svg";
+  const ext = name.endsWith("-new") || name.startsWith("studio-mockup") ? "png" : "svg";
   return `${import.meta.env.BASE_URL}shots/${name}-${theme}.${ext}`;
 };
 
@@ -32,33 +32,33 @@ const beats = [
     n: "1",
     head: "One list. Every sound, every slide.",
     line: "In the order you will call them, numbered the way you will call them.",
-    src: "studio-mockup-desktop",
-    phone: "studio-mockup-phone",
-    alt: "CueFlow Studio displayed inside a desktop monitor mockup with the Library and cue board visible",
+    src: "cue-rail-new",
+    phone: "cue-rail-new-phone",
+    alt: "A staged cue rail with four numbered cue nodes moving from preparation to live output",
   },
   {
     n: "2",
     head: "One key instead of four windows.",
     line: "Arrows step the deck. A and D move the slide without touching the sound.",
-    src: "pulse",
-    phone: "pulse-phone",
-    alt: "Abstract amber waveform ribbon passing through layered signal circles",
+    src: "keyboard-control-new",
+    phone: "keyboard-control-new-phone",
+    alt: "An operator presses one brass key while two screens stay synchronized with the stage",
   },
   {
     n: "3",
     head: "On now, and standing by.",
     line: "The whole readout, on every device in the room.",
-    src: "stage",
-    phone: "stage-phone",
-    alt: "Abstract stage-light beams crossing three warm theatrical blocks and a waveform arc",
+    src: "rehearsal-new",
+    phone: "rehearsal-new-phone",
+    alt: "A prompt script, timing stopwatch, and Cueflow control tablet ready for rehearsal",
   },
   {
     n: "4",
     head: "The crew join on their phones.",
     line: "Hand out a key. No install, nothing to hand back at the end.",
-    src: "studio-mockup-desktop",
-    phone: "studio-mockup-deck-phone",
-    alt: "CueFlow Deck displayed inside a portrait phone mockup with the mobile transport visible",
+    src: "crew-handoff-new",
+    phone: "crew-handoff-new-phone",
+    alt: "Four crew devices connected around one shared CueFlow show key",
   },
 ];
 

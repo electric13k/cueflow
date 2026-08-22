@@ -9,7 +9,7 @@
 @theme {
   /* Serif throughout. A prompt book is paper and a playbill is a Didone; neither has ever been set
      in a grotesk. Courier is not a stylistic choice either -- it is the font scripts are typed in. */
-  --font-sans: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-sans: Corbel, sans-serif;
   --font-display: "Bodoni Moda", "Source Serif 4", Georgia, serif;
   --font-mono: "Courier Prime", ui-monospace, "Courier New", monospace;
   --shadow-glass: 0 10px 34px -14px rgba(36, 31, 28, .5), inset 0 1px 0 rgba(255, 255, 255, .05);
@@ -25,6 +25,7 @@
   --color-armed: var(--cue-armed);     /* deck loaded, nothing fired yet */
   --color-live: var(--cue-live);       /* on air */
   --color-ready: var(--cue-ready);     /* saved, synced, safe */
+  --color-emerald: var(--cue-emerald); /* hierarchy and confirmation */
   --animate-float: float 6s ease-in-out infinite;
   @keyframes float {
     0%, 100% { transform: translateY(0); }
@@ -52,7 +53,8 @@
     --cue-visual: #8C4A2F;  /* rust: lamp on skin */
     --cue-armed: #8A6A2A;   /* brass */
     --cue-live: #A32330;    /* crimson */
-    --cue-ready: #46583A;
+    --cue-ready: #167A58;
+    --cue-emerald: #167A58;    /* readable green for ready, synced, and confirmed states */
     /**
      * The neutral ramp, re-cut warm.
      *
@@ -102,7 +104,8 @@
     --cue-visual: #D98A5A;
     --cue-armed: #D4A957;
     --cue-live: #E05566;
-    --cue-ready: #A3B37A;
+    --cue-ready: #4DBB85;
+    --cue-emerald: #4DBB85;    /* luminous green with a softened dark-theme surface */
     /* Same ramp, dark and still warm. HeroUI's dark neutrals are the same blue-grey hue and a
        blue-black control screen was the single note that made this look like a synth plugin. */
     --surface: #241F1C;
@@ -754,21 +757,9 @@
     }
   }
 
-  /**
-   * How far down the page you are, as a hairline under the nav. `scroll()` means the browser drives
-   * it off the scroller itself: no listener, no rAF, nothing to leak, and it cannot fall behind the
-   * scroll the way a JS-driven bar does.
-   */
-  @supports (animation-timeline: scroll()) {
-    @media (prefers-reduced-motion: no-preference) {
-      @keyframes cue-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-      .scroll-progress {
-        transform-origin: 0 50%;
-        animation: cue-progress linear both;
-        animation-timeline: scroll(root block);
-      }
-    }
-  }
+  /* The progress indicator is rendered inside Nav and receives a spring-smoothed Motion value. Keeping
+     only its visual contract here prevents a second CSS timeline from fighting the inline transform. */
+  .scroll-progress { transform-origin: 0 50%; box-shadow: 0 0 12px color-mix(in srgb, var(--cue-emerald) 42%, transparent); }
 
   /**
    * Hover, and only where hovering is a thing that happens. Without the `pointer: fine` gate a
