@@ -61,13 +61,13 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
         onPointerEnter={enter}
         onPointerLeave={leave}
         onPointerCancel={leave}
-        className="relative flex h-full w-full flex-col overflow-hidden rounded-lg bg-surface/35 p-3 ring-1 ring-inset ring-border/50 transition-colors hover:bg-surface/70 hover:ring-border"
+        className="recent-tile relative flex h-full w-full flex-col overflow-hidden rounded-lg bg-surface/35 p-3 ring-1 ring-inset ring-border/50 transition-colors hover:bg-surface/70 hover:ring-border"
       >
         <span className="flex items-center gap-2">
           <Icon size={14} className={TINT[entry.kind]} aria-hidden />
           <span className="font-mono text-[9px] uppercase tracking-[.2em] text-muted">{LABEL[entry.kind]}</span>
         </span>
-        <span className={`mt-1.5 block truncate ${roomy ? "text-base font-bold" : "text-sm font-semibold"}`}>{entry.title}</span>
+        <span className={`mt-1.5 block truncate font-control ${roomy ? "text-base font-bold" : "text-sm font-semibold"}`}>{entry.title}</span>
 
         {/* A tall tile has room to say something useful before you ever hover it. */}
         {entry.kind === "sequence" && cues.length > 0 && (

@@ -17,7 +17,7 @@ import { Button } from "../ui";
  * ask the same question and no answer about which one is the way in.
  */
 const PLAIN_PNG_SHOTS = new Set(["soundboard", "sequences", "editor", "phone", "phone-deck", "phone-editor"]);
-const THEMED_PNG_SHOTS = new Set(["studio-mockup-desktop", "studio-mockup-phone", "studio-mockup-deck-phone"]);
+const THEMED_PNG_SHOTS = new Set(["cue-rail-new", "cue-rail-new-phone", "rehearsal-new", "rehearsal-new-phone", "studio-mockup-desktop", "studio-mockup-phone", "studio-mockup-deck-phone"]);
 const shot = (name: string, theme: Theme) => {
   const themedPng = THEMED_PNG_SHOTS.has(name) || name.endsWith("-new");
   const filename = themedPng ? `${name}-${theme}.png` : PLAIN_PNG_SHOTS.has(name) ? `${name}.png` : `${name}-${theme}.svg`;
@@ -35,34 +35,34 @@ const beats = [
   {
     n: "1",
     head: "One list. Every sound, every slide.",
-    line: "In the order you will call them, numbered the way you will call them.",
-    src: "soundboard",
-    phone: "phone",
-    alt: "CueFlow’s Soundboard screen with numbered media cards arranged for a live production",
+    line: "A brass cue rail keeps every call in the order the room will experience it.",
+    src: "cue-rail-new",
+    phone: "cue-rail-new-phone",
+    alt: "CueFlow’s brass cue rail with standby and live markers for an ordered production",
   },
   {
     n: "2",
     head: "One key instead of four windows.",
-    line: "Arrows step the deck. A and D move the slide without touching the sound.",
-    src: "sequences",
-    phone: "phone-deck",
-    alt: "CueFlow’s sequence deck showing ordered cues and the next item standing by",
+    line: "Arrows step the deck while the stage surface keeps the next call visible.",
+    src: "stage",
+    phone: "stage-phone",
+    alt: "CueFlow’s abstract stage output with beams, a cue rail, and a live surface",
   },
   {
     n: "3",
     head: "On now, and standing by.",
-    line: "The whole readout, on every device in the room.",
-    src: "editor",
-    phone: "phone-editor",
-    alt: "CueFlow’s editor workspace with a media preview, timeline, and controls for rehearsal",
+    line: "Rehearse the handoff before the house lights go down.",
+    src: "rehearsal-new",
+    phone: "rehearsal-new-phone",
+    alt: "CueFlow rehearsal desk with a stage cue rail and a prepared production surface",
   },
   {
     n: "4",
     head: "The crew join on their phones.",
-    line: "Hand out a key. No install, nothing to hand back at the end.",
-    src: "studio-mockup-desktop",
-    phone: "studio-mockup-phone",
-    alt: "CueFlow Studio showing the library, show controls, and script surface in one browser workspace",
+    line: "One shared room, with the operator still holding the call.",
+    src: "crew",
+    phone: "crew-phone",
+    alt: "CueFlow crew handoff graphic showing a shared production room and phone-ready control",
   },
 ];
 
@@ -187,7 +187,7 @@ export default function Home() {
         {/* Held for half a screen, the way a house light fade is held. Nothing moves but opacity. */}
         <section data-pin className="py-24">
           <blockquote data-pin-inner className="max-w-3xl">
-            <p className="text-3xl font-bold italic leading-snug sm:text-5xl">
+              <p className="editorial-quote text-3xl font-bold italic leading-snug sm:text-5xl">
               A desk decides what goes out and when.
               <span className="text-accent"> You should decide the when.</span>
             </p>

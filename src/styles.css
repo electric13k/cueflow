@@ -501,6 +501,37 @@
     .glass-hover:hover { background: var(--glass-face); }
   }
 
+  .editorial-quote { font-family: var(--font-display); }
+  .cue-ribbon-hitbox { position: relative; isolation: isolate; }
+  .cue-ribbon-hitbox::before {
+    content: "";
+    position: absolute;
+    inset: -.7rem;
+    z-index: -1;
+    border-radius: inherit;
+    background: transparent;
+  }
+  .feature-ambient { height: 28rem; }
+  .feature-orbit {
+    position: absolute;
+    display: block;
+    width: 18rem;
+    height: 8rem;
+    border: 1px solid color-mix(in srgb, var(--cue-armed) 22%, transparent);
+    border-radius: 50%;
+    opacity: .36;
+    filter: blur(.2px);
+    transform: rotate(-18deg);
+  }
+  .feature-orbit::after {
+    content: "";
+    position: absolute;
+    inset: 20% 8%;
+    border-top: 1px solid color-mix(in srgb, var(--cue-foolscap) 18%, transparent);
+    border-radius: 50%;
+  }
+  .feature-orbit--brass { right: 4%; top: 2rem; }
+  .feature-orbit--curtain { left: -5%; top: 12rem; border-color: color-mix(in srgb, var(--cue-curtain) 24%, transparent); transform: rotate(22deg); }
   .feature-card {
     transition: transform .34s cubic-bezier(.16, 1, .3, 1), border-color .28s ease, background-color .28s ease;
   }
@@ -544,7 +575,7 @@
     left: 0;
     right: 0;
     top: 1.55rem;
-    border-top: 1px dashed rgba(var(--glass-tint), .16);
+    border-top: 1px solid rgba(var(--glass-tint), .12);
     pointer-events: none;
   }
   .glass-soft {
@@ -714,7 +745,10 @@
     .media-card--audio .media-preview { aspect-ratio: 16 / 4; }
     .media-card--image .media-preview, .media-card--video .media-preview, .media-card--embed .media-preview { aspect-ratio: 16 / 8; }
   }
-  @media (prefers-reduced-motion: reduce) { .media-audio-bars i { animation: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .media-audio-bars i { animation: none; }
+    .feature-orbit { animation: none; }
+  }
   /* The phone screen explains the phone layout, so it belongs only to phone-sized views. */
   .tutorial-phone-only { display: none; }
   @media (max-width: 639px) { .tutorial-phone-only { display: block; } }

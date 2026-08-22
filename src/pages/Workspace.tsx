@@ -107,7 +107,7 @@ export default function Workspace() {
 
     for (const s of shows) list.push({
       id: `show:${s.id}`, kind: "show", title: s.name,
-      note: s.startedAt ? "live" : (s.password ?? "no key"),
+      note: s.startedAt ? "live" : "standing by",
       href: "/show", at: s.startedAt,
     });
 

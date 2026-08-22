@@ -28,9 +28,12 @@ const typography = await page.evaluate(() => {
     button: button ? getComputedStyle(button).fontFamily : "",
   };
 });
-const result = { before, after, scrollY: await page.evaluate(() => window.scrollY), typography, errors };
+await page.goto(`${base}/`, { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(700);
+const quote = await page.locator(".editorial-quote").first().evaluate(el => getComputedStyle(el).fontFamily).catch(() => "");
+const result = { before, after, scrollY: await page.evaluate(() => window.scrollY), typography, quote, errors };
 console.log(JSON.stringify(result, null, 2));
 await browser.close();
 const sidebarPinned = after.position === "fixed" && after.top >= 0 && after.top < 140 && after.bottom <= 900;
-const fontsSeparated = typography.body.includes("Corbel") && !typography.button.includes("Corbel");
+const fontsSeparated = typography.body.includes("Corbel") && !typography.button.includes("Corbel") && quote.includes("Bodoni");
 if (errors.length || !sidebarPinned || !fontsSeparated) process.exit(1);

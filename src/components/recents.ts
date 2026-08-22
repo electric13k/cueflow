@@ -88,8 +88,8 @@ export const cellStyle = (kind: RecentKind): CSSProperties => ({
 export const CATEGORIES: { id: string; title: string; blurb: string; kinds: RecentKind[] }[] = [
   { id: "resume", title: "Unfinished edits", blurb: "Stopped mid edit, one click back in", kinds: ["session"] },
   { id: "sequences", title: "Sequences", blurb: "Cue lists you have been building", kinds: ["sequence"] },
-  { id: "library", title: "Library", blurb: "Sound, pictures, clips and decks", kinds: ["audio", "image", "video", "deck"] },
   { id: "shows", title: "Shows", blurb: "Rooms with a key", kinds: ["show"] },
+  { id: "library", title: "Library", blurb: "Sound, pictures, clips and decks", kinds: ["audio", "image", "video", "deck"] },
   { id: "scripts", title: "Script", blurb: "What the room is reading from", kinds: ["script"] },
 ];
 

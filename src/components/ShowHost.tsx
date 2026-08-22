@@ -3,7 +3,7 @@ import { Button, Input, Switch } from "../ui";
 import { Copy, Plus, RefreshCw, Send, Square, Trash2, Radio } from "lucide-react";
 import { toast } from "../lib/toast";
 import {
-  addRole, createShow, deleteRole, deleteShow, listRoles, listShows, PERMS, regeneratePassword,
+  addRole, createShow, deleteRole, deleteShow, joinShow, listRoles, listShows, PERMS, regeneratePassword,
   regenerateRoleCode, updateRole, updateShow, type Perm, type Role, type Show,
 } from "../lib/shows";
 
@@ -42,7 +42,19 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
     finally { setBusy(false); }
   };
 
-  const refresh = async () => { const list = await listShows(projectId); setShows(list); if (show) setShow(list.find(s => s.id === show.id) ?? null); };
+  const refresh = async () => {
+    const list = await listShows(projectId);
+    setShows(list);
+    if (show) {
+      const next = list.find(s => s.id === show.id) ?? null;
+      setShow(next);
+      if (next) await enterAsOwner(next).catch(() => undefined);
+    }
+  };
+  const enterAsOwner = async (s: Show) => {
+    if (!s.password) return;
+    await joinShow(s.password, localStorage.getItem("cueflow:showName")?.trim() || "Operator");
+  };
 
   const togglePerm = (role: Role, perm: Perm) => {
     const next = role.perms.includes(perm) ? role.perms.filter(p => p !== perm) : [...role.perms, perm];
@@ -59,7 +71,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       <div className="flex flex-wrap gap-2">
         <Input className="min-w-48 flex-1" label="Name this show" value={name} onValueChange={setName} placeholder="Friday night" />
         <Button className="self-end" color="primary" isLoading={busy} startContent={<Plus size={15} />}
-          onPress={() => void run(async () => setShow(await createShow(name, projectId, sequenceId || null)), "Show created.")}>
+          onPress={() => void run(async () => { const created = await createShow(name, projectId, sequenceId || null); await enterAsOwner(created); setShow(created); }, "Show created. You are already in as the operator.")}>
           Create
         </Button>
       </div>
@@ -67,7 +79,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Or reopen one</p>
           {shows.map(s => (
-            <button key={s.id} type="button" onClick={() => setShow(s)}
+            <button key={s.id} type="button" onClick={() => void enterAsOwner(s).then(() => setShow(s)).catch(e => toast("Could not reopen the show", (e as Error).message, "warn"))}
               className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10">
               <span>{s.name}</span>
               <span className="font-mono tracking-widest text-muted">{s.password}</span>
