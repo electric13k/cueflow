@@ -145,7 +145,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
           <div className="mb-4 flex items-center gap-2">
             {/* min-h-11 on a phone: at `size="sm"` this was a 36px target, under the 44px minimum,
                 and it is the only way to the rest of the app on a small screen. */}
-            <Button className="min-h-11 lg:hidden" size="sm" variant="bordered" startContent={<Menu size={15} />} aria-expanded={open} aria-controls="workspace-menu" onPress={() => setOpen(true)}>Menu</Button>
+            <Button data-tour="menu" className="min-h-11 lg:hidden" size="sm" variant="bordered" startContent={<Menu size={15} />} aria-expanded={open} aria-controls="workspace-menu" onPress={() => setOpen(true)}>Menu</Button>
             <Button className="hidden lg:inline-flex" size="sm" variant="light" isIconOnly
               aria-label={collapsed ? "Show sidebar" : "Hide sidebar"} onPress={() => setLayout({ pane: collapsed ? "panel" : "focus" })}>
               {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}

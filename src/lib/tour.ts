@@ -84,6 +84,14 @@ export const steps: Step[] = [
     done: () => sequences().some(s => s.items.length >= 2),
   },
   {
+    id: "show",
+    anchor: "[data-coach='show']",
+    route: "/studio",
+    say: "A show hands the deck to everyone else's phone.",
+    done: () => false,
+    onPress: true,
+  },
+  {
     id: "arm",
     anchor: "[data-coach='arm']",
     route: "/studio",
@@ -111,13 +119,6 @@ export const steps: Step[] = [
     anchor: "[data-coach='script']",
     route: "/studio",
     say: "A script is loaded too. Open the reader.",
-    done: () => onScreen(".script-prose"),
-  },
-  {
-    id: "show",
-    anchor: "[data-coach='show']",
-    route: "/studio",
-    say: "Last one: a show hands the deck to everyone else's phone.",
     done: () => false,
     onPress: true,
   },

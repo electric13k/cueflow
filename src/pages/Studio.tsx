@@ -117,6 +117,15 @@ export default function Studio() {
     const frame = requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
     return () => cancelAnimationFrame(frame);
   }, [pane, phone]);
+  useEffect(() => {
+    const onTourPane = (event: Event) => {
+      if (!phone) return;
+      const next = (event as CustomEvent<PaneId>).detail;
+      if (PANES.some(candidate => candidate.id === next)) setPane(next);
+    };
+    window.addEventListener("cueflow:tour-pane", onTourPane);
+    return () => window.removeEventListener("cueflow:tour-pane", onTourPane);
+  }, [phone]);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -681,6 +690,7 @@ export default function Studio() {
   const openAudience = () => { teach("presenter"); window.open(`${location.origin}${import.meta.env.BASE_URL}audience`, "cueflow-audience", "popup,width=1000,height=650"); };
   // Split, popup or its own tab: the same reader either way, so where it lives is only a preference.
   const openScript = (where: "off" | "split" | "popup" | "tab") => {
+    if (phone && where !== "off") setPane("script");
     setScriptMode(where);
     if (where !== "off") teach("script");
     if (where === "off" || where === "split") return;
@@ -753,6 +763,7 @@ export default function Studio() {
             <span className="text-xs text-muted">Press → for the next cue, ← to go back.</span>
             <span className="ml-auto flex items-center gap-1">
               <Button data-coach="presenter" size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button>
+              <Button data-coach="script" size="sm" variant="flat" startContent={<FileText size={15} />} onPress={() => openScript("split")}>Open script</Button>
               <CoachHelp id="armed" />
             </span>
           </div>

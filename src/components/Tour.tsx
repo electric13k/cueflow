@@ -32,6 +32,13 @@ export default function Tour() {
     return candidate.id === "sidebar" ? (signedIn ? "/workspace" : "/studio") : (candidate.route ?? pathname);
   };
 
+  const paneFor = (id: string) => {
+    if (id === "library") return "library";
+    if (id === "show") return "shows";
+    if (["sequence", "cues", "arm", "fire", "presenter"].includes(id)) return "deck";
+    return null;
+  };
+
   const moveToStep = (to: number) => {
     const target = steps[to];
     setStep(to);
@@ -124,6 +131,8 @@ export default function Tour() {
 
   useEffect(() => {
     if (!current || !pathname.endsWith(routeFor(current))) return;
+    const pane = paneFor(current.id);
+    if (pane) window.dispatchEvent(new CustomEvent("cueflow:tour-pane", { detail: pane }));
     const timer = setInterval(() => {
       if (current.done()) next();
     }, TICK);

@@ -111,7 +111,7 @@ export default function ShowsBoard({
                 </div>
               </div>
             ) : (
-              <button type="button" onClick={() => setNaming(true)}
+              <button type="button" data-coach="show" onClick={() => setNaming(true)}
                 className="flex min-h-24 items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-muted transition-colors hover:border-accent hover:text-foreground">
                 <Plus size={16} /> New show
               </button>
