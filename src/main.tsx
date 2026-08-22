@@ -10,6 +10,7 @@ import Audience from "./pages/Audience";
 import Contact from "./pages/Contact";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import Cookies from "./pages/Cookies";
 import Tutorial from "./pages/Tutorial";
 import Credits from "./pages/Credits";
 import Script from "./pages/Script";
@@ -29,6 +30,7 @@ import { applyTheme, getStudioTheme } from "./lib/theme";
 import { applyLayout } from "./lib/layout";
 import { trackGlassPointer } from "./lib/glass";
 import { touchLastSeen } from "./lib/retention";
+import { registerCueflowCache } from "./lib/cache";
 
 /** /legal was one page with two anchors; keep old links working now that it is two pages. */
 function LegalRedirect() {
@@ -45,6 +47,7 @@ trackGlassPointer();
 // Once per load, and only for a session that exists. This is the clock the retention sweep reads,
 // so the thing that must never happen is an active account looking idle to it.
 void touchLastSeen();
+registerCueflowCache();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">
@@ -68,6 +71,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/settings" element={<Settings />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/cookies" element={<Cookies />} />
         <Route path="/legal" element={<LegalRedirect />} />
         <Route path="*" element={<Home />} />
       </Routes>

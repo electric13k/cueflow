@@ -86,6 +86,9 @@ export const demoScript = (): ScriptDoc => ({
  * middle of a production somebody is actually working on.
  */
 export function loadDemo() {
+  // Replaying from Settings or the tutorial must restore every demo scope, not append to stale demo
+  // rows left by an interrupted run. clearDemo preserves every non-demo resource by contract.
+  if (demoPresent()) clearDemo();
   const mine = local.get<Track[]>("tracks", []).filter(t => !isDemo(t.id));
   local.set("tracks", [...demoTracks(), ...mine]);
   // Only if there is no script already. Someone replaying the tutorial three weeks in has a real

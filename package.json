@@ -11,6 +11,7 @@
     "capture:screens": "node scripts/capture-app-screens.mjs",
     "check:mobile-scroll": "node scripts/check-mobile-scroll.mjs",
     "check:menu-motion": "node scripts/check-menu-motion.mjs",
+    "check:alerts-consent": "node scripts/check-alerts-consent.mjs",
     "auth:probe": "node scripts/probe-production-auth.mjs",
     "auth:smoke": "node scripts/check-production-auth-flow.mjs"
   },

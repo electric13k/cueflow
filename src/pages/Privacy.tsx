@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import Page, { Section } from "../components/Page";
 
-const UPDATED = "3 August 2026";
+const UPDATED = "22 August 2026";
 
 export default function Privacy() {
   return (
@@ -18,11 +18,15 @@ export default function Privacy() {
         <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><ShieldCheck size={20} className="text-accent" />What we hold</h2>
 
         <Section title="The short version">
-          No ads. No analytics. No third-party trackers. No selling or sharing of your data. CueFlow collects the minimum it needs to work.
+          No ads and no sale of personal data. Necessary storage keeps CueFlow working. Optional analytics is off by default and is used only after you choose to allow it. CueFlow does not use analytics to read your scripts, media files, passwords, access tokens, or private project content.
         </Section>
 
         <Section title="What is stored on your device">
-          Your media, sequences, keybinds and interface preferences are saved in this browser's local storage under keys beginning <code className="rounded bg-white/10 px-1">cueflow:</code>. A cookie records whether you dismissed the cookie notice. If you sign in, your session token is stored so you stay signed in. Clearing your browser data removes all of it.
+          Your media references, sequences, keybinds, scripts, editor preferences, alert scope, and interface preferences are saved in this browser's local storage under keys beginning <code className="rounded bg-white/10 px-1">cueflow:</code>. A first-party cookie records your optional analytics choice. A service worker may cache the public application shell and static assets, but it does not intentionally cache authentication tokens, private project records, or uploaded media. If you sign in, Supabase session storage keeps you signed in. Clearing your browser data removes the local copy and consent choice.
+        </Section>
+
+        <Section title="Optional analytics">
+          <p>Analytics is disabled unless you choose <b>Allow analytics</b>. If enabled, CueFlow may receive aggregated route visits, feature interactions, performance timings, and error counts to help improve the product. It is not intended to receive script contents, media files, passwords, access tokens, or private project records. You can choose <b>Only necessary</b> at the banner or change the choice later in <Link to="/settings" className="text-accent underline-offset-2 hover:underline">Settings</Link>.</p>
         </Section>
 
         <Section title="What is stored on the server">
@@ -34,6 +38,7 @@ export default function Privacy() {
           <p>Importing by link sends that URL to this site's server, which fetches the file and stores it for you. The URL is not logged or retained by CueFlow beyond that request.</p>
           <p>Searching the Internet Archive or Wikimedia Commons sends your query straight from your browser to those services, under their own privacy policies. Searching Myinstants opens their site in a new tab, at which point you are on their site.</p>
           <p>An embedded Google Slides or PowerPoint deck loads directly from that provider in the presenter window, so that provider sees the request.</p>
+          <p>Optional analytics, when enabled by you, is processed as aggregated product telemetry. It is not a requirement for using CueFlow, and it can be disabled at any time.</p>
         </Section>
 
         <Section title="The contact form">
@@ -41,7 +46,7 @@ export default function Privacy() {
         </Section>
 
         <Section title="Hosting logs">
-          The site is served by <b>Cloudflare Pages</b>, with mirror deployments on <b>Vercel</b> and <b>Netlify</b>. All three keep standard request logs (IP address, timestamp, requested URL) for security and abuse prevention, under their own privacy policies. CueFlow does not read them for any other purpose.
+          The site is served by <b>Cloudflare Pages</b>, with mirror deployments on <b>Vercel</b> where available. Hosting providers may keep standard request logs such as IP address, timestamp, requested URL, and response status for security and abuse prevention under their own privacy policies. CueFlow does not use those logs for advertising.
         </Section>
 
         <Section title="How long it is kept" id="retention">

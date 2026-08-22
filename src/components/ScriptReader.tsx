@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button, Input, Slider, Tooltip } from "../ui";
 import { Bell, ChevronDown, ChevronUp, FileUp, Minus, Pause, Play, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { send } from "../lib/bus";
 import { cueAlert, emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Armed, type Cue, type ScriptDoc } from "../lib/script";
+import type { AlertScope } from "../lib/alerts";
 
 /** Where on screen the line you are reading sits. Not the very top: you need to see what is coming. */
 const READ_LINE = .38;
@@ -10,9 +12,10 @@ const READ_LINE = .38;
 /** `00:00:00`, the way a stage manager writes it. */
 const clock = (ms: number) => new Date(Math.max(0, ms)).toISOString().slice(11, 19);
 
-export function AlertFlash({ level }: { level: "warn" | "hit" | null }) {
+export function AlertFlash({ level, scope = "operator" }: { level: "warn" | "hit" | null; scope?: AlertScope }) {
   if (!level) return null;
-  return <div aria-hidden className={`pointer-events-none fixed inset-0 z-50 ${level === "hit" ? "flash-hit" : "flash-warn"}`} />;
+  const local = scope === "script";
+  return <div aria-hidden className={`pointer-events-none ${local ? "absolute inset-0 z-20 rounded-[inherit]" : "fixed inset-0 z-50"} ${level === "hit" ? "flash-hit" : "flash-warn"}`} />;
 }
 
 /**
@@ -28,11 +31,12 @@ export function AlertFlash({ level }: { level: "warn" | "hit" | null }) {
  * `onAlert` lets the host window flash too, so the operator sees it on the control screen whether or
  * not the reader is the window they are looking at.
  */
-export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: {
+export default function ScriptReader({ doc, setDoc, onAlert, editable = true, alertScope = "script" }: {
   doc: ScriptDoc;
   setDoc: (d: ScriptDoc) => void;
   onAlert?: (level: "warn" | "hit", message: string, cue: string) => void;
   editable?: boolean;
+  alertScope?: AlertScope;
 }) {
   const [size, setSize] = useState(() => Number(localStorage.getItem("cueflow:scriptSize")) || 18);
   const [colour, setColour] = useState(() => localStorage.getItem("cueflow:scriptColour") || "");
@@ -46,6 +50,9 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
   const [flash, setFlash] = useState<"warn" | "hit" | null>(null);
   const [message, setMessage] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
+  const speedRef = useRef(speed);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  speedRef.current = speed;
   const fired = useRef<Armed>({ warn: new Set(), hit: new Set() });
   const accrued = useRef(0);
 
@@ -62,7 +69,8 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
     const text = cue.message || (level === "warn" ? `${keywordsOf(cue)[0] ?? "Cue"} coming up` : `${keywordsOf(cue)[0] ?? "Cue"} now`);
     setMessage(text);
     setFlash(level);
-    setTimeout(() => setFlash(null), level === "hit" ? 1600 : 1100);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(null), level === "hit" ? 1600 : 1100);
     onAlert?.(level, text, cue.id);
   };
 
@@ -96,14 +104,17 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
     let frame = requestAnimationFrame(function step(now) {
       // A hand on the scrollbar wins: take its position and carry on from there.
       if (Math.abs(box.scrollTop - position) > 2) position = box.scrollTop;
-      position += speed * (now - last) / 1000;
+      position += speedRef.current * (now - last) / 1000;
       last = now;
       box.scrollTop = position;
-      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) return setPlaying(false);
+      // A short script can fit entirely in the viewport. It is not finished just because the
+      // viewport starts at scrollTop 0, so only stop when there is real scrollable distance.
+      const maxScroll = Math.max(0, box.scrollHeight - box.clientHeight);
+      if (maxScroll > 1 && box.scrollTop >= maxScroll - 1) return setPlaying(false);
       frame = requestAnimationFrame(step);
     });
     return () => cancelAnimationFrame(frame);
-  }, [playing, speed]);
+  }, [playing]);
 
   /**
    * The clock. `setInterval` and wall time rather than the scroll loop above: a run has to keep
@@ -155,8 +166,8 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
   const editCue = (id: string, patch: Partial<Cue>) => setCues(doc.cues.map(c => (c.id === id ? { ...c, ...patch } : c)));
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <AlertFlash level={flash} />
+    <div className="relative flex h-full min-h-0 flex-col gap-3">
+      {alertScope === "script" && <AlertFlash level={flash} scope="script" />}
 
       {editable && (
         // A phone gets rows that line up rather than a desktop toolbar left to wrap where it likes:
@@ -260,7 +271,9 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true }: 
           dangerouslySetInnerHTML={{ __html: found.html || "<p>Open a Word or PDF script. The text comes across with the shape the writer gave it; the page it was printed on does not.</p>" }} />
       </div>
 
-      {message && <p className="text-center text-sm font-semibold text-muted">{message}</p>}
+      <AnimatePresence mode="wait">
+        {message && <motion.p key={message} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .18 }} className="text-center text-sm font-semibold text-muted">{message}</motion.p>}
+      </AnimatePresence>
     </div>
   );
 }

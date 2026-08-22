@@ -35,6 +35,7 @@ import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolve
 import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack } from "../lib/store";
 import { toast } from "../lib/toast";
 import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual } from "../types";
+import { loadAlertScope, type AlertScope } from "../lib/alerts";
 
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
 const timerLeftFor = (id: string, timers: Record<string, number>) => Number(timers[id] ?? 0);
@@ -78,6 +79,8 @@ type PaneId = (typeof PANES)[number]["id"];
 export default function Studio() {
   const audio = useRef<HTMLAudioElement>(new Audio());
   const engine = useRef(new AudioEngine());
+  const playRequest = useRef(0);
+  const cuePreloaders = useRef<HTMLAudioElement[]>([]);
   // Arriving from the workspace: ?tab=editor&track=<id> opens that sound in the editor, so "edit
   // this" is one click from where you saw it rather than a hunt through the library.
   const link = new URLSearchParams(typeof location === "undefined" ? "" : location.search);
@@ -126,9 +129,16 @@ export default function Studio() {
   const [scriptDoc, setScriptDoc] = useState<ScriptDoc>(() => loadScript());
   const [flash, setFlash] = useState<"warn" | "hit" | null>(null);
   const [alertNote, setAlertNote] = useState("");
+  const [alertScope, setAlertScope] = useState<AlertScope>(() => loadAlertScope());
   const alertTimer = useRef(0);
+  useEffect(() => {
+    const onScope = (event: Event) => setAlertScope((event as CustomEvent<AlertScope>).detail);
+    window.addEventListener("cueflow:alert-scope", onScope);
+    return () => window.removeEventListener("cueflow:alert-scope", onScope);
+  }, []);
   /** Flash the control screen and hold the words a moment longer than the flash itself. */
   const showAlert = (level: "warn" | "hit", message: string) => {
+    if (alertScope !== "operator") return;
     setAlertNote(message);
     setFlash(level);
     clearTimeout(alertTimer.current);
@@ -293,7 +303,34 @@ export default function Studio() {
 
   const selected = tracks.find(t => t.id === selectedId) ?? tracks[0];
   const selectedSequence = sequences.find(s => s.id === sequenceId);
+  const sequenceTrackSignature = selectedSequence?.items.map(item => item.trackId).join(",") ?? "";
   useEffect(() => { audio.current.loop = loop; }, [loop]);
+  useEffect(() => {
+    cuePreloaders.current.forEach(preloader => { preloader.pause(); preloader.removeAttribute("src"); preloader.load(); });
+    cuePreloaders.current = [];
+    const ids = [...new Set((selectedSequence?.items ?? []).map(item => item.trackId))];
+    ids.map(id => tracks.find(track => track.id === id)).filter(track => track && !isVisual(track)).slice(0, 8).forEach(track => {
+      const preloader = new Audio(track!.url);
+      preloader.preload = "auto";
+      preloader.load();
+      cuePreloaders.current.push(preloader);
+    });
+    return () => {
+      cuePreloaders.current.forEach(preloader => { preloader.pause(); preloader.removeAttribute("src"); preloader.load(); });
+      cuePreloaders.current = [];
+    };
+  }, [sequenceTrackSignature, selectedSequence?.id, tracks]);
+  // Prime the browser media element and Web Audio graph before a cue is called. The first call should
+  // spend its time making sound, not fetching metadata or constructing the filter chain.
+  useEffect(() => {
+    const a = audio.current;
+    a.preload = "auto";
+    if (!selected || isVisual(selected)) return;
+    const src = editUrl && selected.id === selectedId ? editUrl : selected.url;
+    const absolute = new URL(src, location.href).href;
+    if (a.src !== absolute) { a.src = src; a.load(); }
+    engine.current.apply(a, selected.effects);
+  }, [selected?.id, selected?.url, selectedId, editUrl]);
 
   const lastSyncNote = useRef("");
   // Sync is on and has no button: it runs on every change and only speaks up when it fails, once
@@ -407,9 +444,15 @@ export default function Studio() {
     const src = editUrl && track.id === selected?.id ? editUrl : track.url;
     const swap = a.src !== new URL(src, location.href).href;
     if (restart || swap) { a.pause(); setPlaying(false); }
-    if (swap) { a.src = src; setDuration(0); }
+    const request = ++playRequest.current;
+    if (swap) { a.src = src; a.preload = "auto"; a.load(); setDuration(0); }
     if (restart || swap) { a.currentTime = 0; setTime(0); }
-    try { await engine.current.play(a, fx); setPlaying(true); } catch { setPlaying(false); }
+    try {
+      await engine.current.play(a, fx);
+      if (request === playRequest.current) setPlaying(true);
+    } catch {
+      if (request === playRequest.current) setPlaying(false);
+    }
   };
   const toggle = () => { if (playing) { audio.current.pause(); setPlaying(false); } else void play(selected, selected?.effects, false); };
   /** Puts a slide or video on the stage. Audio keeps playing under it, which is the whole point. */
@@ -661,14 +704,16 @@ export default function Studio() {
       {/* The working surface, and the only thing the dark toggle reaches: the sidebar, the nav and
           the footer around it stay beige, and so does everybody else's device. */}
       <WorkSurface className="-mx-3 rounded-2xl px-3 py-4">
-      <AlertFlash level={flash} />
+      {alertScope === "operator" && <AlertFlash level={flash} scope="operator" />}
       {/* The alert's own words, held on screen after the flash has gone: a flash you half-caught
           while looking at the deck is no use if it does not say what it was for. */}
-      {alertNote && (
-        <div className={`fixed inset-x-0 top-16 z-50 mx-auto w-fit rounded-full border px-4 py-1.5 text-sm font-semibold shadow-glass ${flash === "hit" ? "border-live/50 bg-live/20" : "border-armed/50 bg-armed/20"}`}>
-          {alertNote}
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        {alertNote && (
+          <motion.div key={alertNote} initial={{ y: -10, opacity: 0, scale: .96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -8, opacity: 0, scale: .98 }} transition={{ type: "spring", stiffness: 340, damping: 24 }} className={`pointer-events-none fixed inset-x-0 top-16 z-50 mx-auto w-fit rounded-full border px-4 py-1.5 text-sm font-semibold shadow-glass ${flash === "hit" ? "border-live/50 bg-live/20" : "border-armed/50 bg-armed/20"}`}>
+            {alertNote}
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Bottom padding clears the fixed player, which stacks taller on phones, and on a phone the
           pane bar below it as well. */}
       <div className="pb-72 sm:pb-36">
@@ -817,7 +862,7 @@ export default function Studio() {
               onChange={value => openScript(value as typeof scriptMode)}
               options={[{ value: "split", label: "Reader: split screen" }, { value: "popup", label: "Reader: popup window" }, { value: "tab", label: "Reader: new tab" }, { value: "off", label: "Close the reader" }]} />
             {/* BroadcastChannel never echoes to the window that posted, so this one raises its own. */}
-            <ScriptReader doc={scriptDoc} setDoc={setScriptDoc}
+            <ScriptReader doc={scriptDoc} setDoc={setScriptDoc} alertScope={alertScope}
               onAlert={(level, message, cue) => { showAlert(level, message); send({ type: "alert", level, message, cue }); }} />
           </div>
         )}

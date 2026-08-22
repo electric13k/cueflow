@@ -23,6 +23,7 @@ const links = [
   { to: "/account", label: "Account", mine: true },
   { to: "/terms", label: "Terms" },
   { to: "/privacy", label: "Privacy" },
+  { to: "/cookies", label: "Cookies" },
 ];
 
 export function SiteFooter() {

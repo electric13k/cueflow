@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { FileText } from "lucide-react";
+import { Link as RouterLink } from "react-router-dom";
 import Page, { Section } from "../components/Page";
 
-const UPDATED = "3 August 2026";
+const UPDATED = "22 August 2026";
 
 export default function Terms() {
   return (
@@ -22,7 +23,7 @@ export default function Terms() {
         </Section>
 
         <Section title="Your account">
-          An account is optional, CueFlow works without one. If you create one, keep your password to yourself; you are responsible for what happens under your account. You can sign out at any time, and you can ask for your account and its data to be deleted (see Privacy).
+          An account is optional, CueFlow works without one. If you create one, keep your password to yourself; you are responsible for what happens under your account. You can sign out at any time, and you can ask for your account and its data to be deleted (see Privacy). Optional analytics is controlled by your consent and can be turned off in Settings.
         </Section>
 
         <Section title="The media you upload">
@@ -38,6 +39,10 @@ export default function Terms() {
 
         <Section title="Embedded decks">
           A Google Slides or PowerPoint Online link is embedded, not copied: the deck stays on that service, under that service's terms, and is visible to anyone who can reach the link you shared.
+        </Section>
+
+        <Section title="Cookies and analytics">
+          <p>Necessary browser storage supports the cue board, local projects, script reader, editors, preferences, authentication, and cache. Optional analytics is off by default and is enabled only when you choose Allow analytics. You can choose Only necessary or change the choice later in <RouterLink to="/settings" className="text-accent underline-offset-2 hover:underline">Settings</RouterLink>. See the <RouterLink to="/cookies" className="text-accent underline-offset-2 hover:underline">Cookies policy</RouterLink> for details.</p>
         </Section>
 
         <Section title="No warranty">

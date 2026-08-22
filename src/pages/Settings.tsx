@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Switch } from "../ui";
-import { GraduationCap, Keyboard, LayoutGrid, Palette, RotateCcw } from "lucide-react";
+import { Bell, Cookie, GraduationCap, Keyboard, LayoutGrid, Palette, RotateCcw } from "lucide-react";
 import Shell from "../components/Shell";
 import { startTour } from "../components/Tour";
 import KeybindRow from "../components/KeybindRow";
@@ -8,6 +8,9 @@ import { clashes, defaultBinds, keyActions, loadBinds, saveBinds, type Action } 
 import { useStudioTheme } from "../lib/theme";
 import { useLayout } from "../lib/layout";
 import { emptyDoc, loadScript, saveScript, type ScriptDoc } from "../lib/script";
+import { loadAlertScope, saveAlertScope, type AlertScope } from "../lib/alerts";
+import { getConsent, saveConsent, type ConsentState } from "../lib/cookies";
+import { loadDemo } from "../lib/demo";
 
 export default function Settings() {
   const [binds, setBinds] = useState<Record<Action, string>>(loadBinds);
@@ -16,7 +19,15 @@ export default function Settings() {
   const [theme, setTheme] = useStudioTheme();
   const [layout, setLayout] = useLayout();
   const [doc, setDoc] = useState<ScriptDoc>(() => (typeof localStorage === "undefined" ? emptyDoc() : loadScript()));
+  const [alertScope, setAlertScope] = useState<AlertScope>(() => loadAlertScope());
+  const [consent, setConsent] = useState<ConsentState>(() => getConsent());
   const bad = clashes(binds);
+
+  useEffect(() => {
+    const syncConsent = () => setConsent(getConsent());
+    window.addEventListener("cueflow:consent", syncConsent);
+    return () => window.removeEventListener("cueflow:consent", syncConsent);
+  }, []);
 
   useEffect(() => { saveBinds(binds); }, [binds]);
 
@@ -63,6 +74,31 @@ export default function Settings() {
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Bell size={18} className="text-accent" />Alerts</h2>
+        <p className="mt-2 text-sm text-muted">Choose where script cue warnings appear. The audience view is never covered by operator alerts.</p>
+        <div className="mt-4">
+          <Choice label="Alert surface" value={alertScope} onChange={scope => { setAlertScope(scope); saveAlertScope(scope); }}
+            options={[
+              { id: "script", label: "Script only", note: "Keep the red and yellow edge treatments inside the script reader or script window." },
+              { id: "operator", label: "Operator surface", note: "Cover the Cueflow control surface while leaving the audience view untouched." },
+            ]} />
+        </div>
+      </section>
+
+      <section className="glass mt-6 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Cookie size={18} className="text-accent" />Cookies and analytics</h2>
+        <p className="mt-2 text-sm text-muted">Necessary storage keeps Cueflow working. Optional analytics is off unless you choose to allow it, and you can change this choice later.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Switch isSelected={consent.analytics === "accepted"} onValueChange={allowed => { const next = { analytics: allowed ? "accepted" : "declined" } as ConsentState; setConsent(next); saveConsent(next); }}>
+            Allow optional analytics
+          </Switch>
+          <span className="text-xs text-muted">Current choice: {consent.analytics === "accepted" ? "allowed" : consent.analytics === "declined" ? "only necessary" : "not chosen"}</span>
+        </div>
+        <p className="mt-3 text-xs text-muted">Analytics is intended for aggregated route, feature, performance, and error signals. It does not need script contents, media files, passwords, access tokens, or private project data.</p>
+        <p className="mt-3 text-xs text-muted"><a href={`${import.meta.env.BASE_URL}cookies`} className="text-accent underline-offset-2 hover:underline">Read the Cookies policy</a></p>
+      </section>
+
+      <section className="glass mt-6 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><LayoutGrid size={18} className="text-accent" />Layout</h2>
         <p className="mt-2 text-sm text-muted">A phone and a desk are not asking the same question, so they get one setting each.</p>
         <div className="mt-5 space-y-6">
@@ -86,8 +122,12 @@ export default function Settings() {
           It walks you through building a deck and firing a cue, on a board it fills with demo sounds, pictures
           and a script. That material is cleared when you reach the end, and nothing you made yourself goes with it.
         </p>
-        <Button className="mt-4 min-h-11" size="sm" variant="flat" startContent={<GraduationCap size={14} />}
-          onPress={startTour}>Run the tutorial again</Button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button className="min-h-11" size="sm" variant="flat" startContent={<GraduationCap size={14} />}
+            onPress={startTour}>Run the tutorial again</Button>
+          <Button className="min-h-11" size="sm" variant="bordered" startContent={<RotateCcw size={14} />}
+            onPress={() => { loadDemo(); window.location.reload(); }}>Restore demo resources</Button>
+        </div>
       </section>
     </Shell>
   );
