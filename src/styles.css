@@ -461,6 +461,19 @@
     background: var(--background);
     padding: 0 .3rem;
   }
+  /* Spotlight dismissal regions are intentionally invisible hit targets. Global button hover motion and
+     user-agent borders make their rectangular edges appear as stray lines over the dimmed page. */
+  .spotlight-dismiss,
+  .spotlight-dismiss:hover,
+  .spotlight-dismiss:active {
+    border: 0 !important;
+    outline: 0;
+    box-shadow: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .spotlight-dismiss:focus-visible { outline: 2px solid color-mix(in srgb, var(--cue-armed) 70%, transparent); outline-offset: -2px; }
+
   .glass-hover { @apply transition-colors hover:border-accent/40; }
   .glass-hover:hover { background: var(--glass-face-hover); }
 

@@ -1,5 +1,7 @@
 import { Heart } from "lucide-react";
+import { useRef } from "react";
 import Page, { Section } from "../components/Page";
+import { useReveal } from "../lib/motion";
 
 type Credit = { name: string; url: string; licence: string; what: string };
 
@@ -65,15 +67,17 @@ function Row({ c }: { c: Credit }) {
 }
 
 export default function Credits() {
+  const root = useRef<HTMLDivElement>(null);
+  useReveal(root);
   return (
-    <Page width="max-w-3xl">
+    <Page width="max-w-3xl"><div ref={root}>
       <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Thanks</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Standing on open shoulders</h1>
       <p className="mt-2 text-sm text-muted">
         CueFlow's editors were built by studying tools that got these problems right first.
       </p>
 
-      <div className="glass mt-10 p-6 sm:p-8">
+      <div data-reveal className="glass mt-10 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><Heart size={20} className="text-accent" />Behaviour, not code</h2>
 
         <Section title="What was borrowed">
@@ -93,7 +97,7 @@ export default function Credits() {
         <ul className="mt-6">{TOOLS.map(c => <Row key={c.name} c={c} />)}</ul>
       </div>
 
-      <div className="glass mt-6 p-6 sm:p-8">
+      <div data-reveal className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-black tracking-tight">Editor software credits</h2>
         <p className="mt-2 text-sm text-muted">
           These projects power or inform CueFlow’s browser editor workflows. Their license notices remain part
@@ -102,7 +106,7 @@ export default function Credits() {
         <ul className="mt-6">{EDITOR_TOOLS.map(c => <Row key={c.name} c={c} />)}</ul>
       </div>
 
-      <div className="glass mt-6 p-6 sm:p-8">
+      <div data-reveal className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-black tracking-tight">Where the media comes from</h2>
         <p className="mt-2 text-sm text-muted">
           Licences vary per item and several require attribution. Checking what you are about to perform in
@@ -111,7 +115,7 @@ export default function Credits() {
         <ul className="mt-6">{SOURCES.map(c => <Row key={c.name} c={c} />)}</ul>
       </div>
 
-      <div className="glass mt-6 p-6 sm:p-8">
+      <div data-reveal className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-black tracking-tight">Built with</h2>
         <p className="mt-2 text-sm text-muted">
           React, Vite, Tailwind CSS, HeroUI, react-aria-components, Lucide icons, wavesurfer.js, Cropper.js,
@@ -120,6 +124,6 @@ export default function Credits() {
           Open XML adapter built on the app’s credited ZIP utility.
         </p>
       </div>
-    </Page>
+    </div></Page>
   );
 }

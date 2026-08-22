@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button, Input, Slider, Switch, Tooltip } from "../ui";
-import { Bell, ChevronDown, ChevronUp, FileUp, ListPlus, Minus, MousePointer2, Pause, Play, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronUp, FileUp, ListPlus, Minus, MousePointer2, Pause, Pencil, Play, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { send } from "../lib/bus";
-import { cueAlert, directionOf, emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Armed, type Cue, type ScriptDoc } from "../lib/script";
+import { clean, cueAlert, directionOf, emptyDoc, findInScript, keywordsOf, markKeywords, parseScript, saveScript, type Armed, type Cue, type ScriptDoc } from "../lib/script";
 import type { AlertScope } from "../lib/alerts";
 
 /** Where on screen the line you are reading sits. Not the very top: you need to see what is coming. */
@@ -51,6 +51,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
   const [flash, setFlash] = useState<"warn" | "hit" | null>(null);
   const [message, setMessage] = useState("");
   const [selectedPhrase, setSelectedPhrase] = useState("");
+  const [editingText, setEditingText] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null);
   const [scan, setScan] = useState<{ top: number; start: number; travel: number; key: string } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -71,6 +72,10 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
   // A changed script or cue list makes every past alert irrelevant.
   useEffect(() => { fired.current = { warn: new Set(), hit: new Set() }; }, [marked.html]);
   useEffect(() => { setAt(0); }, [query]);
+  useEffect(() => {
+    if (!editingText) return;
+    scroller.current?.focus();
+  }, [editingText]);
   useEffect(() => {
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
@@ -248,6 +253,13 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
   };
 
   const setCues = (cues: Cue[]) => { const next = { ...doc, cues }; try { saveScript(next); setDoc(next); send({ type: "script" }); } catch (e) { setError((e as Error).message); } };
+  const saveText = () => {
+    const box = scroller.current;
+    if (!box) return;
+    const next = { ...doc, html: clean(box.innerHTML) };
+    try { saveScript(next); setDoc(next); send({ type: "script" }); setEditingText(false); }
+    catch (e) { setError((e as Error).message); }
+  };
   const addBlankCue = () => setCues([...doc.cues, { id: crypto.randomUUID(), words: "", message: "" }]);
   const editCue = (id: string, patch: Partial<Cue>) => setCues(doc.cues.map(c => (c.id === id ? { ...c, ...patch } : c)));
 
@@ -259,13 +271,23 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
         // A phone gets rows that line up rather than a desktop toolbar left to wrap where it likes:
         // the file button takes the full width, and the three settings below it share it evenly.
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <label className="flex">
-            <input type="file" accept=".docx,.pdf,.txt,.md,.rtf" className="sr-only"
-              onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void load(f); }} />
-            <span className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm font-medium hover:border-accent sm:h-9 sm:w-auto sm:justify-start">
-              <FileUp size={15} />{busy ? "Reading…" : doc.name || "Open a script"}
-            </span>
-          </label>
+              <label className="flex">
+                <input type="file" accept=".docx,.pdf,.txt,.md,.rtf" className="sr-only"
+                  onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void load(f); }} />
+                <span className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm font-medium hover:border-accent sm:h-9 sm:w-auto sm:justify-start">
+                  <FileUp size={15} />{busy ? "Reading…" : doc.name || "Open a script"}
+                </span>
+              </label>
+              {!editingText ? (
+                <Button size="sm" variant="flat" startContent={<Pencil size={14} />} onPress={() => setEditingText(true)}>
+                  Edit text
+                </Button>
+              ) : (
+                <>
+                  <Button size="sm" color="primary" startContent={<Check size={14} />} onPress={saveText}>Save text</Button>
+                  <Button size="sm" variant="light" onPress={() => setEditingText(false)}>Cancel</Button>
+                </>
+              )}
           <div className="flex flex-wrap items-center gap-2">
             <Tooltip content="Smaller text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.max(12, s - 2))}><Minus size={14} /></Button></Tooltip>
             <span className="w-10 text-center text-xs tabular-nums text-muted">{size}px</span>
@@ -275,7 +297,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
               <input type="color" aria-label="Text colour" value={colour || "#d8cfc4"} onChange={e => setColour(e.target.value)}
                 className="h-8 w-9 cursor-pointer rounded-lg border border-border bg-transparent p-0.5" />
             </label>
-            {colour && <Button size="sm" variant="light" onPress={() => setColour("")}>Theme colour</Button>}
+            {colour && <Button size="sm" variant="light" aria-label="Reset text colour" onPress={() => setColour("")}>Default colour</Button>}
             <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addBlankCue}>Alert word</Button>
             <Switch size="sm" isSelected={yellowEnabled} onValueChange={setYellowEnabled}>Yellow alerts</Switch>
             {marked.hits > 0 && <span className="text-xs text-muted">{marked.hits} marked</span>}
@@ -357,10 +379,14 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
             tags and of attributes by name -- six layout properties, four align values, the classes
             the importer itself emits -- and it runs again on load. The only things added after that
             are <mark> and <span class="find-hit">, both built here. */}
-        <div ref={scroller} dir={directionOf(doc.html)} onScroll={check} onMouseUp={() => setSelectedPhrase(selectedFromWindow())} onContextMenu={openSelectionMenu}
-          className="script-prose h-full overflow-y-auto rounded-2xl border border-border bg-surface/30 px-5 py-4"
+        <div ref={scroller} dir={directionOf(doc.html)} onScroll={check} onMouseUp={() => { if (!editingText) setSelectedPhrase(selectedFromWindow()); }} onContextMenu={editingText ? undefined : openSelectionMenu}
+          className={`script-prose h-full overflow-y-auto rounded-2xl border border-border bg-surface/30 px-5 py-4 ${editingText ? "ring-2 ring-accent/40" : ""}`}
           style={{ fontSize: size, color: colour || undefined }}
-          dangerouslySetInnerHTML={{ __html: found.html || "<p>Open a Word or PDF script. The text comes across with the shape the writer gave it; the page it was printed on does not.</p>" }} />
+          contentEditable={editingText}
+          suppressContentEditableWarning
+          spellCheck={false}
+          onKeyDown={e => { if (editingText && e.key === "Escape") { e.preventDefault(); setEditingText(false); } if (editingText && (e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); saveText(); } }}
+          dangerouslySetInnerHTML={{ __html: editingText ? (doc.html || "<p><br></p>") : (found.html || "<p>Open a Word or PDF script. The text comes across with the shape the writer gave it; the page it was printed on does not.</p>") }} />
         {scan && <motion.span aria-hidden key={scan.key} className="script-line-scan" style={{ top: scan.top, left: scan.start }} initial={{ opacity: 0, x: 0 }} animate={{ opacity: [0, 1, 1, 0], x: scan.travel }} transition={{ duration: Math.min(2.2, .7 + Math.abs(scan.travel) / 160), ease: "linear" }} />}
         {contextMenu && (
           <motion.div initial={{ opacity: 0, scale: .96, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="absolute z-30 w-56 rounded-xl border border-border bg-surface p-2 shadow-glass" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onClick={e => e.stopPropagation()}>

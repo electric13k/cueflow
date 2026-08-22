@@ -158,9 +158,14 @@ export default function Workspace() {
             )}
       </section>
 
-      <div className="mt-12">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: .3, margin: "0px 0px -8% 0px" }}
+        transition={{ duration: .45, ease: [.16, 1, .3, 1] }}
+        className="mt-12">
         <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={17} />}>Open the Studio</Button>
-      </div>
+      </motion.div>
     </Shell>
   );
 }

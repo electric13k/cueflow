@@ -43,11 +43,30 @@ await page.locator("mark[data-hit]").first().click({ button: "right" });
 const menu = page.getByRole("menu");
 const menuVisible = await menu.isVisible();
 const contextActions = await menu.getByRole("button").allTextContents();
-await menu.getByRole("button", { name: "Assign all occurrences" }).click();
-await page.waitForTimeout(100);
-const cuesAfterContext = await page.locator('input[placeholder="Words, comma separated"]').count();
-const body = await page.locator("body").innerText();
-const result = { cuesAfterEnter, phraseValue, warningSwitches, selectedText, selectedCurrent, menuVisible, contextActions, cuesAfterContext, errors };
+  await menu.getByRole("button", { name: "Assign all occurrences" }).click();
+  await page.waitForTimeout(100);
+  const cuesAfterContext = await page.locator('input[placeholder="Words, comma separated"]').count();
+
+  await page.getByRole("button", { name: "Edit text" }).click();
+  const editor = page.locator(".script-prose");
+  await editor.evaluate(el => { el.innerHTML = "<p>Edited cue line.</p>"; });
+  await page.getByRole("button", { name: "Save text" }).click();
+  const savedHtml = await page.evaluate(() => JSON.parse(localStorage.getItem("cueflow:script") || "{}").html || "");
+
+  const colour = page.locator('input[aria-label="Text colour"]');
+  await colour.evaluate(el => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(el, "#123456");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForTimeout(100);
+  const customColour = await page.evaluate(() => localStorage.getItem("cueflow:scriptColour"));
+  await page.getByRole("button", { name: "Reset text colour" }).click();
+  await page.waitForTimeout(100);
+  const resetColour = await page.evaluate(() => localStorage.getItem("cueflow:scriptColour"));
+  const body = await page.locator("body").innerText();
+  const result = { cuesAfterEnter, phraseValue, warningSwitches, selectedText, selectedCurrent, menuVisible, contextActions, cuesAfterContext, savedHtml, customColour, resetColour, errors };
 console.log(JSON.stringify(result, null, 2));
 await browser.close();
-if (errors.length || cuesAfterEnter !== 1 || phraseValue !== "Door slams" || warningSwitches < 1 || !selectedText.includes("Door slams") || selectedCurrent !== "Door slams" || !menuVisible || cuesAfterContext !== 2) process.exit(1);
+if (errors.length || cuesAfterEnter !== 1 || phraseValue !== "Door slams" || warningSwitches < 1 || !selectedText.includes("Door slams") || selectedCurrent !== "Door slams" || !menuVisible || cuesAfterContext !== 2 || !savedHtml.includes("Edited cue line.") || customColour !== "#123456" || resetColour !== "") process.exit(1);

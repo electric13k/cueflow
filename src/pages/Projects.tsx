@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Button, Input, Select } from "../ui";
 import { FolderOpen, Pencil, Trash2, UserPlus, Users } from "lucide-react";
 import Shell from "../components/Shell";
@@ -12,6 +13,13 @@ import {
   removeMember, setCurrentProject, setMemberRole, updateProject, type Member, type Project,
 } from "../lib/projects";
 import { ROLES, type Role } from "../lib/collab";
+
+const reveal = (delay = 0) => ({
+  initial: { opacity: 0, y: 18 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: .16, margin: "0px 0px -8% 0px" },
+  transition: { duration: .48, delay, ease: [.16, 1, .3, 1] as const },
+});
 
 export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -62,14 +70,16 @@ export default function Projects() {
 
   return (
     <Shell width="max-w-3xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Projects</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">One production, one project</h1>
-      <p className="mt-3 text-muted">
+      <motion.div {...reveal()}>
+        <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Projects</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">One production, one project</h1>
+        <p className="mt-3 text-muted">
         Each project keeps its own sounds, its own sequences and its own shows. People you add
-        see all of it; everything outside a project stays yours alone.
-      </p>
+          see all of it; everything outside a project stays yours alone.
+        </p>
+      </motion.div>
 
-      <section data-coach="projects" className="glass mt-8 space-y-3 p-6">
+      <motion.section {...reveal(.08)} data-coach="projects" className="glass mt-8 space-y-3 p-6">
         <h2 className="flex items-center gap-2 text-lg font-black tracking-tight">
           <FolderOpen size={18} className="text-accent" />Start one
           <CoachHelp id="projects" className="ml-auto" />
@@ -81,9 +91,9 @@ export default function Projects() {
             Create
           </Button>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="mt-6 space-y-3">
+      <motion.section {...reveal(.16)} className="mt-6 space-y-3">
         <button type="button" onClick={() => switchTo(null)}
           className={`glass block w-full p-5 text-left ${here ? "" : "ring-1 ring-accent"}`}>
           <p className="font-bold">Your personal library</p>
@@ -161,7 +171,7 @@ export default function Projects() {
             )}
           </div>
         ))}
-      </section>
+      </motion.section>
     </Shell>
   );
 }

@@ -30,7 +30,12 @@ export function SiteFooter() {
   const signedIn = useSignedIn();
   const shown = signedIn ? links : links.filter(l => !l.mine);
   return (
-    <footer className="border-t border-white/10 py-8">
+    <motion.footer
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: .2, margin: "0px 0px -8% 0px" }}
+      transition={{ duration: .45, ease: [.16, 1, .3, 1] }}
+      className="border-t border-white/10 py-8">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
         <span className="flex items-center gap-2"><LogoMark size={24} /> CueFlow</span>
         <span className="flex flex-wrap items-center gap-4">
@@ -39,17 +44,23 @@ export function SiteFooter() {
           <Link to="/studio" className="link-rule inline-flex min-h-6 items-center font-semibold text-accent">Open Studio →</Link>
         </span>
       </div>
-    </footer>
+    </motion.footer>
   );
 }
 
 /** Section heading + body used across the legal pages. */
 export function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section id={id} className="mt-7 scroll-mt-20">
+    <motion.section
+      id={id}
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: .18, margin: "0px 0px -8% 0px" }}
+      transition={{ duration: .48, ease: [.16, 1, .3, 1] }}
+      className="mt-7 scroll-mt-20">
       <h3 className="text-base font-bold">{title}</h3>
       <div className="mt-2 space-y-2 text-sm leading-relaxed text-muted">{children}</div>
-    </section>
+    </motion.section>
   );
 }
 

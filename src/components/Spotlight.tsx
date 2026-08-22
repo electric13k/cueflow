@@ -179,13 +179,13 @@ export default function Spotlight({ spot, label, onDismiss: _onDismiss, children
         )}
         {spot ? (
           <>
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-x-0 top-0 bg-black/50" style={{ height: Math.max(0, spot.top) }} />
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute left-0 bg-black/50" style={{ top: spot.top, width: Math.max(0, spot.left), height: spot.height }} />
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute right-0 bg-black/50" style={{ top: spot.top, left: spot.left + spot.width, height: spot.height }} />
-            <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-x-0 bottom-0 bg-black/50" style={{ top: spot.top + spot.height }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="spotlight-dismiss pointer-events-auto absolute inset-x-0 top-0" style={{ height: Math.max(0, spot.top) }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="spotlight-dismiss pointer-events-auto absolute left-0" style={{ top: spot.top, width: Math.max(0, spot.left), height: spot.height }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="spotlight-dismiss pointer-events-auto absolute right-0" style={{ top: spot.top, left: spot.left + spot.width, height: spot.height }} />
+            <button aria-label="Dismiss tip" onClick={_onDismiss} className="spotlight-dismiss pointer-events-auto absolute inset-x-0 bottom-0" style={{ top: spot.top + spot.height }} />
           </>
         ) : (
-          <button aria-label="Dismiss tip" onClick={_onDismiss} className="pointer-events-auto absolute inset-0 bg-black/50" />
+          <button aria-label="Dismiss tip" onClick={_onDismiss} className="spotlight-dismiss pointer-events-auto absolute inset-0 bg-black/50" />
         )}
         <motion.div
           ref={cardRef}
