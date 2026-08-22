@@ -32,7 +32,7 @@ export default function Nav({ inShell }: { inShell?: boolean }) {
   const work = signedIn ? { to: "/workspace", label: "Workspace" } : { to: "/studio", label: "Studio" };
   const link = (to: string) => ({ variant: pathname === to ? "flat" : "light", color: pathname === to ? "primary" : "default" } as const);
   return (
-    <nav className="sticky top-0 z-30 border-b border-white/10 bg-background/60 backdrop-blur-2xl">
+    <nav data-workspace-nav={inShell ? "true" : undefined} className={`sticky top-0 z-30 border-b border-white/10 bg-background/60 backdrop-blur-2xl ${inShell ? "workspace-nav" : "home-nav"}`}>
       {/* The bar's height is `--nav-h` rather than whatever the tallest control happens to make it,
           because the toaster and the drawer are fixed elements outside this tree that have to clear
           it. Padding stays for the notch: viewport-fit=cover puts the status bar inside the page. */}
@@ -53,7 +53,7 @@ export default function Nav({ inShell }: { inShell?: boolean }) {
           <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub" className="hidden sm:inline-flex"><Github size={17} /></Button>
         </div>
       </div>
-      <motion.div aria-hidden className="scroll-progress pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[2px] origin-left bg-emerald" style={{ scaleX: progress }} />
+      <motion.div aria-hidden className="scroll-progress pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[2px] origin-left bg-curtain" style={{ scaleX: progress }} />
     </nav>
   );
 }

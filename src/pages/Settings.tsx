@@ -65,7 +65,7 @@ export default function Settings() {
           <label className="block">
             <span className="text-sm">Warn this far before a script cue word</span>
             <span className="mt-1 flex items-center gap-3">
-              <input type="range" min={80} max={800} step={20} value={doc.lookahead}
+              <input className="metal-range" aria-label="Warning distance" type="range" min={80} max={800} step={20} value={doc.lookahead}
                 onChange={e => { const next = { ...doc, lookahead: Number(e.target.value) }; setDoc(next); saveScript(next); }} />
               <span className="text-sm tabular-nums text-muted">{doc.lookahead}px</span>
             </span>

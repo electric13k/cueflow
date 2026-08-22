@@ -4,6 +4,7 @@ import { Button, Input } from "../ui";
 import { Lock, Maximize, MessageSquare, Send, Unlock, X } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import DarkToggle from "../components/DarkToggle";
+import CurtainTransition from "../components/CurtainTransition";
 import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
 import { themeClass, useStudioTheme } from "../lib/theme";
 import {
@@ -79,6 +80,8 @@ export default function Show() {
   const [cues, setCues] = useState<DeckCue[]>([]);
   const [index, setIndex] = useState(-1);
   const [started, setStarted] = useState<string | null>(null);
+  const [curtain, setCurtain] = useState(false);
+  const curtainTimer = useRef<number | null>(null);
   const [stage, setStage] = useState<{ url: string; kind: string; label: string } | null>(null);
   const [doc, setDoc] = useState<ScriptDoc>(emptyDoc);
   const [flash, setFlash] = useState("");
@@ -91,6 +94,11 @@ export default function Show() {
     setFlash(text);
     clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => setFlash(""), 2600);
+  };
+  const startCurtain = () => {
+    if (curtainTimer.current) window.clearTimeout(curtainTimer.current);
+    setCurtain(true);
+    curtainTimer.current = window.setTimeout(() => setCurtain(false), 1400);
   };
 
   // The ticket is only a member id; what it is worth can change while you hold it, because the host
@@ -112,7 +120,7 @@ export default function Show() {
         if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
       }
       if (msg.type === "cue") { setIndex(msg.index); setNote(`Cue ${msg.label}`); }
-      if (msg.type === "start") { setStarted(msg.at); show("Standby, show is live"); }
+      if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
       if (msg.type === "end") { setStarted(null); setNote("Show ended"); }
       if (msg.type === "flash") show(msg.text);
     });
@@ -120,6 +128,8 @@ export default function Show() {
     channel.send({ type: "here", who: "device", role: ticket.role });
     return () => { channel.close(); bus.current = null; };
   }, [ticket?.show]);
+
+  useEffect(() => () => { if (curtainTimer.current) window.clearTimeout(curtainTimer.current); }, []);
 
   // Locked in: once the show starts, the screen is the show and nothing else. Fullscreen is a
   // request, not a command -- a browser can refuse it, so the layout does the work either way.
@@ -141,6 +151,7 @@ export default function Show() {
   return (
     <div className={`${themeClass(theme)} flex h-screen flex-col gap-3 bg-background p-4 text-foreground`}>
       <Flash text={flash} />
+      <CurtainTransition open={curtain} />
       <AlertFlash level={null} />
       {started && <div aria-hidden className="live-frame" />}
 
@@ -155,7 +166,7 @@ export default function Show() {
           {/* A collaborator holds the show password, which is the host's own key: they can call it on. */}
           {ticket.host && (started
             ? <Button size="sm" variant="flat" color="danger" onPress={() => { bus.current?.send({ type: "end" }); setStarted(null); }}>End</Button>
-            : <Button size="sm" color="primary" onPress={() => { const at = new Date().toISOString(); bus.current?.send({ type: "start", at }); setStarted(at); }}>Start the show</Button>)}
+            : <Button size="sm" color="primary" onPress={() => { const at = new Date().toISOString(); bus.current?.send({ type: "start", at }); setStarted(at); startCurtain(); }}>Start the show</Button>)}
           {started
             ? <span className="flex items-center gap-1 text-xs text-live"><Lock size={13} />Locked in</span>
             : <span className="flex items-center gap-1 text-xs text-muted"><Unlock size={13} />Not started</span>}

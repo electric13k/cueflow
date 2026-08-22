@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy } from "lucide-react";
-import { useIsPhone } from "../lib/layout";
+import { useDeviceCapabilities, useIsPhone } from "../lib/layout";
 import LogoMark from "../components/LogoMark";
 import MediaEditor from "../components/MediaEditor";
 import SlideComposer from "../components/SlideComposer";
@@ -975,6 +975,8 @@ export default function Studio() {
 
 function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onRename, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
   const shown: Track[] = tracks;
+  const device = useDeviceCapabilities();
+  const hoverPreview = device.canHover && device.hasFinePointer && !device.isTouch;
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1005,10 +1007,9 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
             const isPlaying = playingId === t.id, pick = selectedIds.indexOf(t.id), isChecked = pick >= 0;
             const kind = kindOf(t), Icon = kindIcon[kind];
             return (
-            <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={{ y: -3 }}>
-              <Card data-tour={i === 0 ? "library-card" : undefined} isPressable onPress={() => onPlay(t)} className={`w-full overflow-hidden border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
-                {kind === "image" && <img src={t.url} alt="" className="h-24 w-full object-cover" />}
-                {kind === "video" && <video src={t.url} muted preload="metadata" className="h-24 w-full object-cover" />}
+            <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={hoverPreview ? { y: -3 } : undefined}>
+              <Card data-tour={i === 0 ? "library-card" : undefined} isPressable onPress={() => onPlay(t)} className={`media-card media-card--${kind} w-full overflow-hidden border ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
+                <TrackPreview track={t} kind={kind} playOnHover={hoverPreview} />
                 <CardBody className="gap-2">
                   <div className="flex items-start gap-2">
                     <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${isPlaying ? "bg-accent text-accent-foreground" : "bg-surface-secondary text-foreground"}`}>
@@ -1045,6 +1046,24 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
       )}
     </div>
   );
+}
+
+function TrackPreview({ track, kind, playOnHover }: { track: Track; kind: Kind; playOnHover: boolean }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const enter = () => {
+    if (kind !== "video" || !playOnHover) return;
+    void video.current?.play().catch(() => {});
+  };
+  const leave = () => {
+    if (!video.current) return;
+    video.current.pause();
+    video.current.currentTime = 0;
+  };
+  const cls = "media-preview w-full overflow-hidden bg-surface-secondary";
+  if (kind === "image") return <div className={cls}><img src={track.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /></div>;
+  if (kind === "video") return <div className={cls} onPointerEnter={enter} onPointerLeave={leave}><video ref={video} src={track.url} muted playsInline preload="metadata" className="h-full w-full object-cover" /></div>;
+  if (kind === "embed") return <div className={cls}><iframe src={track.url} title={`${track.title} preview`} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full border-0" /></div>;
+  return <div className={`${cls} media-preview-audio`}><div className="media-audio-bars" aria-hidden><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div><span className="sr-only">Audio preview for {track.title}</span></div>;
 }
 
 // "My library" is gone: the library has its own search box above this one, and two boxes that both

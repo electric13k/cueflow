@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Clock, ExternalLink, FileText, GripVertical, Layers, ListMusic, MessageSquare, Monitor,
   Play, Radio, Send, Square, Users, X,
@@ -9,6 +9,7 @@ import ScriptReader from "./ScriptReader";
 import ShowChat from "./ShowChat";
 import ShowHost from "./ShowHost";
 import Stage from "./Stage";
+import CurtainTransition from "./CurtainTransition";
 import { logChat } from "../lib/chat";
 import { useDragList } from "../lib/dragList";
 import { clock, liveAt, planShow, showSequences } from "../lib/showPlan";
@@ -74,8 +75,12 @@ export default function ShowManager({
   const [audience, setAudience] = useState(false);
   const [panel, setPanel] = useState<"roles" | "chat">("roles");
   const [busy, setBusy] = useState(false);
+  const [curtain, setCurtain] = useState(false);
+  const curtainTimer = useRef<number | null>(null);
   const [blank, setBlank] = useState<Blank>(() => local.get<Blank>("show:blank", "black"));
   const hold = (b: Blank) => { setBlank(b); local.set("show:blank", b); };
+
+  useEffect(() => () => { if (curtainTimer.current) window.clearTimeout(curtainTimer.current); }, []);
 
   // Escape steps back one: audience mode to the desk, the desk out of the show.
   useEffect(() => {
@@ -119,6 +124,9 @@ export default function ShowManager({
       const deck = show.sequenceId ?? (live ? link.seqs[0] ?? null : null);
       await updateShow(show.id, { started_at: at, ...(deck && deck !== show.sequenceId ? { sequence_id: deck } : {}) });
       setShow({ ...show, startedAt: at, sequenceId: deck ?? show.sequenceId });
+      if (curtainTimer.current) window.clearTimeout(curtainTimer.current);
+      setCurtain(live);
+      if (live) curtainTimer.current = window.setTimeout(() => setCurtain(false), 1400);
       logChat(show.id, { from: "show", text: live ? "Live. Every device is locked in." : "Show ended.", kind: "event" });
     } catch (e) { toast("That did not work", (e as Error).message, "warn"); }
     finally { setBusy(false); }
@@ -147,6 +155,7 @@ export default function ShowManager({
     // written in the same literals rather than in whatever the desk's theme happens to be.
     <div className="fixed inset-0 z-[60] bg-black">
       <Stage stage={stage} blank={blank} className="absolute inset-0" />
+      <CurtainTransition open={curtain} />
       <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-3 p-4 text-sm text-white/70">
         <span className="font-semibold text-white/90">{show.name}</span>
         <span className="text-white/40">{show.startedAt ? "live" : "standing by"} · audience mode</span>
@@ -172,6 +181,7 @@ export default function ShowManager({
 
   return (
     <div className={`${themeClass(theme)} fixed inset-0 z-[60] flex flex-col bg-background text-foreground`}>
+      <CurtainTransition open={curtain} />
       {/* The header is the show, so it is also where a dragged sequence lands. */}
       <header data-drop={`show:${show.id}`}
         className={`flex flex-wrap items-center gap-3 border-b px-4 py-3 transition-colors ${seqDrag.over === `show:${show.id}` ? "border-accent bg-accent/15" : "border-border"}`}>
@@ -187,7 +197,7 @@ export default function ShowManager({
           {show.startedAt
             ? <Button size="sm" color="danger" variant="flat" isLoading={busy} startContent={<Square size={15} />}
                 onPress={() => void goLive(false)}>End the show</Button>
-            : <Button size="sm" color="primary" isLoading={busy} startContent={<Radio size={15} />}
+            : <Button size="sm" color="primary" isLoading={busy} startContent={<Radio size={15} />} className="cue-leather"
                 onPress={() => void goLive(true)}>Go live</Button>}
           <Button size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={() => setAudience(true)}>Audience mode</Button>
           <Button size="sm" variant="light" startContent={<ExternalLink size={15} />} onPress={onOpenAudience}>Audience window</Button>

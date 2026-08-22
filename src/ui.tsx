@@ -111,7 +111,7 @@ export function Slider({ label, getValue, value, className, ...rest }: {
   // v2's `size`/`color` are gone in v3, the theme drives both now.
   const { size: _size, color: _color, ...sliderProps } = rest as Record<string, unknown>;
   return (
-    <S {...sliderProps} value={value} className={cn("w-full", className)}>
+    <S {...sliderProps} value={value} className={cn("control-slider w-full", className)}>
       {(label || getValue) && (
         <div className="mb-1 flex items-center justify-between text-xs text-muted">
           <span>{label}</span>

@@ -15,8 +15,9 @@ import { Button } from "../ui";
  * One button. The page used to offer three at the top and two at the bottom, which is five ways to
  * ask the same question and no answer about which one is the way in.
  */
+const PNG_SHOTS = new Set(["soundboard", "sequences", "editor", "phone", "phone-deck", "phone-editor", "studio-mockup-desktop", "studio-mockup-phone"]);
 const shot = (name: string, theme: Theme) => {
-  const ext = name.endsWith("-new") || name.startsWith("studio-mockup") ? "png" : "svg";
+  const ext = PNG_SHOTS.has(name) || name.endsWith("-new") || name.startsWith("studio-mockup") ? "png" : "svg";
   return `${import.meta.env.BASE_URL}shots/${name}-${theme}.${ext}`;
 };
 
@@ -32,33 +33,33 @@ const beats = [
     n: "1",
     head: "One list. Every sound, every slide.",
     line: "In the order you will call them, numbered the way you will call them.",
-    src: "cue-rail-new",
-    phone: "cue-rail-new-phone",
-    alt: "A staged cue rail with four numbered cue nodes moving from preparation to live output",
+    src: "soundboard",
+    phone: "phone",
+    alt: "CueFlow’s Soundboard screen with numbered media cards arranged for a live production",
   },
   {
     n: "2",
     head: "One key instead of four windows.",
     line: "Arrows step the deck. A and D move the slide without touching the sound.",
-    src: "keyboard-control-new",
-    phone: "keyboard-control-new-phone",
-    alt: "An operator presses one brass key while two screens stay synchronized with the stage",
+    src: "sequences",
+    phone: "phone-deck",
+    alt: "CueFlow’s sequence deck showing ordered cues and the next item standing by",
   },
   {
     n: "3",
     head: "On now, and standing by.",
     line: "The whole readout, on every device in the room.",
-    src: "rehearsal-new",
-    phone: "rehearsal-new-phone",
-    alt: "A prompt script, timing stopwatch, and Cueflow control tablet ready for rehearsal",
+    src: "editor",
+    phone: "phone-editor",
+    alt: "CueFlow’s editor workspace with a media preview, timeline, and controls for rehearsal",
   },
   {
     n: "4",
     head: "The crew join on their phones.",
     line: "Hand out a key. No install, nothing to hand back at the end.",
-    src: "crew-handoff-new",
-    phone: "crew-handoff-new-phone",
-    alt: "Four crew devices connected around one shared CueFlow show key",
+    src: "studio-mockup-desktop",
+    phone: "studio-mockup-phone",
+    alt: "CueFlow Studio showing the library, show controls, and script surface in one browser workspace",
   },
 ];
 
@@ -78,8 +79,8 @@ function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
   const scanProgress = useTransform(scrollYProgress, [0, 1], [0, 1]);
 
   return (
-    <div ref={rowRef} data-reveal
-      className="beat grid items-center gap-6 border-b border-white/10 py-12 sm:py-16 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-14">
+      <div ref={rowRef} data-reveal
+      className="beat grid items-center gap-8 border-b border-white/10 py-16 sm:py-20 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
       {/* GSAP owns the row reveal. Motion owns these child reveals and the local scanline, so no node
           has two scroll owners fighting over the same opacity or transform. */}
       <motion.div
@@ -152,7 +153,7 @@ export default function Home() {
               visitor who wants those is not the visitor this button is for. */}
           <motion.div initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .7, delay: .34 }}
             className="mt-9">
-            <Button href="/studio" color="primary" size="lg" startContent={<Radio size={18} />} className="font-semibold">
+            <Button href="/studio" color="primary" size="lg" startContent={<Radio size={18} />} className="cue-leather font-semibold">
               Open the Studio
             </Button>
           </motion.div>
@@ -189,7 +190,7 @@ export default function Home() {
         <section className="pb-24">
           <div data-reveal className="glass flex flex-wrap items-center justify-between gap-6 px-8 py-14">
             <h2 className="text-4xl font-bold sm:text-5xl">Curtain up.</h2>
-            <Button href="/studio" color="primary" size="lg" startContent={<Radio size={18} />} className="font-semibold">
+            <Button href="/studio" color="primary" size="lg" startContent={<Radio size={18} />} className="cue-leather font-semibold">
               Open the Studio
             </Button>
           </div>

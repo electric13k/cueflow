@@ -318,7 +318,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
         <span className="tabular-nums text-sm font-semibold" aria-label="Elapsed">{clock(elapsed)}</span>
         <label className="flex items-center gap-2 text-xs text-muted">
           Speed
-          <input type="range" min={10} max={300} step={5} value={speed} onChange={e => setSpeed(Number(e.target.value))} />
+          <input className="metal-range" aria-label="Script speed" type="range" min={10} max={300} step={5} value={speed} onChange={e => setSpeed(Number(e.target.value))} />
           <span className="w-16 tabular-nums">{speed} px/s</span>
         </label>
 

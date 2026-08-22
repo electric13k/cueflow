@@ -53,8 +53,9 @@
     --cue-visual: #8C4A2F;  /* rust: lamp on skin */
     --cue-armed: #8A6A2A;   /* brass */
     --cue-live: #A32330;    /* crimson */
-    --cue-ready: #167A58;
-    --cue-emerald: #167A58;    /* readable green for ready, synced, and confirmed states */
+    --cue-forest: #285B43;     /* restrained hierarchy outlines and ready state */
+    --cue-ready: #285B43;
+    --cue-emerald: #285B43;    /* compatibility token, now intentionally forest */
     /**
      * The neutral ramp, re-cut warm.
      *
@@ -104,8 +105,9 @@
     --cue-visual: #D98A5A;
     --cue-armed: #D4A957;
     --cue-live: #E05566;
-    --cue-ready: #4DBB85;
-    --cue-emerald: #4DBB85;    /* luminous green with a softened dark-theme surface */
+    --cue-forest: #75A586;     /* softened forest green for dark-theme hierarchy */
+    --cue-ready: #75A586;
+    --cue-emerald: #75A586;    /* compatibility token, now intentionally forest */
     /* Same ramp, dark and still warm. HeroUI's dark neutrals are the same blue-grey hue and a
        blue-black control screen was the single note that made this look like a synth plugin. */
     --surface: #241F1C;
@@ -248,6 +250,17 @@
   .cue-fade { animation: cue-fade .45s ease-out; }
   .cue-slide { animation: cue-slide .45s ease-out; }
   .cue-zoom { animation: cue-zoom .45s ease-out; }
+
+  .curtain-panel {
+    background:
+      radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--cue-curtain) 96%, #160b0b) 0 34%, transparent 72%),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--cue-curtain) 92%, #100707) 0 1.2rem, color-mix(in srgb, var(--cue-curtain) 70%, #120808) 1.2rem 2.3rem);
+    box-shadow: inset 0 0 7rem rgba(0, 0, 0, .28), 0 0 2rem rgba(0, 0, 0, .28);
+    will-change: transform;
+  }
+  .curtain-panel-left { border-right: 1px solid color-mix(in srgb, var(--cue-foolscap) 16%, transparent); }
+  .curtain-panel-right { border-left: 1px solid color-mix(in srgb, var(--cue-foolscap) 16%, transparent); }
+  .curtain-seam { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cue-armed) 65%, transparent), transparent); box-shadow: 0 0 2rem color-mix(in srgb, var(--cue-armed) 35%, transparent); }
   @media (prefers-reduced-motion: reduce) {
     .cue-fade, .cue-slide, .cue-zoom { animation: none; }
   }
@@ -644,13 +657,24 @@
   /* A slider claims the horizontal drag. Without saying so, a thumb dragged on a phone scrolls the
      page out from under itself and the value never moves. */
   .slider__track, .slider__thumb, [role="slider"] { touch-action: none; }
-  .slider__track { background: rgba(var(--glass-tint), .14); }
-  .slider__thumb {
-    background: var(--cue-foolscap);
-    border: 2px solid var(--accent);
-    box-shadow: 0 2px 10px rgba(36, 31, 28, .65);
+  .metal-range { appearance: none; width: 100%; height: 1.35rem; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--cue-forest) 34%, var(--surface-secondary)), color-mix(in srgb, var(--cue-armed) 25%, var(--surface-secondary))); border: 1px solid color-mix(in srgb, var(--cue-armed) 30%, var(--border)); box-shadow: inset 0 1px 3px rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.12); touch-action: none; }
+  .metal-range::-webkit-slider-thumb { appearance: none; width: 1.35rem; height: 1.35rem; border-radius: 999px; border: 2px solid color-mix(in srgb, var(--cue-forest) 64%, var(--cue-armed)); background: radial-gradient(circle at 34% 28%, var(--cue-foolscap), color-mix(in srgb, var(--cue-armed) 54%, var(--cue-foolscap)) 54%, color-mix(in srgb, var(--cue-armed) 78%, #1c1713)); box-shadow: inset 0 1px 1px rgba(255,255,255,.4), 0 2px 8px rgba(0,0,0,.42); }
+  .metal-range::-moz-range-thumb { width: 1.05rem; height: 1.05rem; border-radius: 999px; border: 2px solid color-mix(in srgb, var(--cue-forest) 64%, var(--cue-armed)); background: var(--cue-foolscap); box-shadow: inset 0 1px 1px rgba(255,255,255,.4), 0 2px 8px rgba(0,0,0,.42); }
+  .metal-range:focus-visible { outline: 2px solid color-mix(in srgb, var(--cue-forest) 70%, transparent); outline-offset: 3px; }
+  .control-slider .slider__track, .slider__track { background: linear-gradient(90deg, color-mix(in srgb, var(--cue-forest) 32%, var(--surface-secondary)), color-mix(in srgb, var(--cue-armed) 28%, var(--surface-secondary))); border: 1px solid color-mix(in srgb, var(--cue-armed) 28%, transparent); box-shadow: inset 0 1px 2px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.08); }
+  .control-slider .slider__thumb, .slider__thumb {
+    background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--cue-foolscap) 92%, white), color-mix(in srgb, var(--cue-armed) 38%, var(--cue-foolscap)) 54%, color-mix(in srgb, var(--cue-armed) 76%, #1c1713));
+    border: 2px solid color-mix(in srgb, var(--cue-forest) 64%, var(--cue-armed));
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.38), 0 2px 10px rgba(36, 31, 28, .65);
   }
-  .slider__thumb[data-dragging], .slider__thumb[data-focus-visible] { background: #fff; transform: scale(1.06); }
+  .slider__thumb[data-dragging], .slider__thumb[data-focus-visible] { background: var(--cue-foolscap); transform: scale(1.06); }
+  .cue-leather { font-family: var(--font-display); letter-spacing: .025em; text-shadow: 0 1px 0 rgba(255,255,255,.12), 0 1px 2px rgba(0,0,0,.4); }
+  .cue-leather::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; opacity: .2; background: repeating-linear-gradient(105deg, transparent 0 4px, rgba(255,255,255,.08) 5px, transparent 7px); mix-blend-mode: overlay; }
+  .cue-leather { position: relative; overflow: hidden; }
+  @media (max-width: 639px) {
+    .control-slider .slider__track { min-height: 1.35rem; border-radius: 999px; }
+    .control-slider .slider__thumb { width: 1.45rem; height: 1.45rem; border-radius: 999px; }
+  }
 
   /**
    * Card grids size themselves off one token instead of a breakpoint ladder, which is what makes the
@@ -659,9 +683,31 @@
    */
   .auto-grid {
     display: grid;
-    gap: var(--grid-gap, .75rem);
+    gap: var(--grid-gap, 1rem);
     grid-template-columns: repeat(auto-fill, minmax(min(var(--grid-min, 16rem), 100%), 1fr));
   }
+  .media-card { border-color: color-mix(in srgb, var(--cue-forest) 25%, var(--border)); transition: transform .32s cubic-bezier(.16,1,.3,1), border-color .25s ease, box-shadow .3s ease; }
+  .media-card--audio, .media-card--image, .media-card--video, .media-card--embed { grid-column: span 2; }
+  .media-preview { aspect-ratio: 16 / 8; border-bottom: 1px solid color-mix(in srgb, var(--cue-forest) 22%, var(--border)); }
+  .media-card--audio .media-preview { aspect-ratio: 16 / 3.5; }
+  .media-card--image .media-preview, .media-card--video .media-preview, .media-card--embed .media-preview { aspect-ratio: 16 / 8; }
+  .media-preview img, .media-preview video, .media-preview iframe { transition: transform .42s cubic-bezier(.16,1,.3,1), filter .32s ease; }
+  .media-audio-bars { display: flex; align-items: center; gap: 3px; height: 100%; padding: .75rem 1.25rem; background: repeating-linear-gradient(90deg, transparent 0 20px, color-mix(in srgb, var(--cue-forest) 9%, transparent) 21px 22px); }
+  .media-audio-bars i { display: block; flex: 1 1 0; min-width: 2px; height: 25%; border-radius: 99px; background: linear-gradient(var(--cue-forest), var(--cue-armed)); opacity: .78; animation: media-pulse 1.8s ease-in-out infinite alternate; }
+  .media-audio-bars i:nth-child(2n) { height: 60%; animation-delay: -.4s; }
+  .media-audio-bars i:nth-child(3n) { height: 38%; animation-delay: -.8s; }
+  .media-audio-bars i:nth-child(5n) { height: 80%; animation-delay: -1.1s; }
+  @keyframes media-pulse { from { transform: scaleY(.72); opacity: .5; } to { transform: scaleY(1); opacity: .9; } }
+  @media (hover: hover) and (pointer: fine) {
+    .media-card:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--cue-forest) 66%, var(--border)); box-shadow: 0 18px 35px -28px rgba(0,0,0,.72); }
+    .media-card:hover .media-preview img, .media-card:hover .media-preview video, .media-card:hover .media-preview iframe { transform: scale(1.035); }
+  }
+  @media (max-width: 639px) {
+    .media-card--audio, .media-card--image, .media-card--video, .media-card--embed { grid-column: span 1; }
+    .media-card--audio .media-preview { aspect-ratio: 16 / 4; }
+    .media-card--image .media-preview, .media-card--video .media-preview, .media-card--embed .media-preview { aspect-ratio: 16 / 8; }
+  }
+  @media (prefers-reduced-motion: reduce) { .media-audio-bars i { animation: none; } }
   /* The phone screen explains the phone layout, so it belongs only to phone-sized views. */
   .tutorial-phone-only { display: none; }
   @media (max-width: 639px) { .tutorial-phone-only { display: block; } }
@@ -669,6 +715,7 @@
      has no business shrinking a desk layout, so the rule simply is not there. */
   @media (max-width: 639px) {
     .workflow-rail, .workflow-grid::before { display: none; }
+    .auto-grid { gap: .875rem; }
     :root[data-density="compact"] { --grid-min: 9.5rem; --grid-gap: .5rem; }
     :root[data-density="compact"] [data-density-hide] { display: none; }
   }
@@ -679,6 +726,10 @@
    * and cropped to its top-left on a phone, the real 16:9 once there is room for it.
    */
   .shot { aspect-ratio: 4 / 5; object-fit: cover; object-position: left top; width: 100%; }
+  .shot-frame { transition: transform .38s cubic-bezier(.16,1,.3,1), box-shadow .3s ease; }
+  @media (hover: hover) and (pointer: fine) {
+    .shot-frame:hover { transform: translateY(-5px) scale(1.018); box-shadow: 0 20px 50px -28px rgba(36, 31, 28, .74); }
+  }
   @media (min-width: 640px) { .shot { aspect-ratio: 16 / 9; object-position: center top; } }
   /* Desktop mockups stay wide. Their phone sources switch to a complete, contained portrait frame
      only below the mobile breakpoint, so a monitor can never be rendered as a phone image. */
@@ -719,6 +770,17 @@
   }
   .theme-dark .themed-shot, .dark .themed-shot {
     filter: brightness(.98) contrast(1.04) saturate(.98);
+  }
+  .forest-outline { border-color: color-mix(in srgb, var(--cue-forest) 46%, var(--border)); }
+  .scroll-progress { background: var(--cue-curtain) !important; }
+  .home-nav { box-shadow: 0 8px 28px -24px color-mix(in srgb, var(--cue-curtain) 45%, transparent); }
+  .workspace-nav { transition: transform .28s cubic-bezier(.16,1,.3,1), opacity .2s ease, box-shadow .28s ease; }
+  @media (min-width: 640px) and (hover: hover) and (pointer: fine) {
+    .workspace-nav { transform: translateY(calc(-100% + 9px)); opacity: .72; box-shadow: 0 12px 30px -24px rgba(0,0,0,.5); }
+    .workspace-nav:hover, .workspace-nav:focus-within { transform: translateY(0); opacity: 1; box-shadow: 0 12px 32px -22px rgba(0,0,0,.5); }
+  }
+  @media (max-width: 639px) {
+    .workspace-nav { box-shadow: 0 8px 28px -24px color-mix(in srgb, var(--cue-curtain) 45%, transparent); }
   }
 
   .hero-orbit {
