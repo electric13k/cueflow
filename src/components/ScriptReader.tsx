@@ -186,12 +186,21 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
     const selection = window.getSelection();
     if (!selection) return;
     const range = document.createRange();
-    range.setStartBefore(nodes[0]);
-    range.setEndAfter(nodes[nodes.length - 1]);
+    range.setStart(nodes[0], 0);
+    range.setEnd(nodes[nodes.length - 1], nodes[nodes.length - 1].childNodes.length);
     selection.removeAllRanges();
     selection.addRange(range);
   };
-  const selectCurrentMatch = () => selectNodes([scroller.current?.querySelector<HTMLElement>(".find-hit.current")].filter(Boolean) as HTMLElement[]);
+  const selectCurrentMatch = () => {
+    const node = scroller.current?.querySelector<HTMLElement>(`[data-find="${at}"]`) ?? scroller.current?.querySelector<HTMLElement>(".find-hit.current");
+    if (!node) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
   const selectAllMatches = () => selectNodes([...scroller.current?.querySelectorAll<HTMLElement>(".find-hit") ?? []]);
   const addCueForText = (text: string, instances: "first" | "all" = "all") => {
     const words = text.trim().replace(/\s+/g, " ");
