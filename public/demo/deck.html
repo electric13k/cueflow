@@ -13,8 +13,11 @@
     <section class="slide"><p>Interval</p><h2>Fifteen minutes</h2></section>
   </div>
   <script>
-    const slides = document.querySelectorAll(".slide");
-    let i = 0;
-    setInterval(() => { slides[i].classList.remove("on"); i = (i + 1) % slides.length; slides[i].classList.add("on"); }, 4000);
+    const slides = [...document.querySelectorAll(".slide")];
+    const requested = Number(new URLSearchParams(location.search).get("slide") || location.hash.replace("#slide=", ""));
+    let i = Number.isInteger(requested) && requested > 0 && requested <= slides.length ? requested - 1 : 0;
+    slides.forEach(slide => slide.classList.remove("on"));
+    slides[i].classList.add("on");
+    if (!requested) setInterval(() => { slides[i].classList.remove("on"); i = (i + 1) % slides.length; slides[i].classList.add("on"); }, 4000);
   </script>
 </body></html>

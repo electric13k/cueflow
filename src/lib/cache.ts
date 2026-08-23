@@ -1,6 +1,6 @@
 import { performanceAllowed } from "./cookies";
 
-const CACHE_VERSION = "cueflow-cache-v3";
+const CACHE_VERSION = "cueflow-cache-v5";
 
 export function registerCueflowCache() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;

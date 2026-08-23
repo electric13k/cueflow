@@ -1006,3 +1006,18 @@ html {
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-thumb { background: rgba(var(--glass-tint), .26); border-radius: 9999px; }
 *::-webkit-scrollbar-thumb:hover { background: rgba(var(--glass-tint), .44); }
+
+/* The mobile transport floats above content instead of docking over the footer. */
+.mobile-player {
+  max-height: min(42dvh, 24rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+@media (min-width: 640px) {
+  .mobile-player { max-height: min(70vh, 32rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-player { scroll-behavior: auto; }
+}

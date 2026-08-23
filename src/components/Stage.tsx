@@ -63,13 +63,16 @@ export default function Stage({ stage, className = "", blank = "black" }: { stag
   // `blank` picks which literal an empty stage holds, and only an empty one: the moment a cue is up
   // the value is "black" again, so nothing can put a white field behind a performance.
   if (!stage) return <div data-stage={blank} className={className} />;
+  const presentationUrl = stage.kind === "embed" && stage.slideIndex !== undefined
+    ? `${stage.url}${stage.url.includes("?") ? "&" : "?"}slide=${stage.slideIndex + 1}#slide=${stage.slideIndex + 1}`
+    : stage.url;
   return (
     <div data-stage="black" className={`relative overflow-hidden ${className}`}>
       {/* Keyed on the cue so firing the same slide twice replays its transition. */}
-      <div key={`${stage.url}:${stage.n}`} className={`absolute inset-0 cue-${stage.visual.transition}`}>
+      <div key={`${stage.url}:${stage.slideIndex ?? "all"}:${stage.n}`} className={`absolute inset-0 cue-${stage.visual.transition}`}>
         {stage.kind === "image" && <img src={stage.url} alt={stage.label} className="h-full w-full" style={visualStyle(stage.visual)} />}
         {stage.kind === "video" && <video ref={video} src={stage.url} playsInline className="h-full w-full" style={visualStyle(stage.visual)} />}
-        {stage.kind === "embed" && <iframe src={stage.url} title={stage.label} allowFullScreen className="h-full w-full border-0" />}
+        {stage.kind === "embed" && <iframe src={presentationUrl} title={stage.label} allowFullScreen className="h-full w-full border-0" />}
         {stage.kind !== "embed" && <Grade v={stage.visual} />}
         {stage.visual.caption && (
           <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-8 text-center text-2xl font-bold text-white sm:text-4xl">

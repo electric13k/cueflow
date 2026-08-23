@@ -5,12 +5,16 @@ import { Lock, Maximize, MessageSquare, Send, Unlock, X } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import DarkToggle from "../components/DarkToggle";
 import CurtainTransition from "../components/CurtainTransition";
+import Stage from "../components/Stage";
 import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
 import { themeClass, useStudioTheme } from "../lib/theme";
+import { defaultVisual, type Kind, type Stage as StageState } from "../types";
 import {
-  forgetTicket, joinShow, refreshTicket, savedTicket, showChannel,
+  forgetTicket, joinShow, listShows, refreshTicket, savedTicket, showChannel,
   type DeckCue, type Perm, type ShowMsg, type Ticket,
 } from "../lib/shows";
+import { currentProject } from "../lib/projects";
+import { supabase } from "../lib/store";
 
 const can = (t: Ticket | null, p: Perm) => !!t && (t.perms ?? []).includes(p);
 
@@ -74,21 +78,40 @@ export default function Show() {
   // Whatever job you hold, the screen you hold it on is yours: the toggle is on this page for every
   // role, not just the host, and what it writes never leaves the device.
   const navigate = useNavigate();
+  const requestedShow = new URLSearchParams(location.search).get("show");
+  const saved = savedTicket();
   const closeDoor = () => { if (window.history.length > 1) navigate(-1); else navigate("/studio"); };
   const [theme] = useStudioTheme();
-  const [ticket, setTicket] = useState<Ticket | null>(savedTicket);
+  const [ticket, setTicket] = useState<Ticket | null>(() => saved && (!requestedShow || saved.show === requestedShow) ? saved : null);
   const [cues, setCues] = useState<DeckCue[]>([]);
   const [index, setIndex] = useState(-1);
   const [started, setStarted] = useState<string | null>(null);
   const [curtain, setCurtain] = useState(false);
   const curtainTimer = useRef<number | null>(null);
-  const [stage, setStage] = useState<{ url: string; kind: string; label: string } | null>(null);
+  const [stage, setStage] = useState<StageState>(null);
   const [doc, setDoc] = useState<ScriptDoc>(emptyDoc);
   const [flash, setFlash] = useState("");
   const [outgoing, setOutgoing] = useState("");
   const [note, setNote] = useState("");
   const bus = useRef<{ send: (m: ShowMsg) => void; close: () => void } | null>(null);
   const flashTimer = useRef(0);
+
+  useEffect(() => {
+    if (ticket || !requestedShow) return;
+    let cancelled = false;
+    void (async () => {
+      if (!supabase) return null;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const shows = await listShows(currentProject());
+      const owned = shows.find(item => item.id === requestedShow && item.owner === user.id);
+      if (!owned?.password) return null;
+      return joinShow(owned.password, localStorage.getItem("cueflow:showName")?.trim() || "Operator");
+    })().then(next => {
+      if (!cancelled && next) { setTicket(next); setStarted(next.started); }
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [ticket, requestedShow]);
 
   const show = (text: string) => {
     setFlash(text);
@@ -115,7 +138,7 @@ export default function Show() {
     if (!ticket) return;
     const channel = showChannel(ticket.show, msg => {
       if (msg.type === "deck") {
-        setCues(msg.cues); setIndex(msg.index); setStage(msg.stage ?? null);
+        setCues(msg.cues); setIndex(msg.index); setStage(msg.stage ? { ...msg.stage, kind: msg.stage.kind as Kind, visual: defaultVisual(), n: Date.now() } : null);
         // Arrives from another device, so it is untrusted markup: sanitise before it can be rendered.
         if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
       }
@@ -224,9 +247,7 @@ export default function Show() {
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-muted">On the screen</h2>
             <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-black/40">
               {!stage && <p className="text-sm text-muted">Nothing up.</p>}
-              {stage?.kind === "video"
-                ? <video src={stage.url} className="max-h-full max-w-full" muted autoPlay playsInline />
-                : stage && <img src={stage.url} alt={stage.label} className="max-h-full max-w-full object-contain" />}
+              {stage && <Stage stage={stage} className="h-full w-full" />}
             </div>
           </section>
         )}

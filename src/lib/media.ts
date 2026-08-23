@@ -5,12 +5,14 @@ const EXT: Record<string, Kind> = {
   mp3: "audio", wav: "audio", ogg: "audio", oga: "audio", m4a: "audio", aac: "audio", flac: "audio", opus: "audio", weba: "audio",
   png: "image", jpg: "image", jpeg: "image", gif: "image", webp: "image", avif: "image", svg: "image", bmp: "image",
   mp4: "video", webm: "video", mov: "video", m4v: "video", ogv: "video", mkv: "video",
+  ppt: "embed", pptx: "embed",
 };
 const extOf = (name: string) => (name.split(/[?#]/)[0].split(".").pop() ?? "").toLowerCase();
 
 export function kindFromFile(file: File): Kind | null {
   const [top] = file.type.split("/");
   if (top === "audio" || top === "image" || top === "video") return top;
+  if (file.type.includes("presentation") || file.type === "application/vnd.ms-powerpoint") return "embed";
   return EXT[extOf(file.name)] ?? null; // some browsers report "" for .flac / .m4a
 }
 export const kindFromUrl = (url: string): Kind => EXT[extOf(url)] ?? "audio";

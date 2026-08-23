@@ -35,8 +35,9 @@ import { cuePoints } from "../lib/trim";
 import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, searchOpenverse, uniqueTitle, type Hit, type Source } from "../lib/media";
 import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack } from "../lib/store";
 import { toast } from "../lib/toast";
-import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual } from "../types";
+import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual, type DeckSlide } from "../types";
 import { loadAlertScope, type AlertScope } from "../lib/alerts";
+import { slideLabels, slidesFromPptx } from "../lib/presentation";
 
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
 const timerLeftFor = (id: string, timers: Record<string, number>) => Number(timers[id] ?? 0);
@@ -62,7 +63,7 @@ const key = (k: string) => (project ? `${k}:${project}` : k);
 const patch = (arr: Track[], id: string, p: Partial<Track>) => arr.map(t => t.id === id ? { ...t, ...p } : t);
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 const kindIcon = { audio: Volume2, image: ImageIcon, video: Film, embed: Presentation };
-const UPLOAD_ACCEPT = "audio/*,image/*,video/*";
+const UPLOAD_ACCEPT = "audio/*,image/*,video/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 /**
  * The four things the Studio is, in the order they are used: you gather media, you put it in an
@@ -195,6 +196,25 @@ export default function Studio() {
   const [timerLeft, setTimerLeft] = useState(0);
   const featureRef = useRef(features); featureRef.current = features;
   const sequenceRef = useRef(sequences); sequenceRef.current = sequences;
+  useEffect(() => {
+    let changed = false;
+    const expanded = sequences.map(sequence => {
+      const items = sequence.items.flatMap(item => {
+        const track = tracks.find(candidate => candidate.id === item.trackId);
+        if (track?.kind !== "embed" || !track.slides?.length || item.slideIndex !== undefined) return [item];
+        changed = true;
+        return track.slides.map(slide => ({
+          ...item,
+          id: crypto.randomUUID(),
+          label: `${track.title} · ${slide.label}`,
+          slideIndex: slide.index,
+          link: undefined,
+        }));
+      });
+      return items.length === sequence.items.length ? sequence : { ...sequence, items };
+    });
+    if (changed) { sequenceRef.current = expanded; setSequences(expanded); }
+  }, [tracks]);
   const gridOn = (v: boolean) => { setShowsGrid(v); local.set(key("grid:shows"), v); };
   const updateFeatures = (updater: (state: FeatureState) => FeatureState) => {
     const next = updater(featureRef.current);
@@ -401,8 +421,8 @@ export default function Studio() {
     if ((action === "zoomIn" || action === "zoomOut") && !stage) return false;
     if (["volUp", "volDown", "speedUp", "speedDown", "reverbUp", "reverbDown"].includes(action) && !selected) return false;
     switch (action) {
-      case "nextCue": advance(1); break;
-      case "prevCue": advance(-1); break;
+      case "nextCue": advanceAudio(1); break;
+      case "prevCue": advanceAudio(-1); break;
       case "nextVisual": advanceVisual(1); break;
       case "prevVisual": advanceVisual(-1); break;
       case "zoomIn": zoomStage(.1); break;
@@ -475,8 +495,8 @@ export default function Studio() {
   };
   const toggle = () => { if (playing) { audio.current.pause(); setPlaying(false); } else void play(selected, selected?.effects, false); };
   /** Puts a slide or video on the stage. Audio keeps playing under it, which is the whole point. */
-  const show = (track: Track, visual = track.visual ?? defaultVisual()) =>
-    setStage(s => ({ url: track.url, kind: kindOf(track), visual, label: track.title, n: (s?.n ?? 0) + 1 }));
+  const show = (track: Track, visual = track.visual ?? defaultVisual(), slideIndex?: number) =>
+    setStage(s => ({ url: track.url, kind: kindOf(track), visual, label: slideIndex === undefined ? track.title : `${track.title} · Slide ${slideIndex + 1}`, slideIndex, n: (s?.n ?? 0) + 1 }));
   const zoomStage = (delta: number) => setStage(s => s && ({ ...s, visual: { ...s.visual, zoom: clamp(s.visual.zoom + delta, .25, 4) } }));
   // Soundboard: click a card to fire it (and make it the active/editor asset).
   const playTrack = (track: Track) => {
@@ -502,7 +522,7 @@ export default function Studio() {
   const fire = (item: SequenceItem) => {
     const track = tracks.find(t => t.id === item.trackId);
     if (!track) return;
-    if (isVisual(track)) show(track, item.visual ?? track.visual ?? defaultVisual());
+    if (isVisual(track)) show(track, item.visual ?? track.visual ?? defaultVisual(), item.slideIndex);
     else void play(track, item.effects);
   };
   const playCue = (i: number) => {
@@ -517,6 +537,11 @@ export default function Studio() {
     if (featureRef.current.rehearsal.active) markRehearsed(item.id);
     updateFeatures(state => ({ ...state, runHistory: [...state.runHistory, { id: crypto.randomUUID(), at: new Date().toISOString(), type: "cue" as const, sequenceId: selectedSequence.id, sequenceName: selectedSequence.name, cueIndex: i, label: cueLabels[i] ?? String(i + 1) }].slice(-500) }));
     showBus.current?.send({ type: "cue", index: i, label: cueLabels[i] ?? String(i + 1) });
+    if (armed && !loopSeq && i === selectedSequence.items.length - 1) {
+      const ids = showSequenceIds();
+      const next = sequences.find(sequence => sequence.id === ids[ids.indexOf(selectedSequence.id) + 1]);
+      if (next && armSequence(next, false)) toast("Next sequence armed", `${next.name} is ready to run.`, "success");
+    }
   };
 
   /**
@@ -533,7 +558,7 @@ export default function Studio() {
       kind: kindOf(tracks.find(t => t.id === it.trackId) ?? { kind: "audio" }),
     })),
     script: scriptDoc.html.length > SCRIPT_LIMIT ? undefined : scriptDoc.html,
-    stage: stage ? { url: stage.url, kind: stage.kind, label: stage.label } : null,
+    stage: stage ? { url: stage.url, kind: stage.kind, label: stage.label, slideIndex: stage.slideIndex } : null,
   });
   onShowMsg.current = msg => {
     if (msg.type === "here") { showBus.current?.send(deck()); toast("Someone joined", `${msg.role ?? "A device"} is in the show.`, "info"); }
@@ -599,6 +624,16 @@ export default function Studio() {
     tick();
     return () => clearInterval(id);
   }, [armed, cueIndex, loopSeq, selectedSequence?.id, selectedSequence?.items.length, features.cueTimers]);
+  /** Arrow keys step audio cues only, so visual slides can be advanced independently with WASD. */
+  const advanceAudio = (dir: 1 | -1) => {
+    const items = selectedSequence?.items ?? []; if (!items.length) return;
+    for (let step = 1; step <= items.length; step++) {
+      const i = loopSeq ? (cueIndex + dir * step + items.length * step) % items.length : cueIndex + dir * step;
+      if (i < 0 || i >= items.length) break;
+      const track = tracks.find(x => x.id === items[i]?.trackId);
+      if (track && !isVisual(track)) return playCue(i);
+    }
+  };
   /** WASD steps the deck's visuals only, so slides move without disturbing the sound already running. */
   const advanceVisual = (dir: 1 | -1) => {
     const items = selectedSequence?.items ?? []; if (!items.length) return;
@@ -639,9 +674,17 @@ export default function Studio() {
       return { id: crypto.randomUUID(), title, url: URL.createObjectURL(f), kind, mime: f.type, effects: defaultEffects(), ...(kind === "audio" ? {} : { visual: defaultVisual() }), createdAt: new Date().toISOString(), pending: true };
     });
     setTracks(o => [...created, ...o]); setSelectedId(created[0].id);
-    created.forEach((t, i) => uploadTrack(files[i])
-      .then(url => { setTracks(o => patch(o, t.id, { url, pending: false })); URL.revokeObjectURL(t.url); })
-      .catch(() => setTracks(o => patch(o, t.id, { pending: false, error: true }))));
+    created.forEach((t, i) => {
+      const file = files[i];
+      const slideMeta = t.kind !== "embed" ? Promise.resolve<DeckSlide[] | undefined>(undefined)
+        : file.name.toLowerCase().endsWith(".pptx") ? slidesFromPptx(file).catch(() => slideLabels(1))
+        : Promise.resolve(slideLabels(1));
+      void slideMeta.then(slides => {
+        if (slides) setTracks(o => patch(o, t.id, { slides }));
+        return uploadTrack(file);
+      }).then(url => { setTracks(o => patch(o, t.id, { url, pending: false })); URL.revokeObjectURL(t.url); })
+        .catch(() => setTracks(o => patch(o, t.id, { pending: false, error: true })));
+    });
   };
   /**
    * Import by URL. Everything goes through the serverless proxy: fetching remote media straight from
@@ -689,10 +732,42 @@ export default function Studio() {
   const addTracksTo = (seqId: string, ids: string[]) => {
     const chosen = ids.map(id => tracks.find(t => t.id === id)).filter(Boolean) as Track[];
     if (!seqId || !chosen.length) return;
-    applySequences(o => o.map(s => s.id !== seqId ? s : { ...s, items: [...s.items, ...chosen.map(t => ({ id: crypto.randomUUID(), trackId: t.id, label: t.title, effects: cloneEffects(t.effects), ...(isVisual(t) ? { visual: { ...(t.visual ?? defaultVisual()) } } : {}) }))] }), "Add cue to sequence");
+    if (chosen.some(track => track.slides?.length)) teach("mixed-media");
+    const items = chosen.flatMap(t => {
+      const slides = t.kind === "embed" && t.slides?.length ? t.slides : [undefined];
+      return slides.map(slide => ({
+        id: crypto.randomUUID(), trackId: t.id, label: slide ? `${t.title} · ${slide.label}` : t.title,
+        effects: cloneEffects(t.effects), ...(isVisual(t) ? { visual: { ...(t.visual ?? defaultVisual()) } } : {}),
+        ...(slide ? { slideIndex: slide.index } : {}),
+      }));
+    });
+    applySequences(o => o.map(s => s.id !== seqId ? s : { ...s, items: [...s.items, ...items] }), "Add cue to sequence");
     toast("Added to the sequence", `${chosen.length} item${chosen.length === 1 ? "" : "s"} into ${sequences.find(s => s.id === seqId)?.name ?? "it"}.`, "success");
   };
   const addItem = () => addTracksTo(sequenceId, selectedIds.length ? selectedIds : selected ? [selected.id] : []);
+  const linkAudioToSlide = (deckId: string, slideIndex: number) => {
+    teach("cue-links");
+    const audioTrack = tracks.find(track => track.id === selectedId);
+    const deckTrack = tracks.find(track => track.id === deckId);
+    if (!audioTrack || isVisual(audioTrack) || deckTrack?.kind !== "embed") return toast("Select an audio cue first", "Choose an audio item, then link it to a presentation slide.", "info");
+    if (!sequenceId) return toast("Choose a sequence first", "The linked audio and slide will be added to the selected sequence.", "info");
+    const slide = deckTrack.slides?.find(item => item.index === slideIndex);
+    if (!slide) return toast("Slide unavailable", "This presentation does not expose that slide yet.", "warn");
+    const audioItemId = crypto.randomUUID();
+    const slideItemId = crypto.randomUUID();
+    applySequences(all => all.map(sequence => {
+      if (sequence.id !== sequenceId) return sequence;
+      const existingAudio = sequence.items.find(item => item.trackId === audioTrack.id);
+      const existingSlide = sequence.items.find(item => item.trackId === deckTrack.id && item.slideIndex === slideIndex);
+      const audioItem = existingAudio ?? { id: audioItemId, trackId: audioTrack.id, label: audioTrack.title, effects: cloneEffects(audioTrack.effects) };
+      const slideItem = existingSlide ?? { id: slideItemId, trackId: deckTrack.id, label: `${deckTrack.title} · ${slide.label}`, slideIndex, effects: cloneEffects(deckTrack.effects), visual: { ...(deckTrack.visual ?? defaultVisual()) } };
+      const items = [...sequence.items];
+      if (!existingAudio) items.push(audioItem);
+      if (!existingSlide) items.push(slideItem);
+      return { ...sequence, items: items.map(item => item.id === audioItem.id || item.id === slideItem.id ? { ...item, link: item.id === audioItem.id ? slideItem.id : audioItem.id } : item) };
+    }), "Link audio to presentation slide");
+    toast("Audio linked", `${audioTrack.title} fires with ${deckTrack.title} · ${slide.label}.`, "success");
+  };
   const openEditor = (id: string) => { setSelectedId(id); setEditingId(id); teach("editor"); };
   /**
    * The three drags §10 asks for, all on one screen and all through `useDragList`: a sequence chip
@@ -742,11 +817,12 @@ export default function Studio() {
     { id: "history", label: "Open run history", group: "Show control", run: historyModal.onOpen },
   ];
 
+  const hasMobilePlayer = phone && !!selected && !isVisual(selected) && !editingId && !armed;
   return (
     <Shell>
       {/* The working surface, and the only thing the dark toggle reaches: the sidebar, the nav and
           the footer around it stay beige, and so does everybody else's device. */}
-      <WorkSurface className="-mx-3 rounded-2xl px-3 py-4">
+      <WorkSurface className={`-mx-3 rounded-2xl px-3 py-4 ${hasMobilePlayer ? "pb-40 sm:pb-4" : ""}`}>
       {alertScope === "operator" && <AlertFlash level={flash} scope="operator" />}
       {/* The alert's own words, held on screen after the flash has gone: a flash you half-caught
           while looking at the deck is no use if it does not say what it was for. */}
@@ -759,7 +835,7 @@ export default function Studio() {
       </AnimatePresence>
       {/* Bottom padding clears the fixed player, which stacks taller on phones, and on a phone the
           pane bar below it as well. */}
-      <div className="pb-72 sm:pb-36">
+      <div className="pb-56 sm:pb-36">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className={`text-[11px] font-semibold uppercase tracking-[.3em] ${armed ? "text-armed" : "text-accent"}`}>{armed ? (cueIndex < 0 ? "Armed" : "Running") : "Studio"}</p>
@@ -896,7 +972,7 @@ export default function Studio() {
             onSelectionChange={k => { setTab(k as string); teach(k as "library" | "sequence"); }}
             classNames={{ tabList: armed || phone ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
-              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
+              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
               <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
@@ -962,7 +1038,7 @@ export default function Studio() {
         </div>
       )}
 
-      <AnimatePresence>{selected && !isVisual(selected) && !editingId && !armed && <Player key="player" track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+      <AnimatePresence>{selected && !isVisual(selected) && !editingId && !armed && <Player key={`player-${selected.id}`} track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -1011,7 +1087,7 @@ export default function Studio() {
   );
 }
 
-function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onRename, onDeleteTrack, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
+function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onLinkSlide, onRename, onDeleteTrack, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
   const shown: Track[] = tracks;
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const device = useDeviceCapabilities();
@@ -1054,7 +1130,7 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
             return (
             <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={hoverPreview ? { y: -3 } : undefined}>
               <Card data-tour={i === 0 ? "library-card" : undefined} isPressable onPress={() => { setMenuFor(null); onPlay(t); }} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setMenuFor(t.id); }} className={`group media-card media-card--${kind} relative z-0 w-full border ${menuFor === t.id ? "z-20" : ""} ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
-                <TrackPreview track={t} kind={kind} playOnHover={hoverPreview} />
+                <TrackPreview track={t} kind={kind} playOnHover={hoverPreview} onLinkSlide={onLinkSlide} />
                 <CardBody className="gap-2">
                   <div className="flex items-start gap-2">
                     <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full ${isPlaying ? "bg-accent text-accent-foreground" : "bg-surface-secondary text-foreground"}`}>
@@ -1099,7 +1175,7 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
   );
 }
 
-function TrackPreview({ track, kind, playOnHover }: { track: Track; kind: Kind; playOnHover: boolean }) {
+function TrackPreview({ track, kind, playOnHover, onLinkSlide }: { track: Track; kind: Kind; playOnHover: boolean; onLinkSlide?: (deckId: string, slideIndex: number) => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const enter = () => {
     if (kind !== "video" || !playOnHover) return;
@@ -1113,8 +1189,38 @@ function TrackPreview({ track, kind, playOnHover }: { track: Track; kind: Kind; 
   const cls = "media-preview w-full overflow-hidden bg-surface-secondary";
   if (kind === "image") return <div className={cls}><img src={track.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /></div>;
   if (kind === "video") return <div className={cls} onPointerEnter={enter} onPointerLeave={leave}><video ref={video} src={track.url} muted playsInline preload="metadata" className="h-full w-full object-cover" /></div>;
-  if (kind === "embed") return <div className={cls}><iframe src={track.url} title={`${track.title} preview`} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full border-0" /></div>;
+  if (kind === "embed") return <DeckPreview track={track} className={cls} playOnHover={playOnHover} onLinkSlide={onLinkSlide} />;
   return <div className={`${cls} media-preview-audio`}><AudioPreview url={track.url} title={track.title} /></div>;
+}
+
+function DeckPreview({ track, className, playOnHover, onLinkSlide }: { track: Track; className: string; playOnHover: boolean; onLinkSlide?: (deckId: string, slideIndex: number) => void }) {
+  const slides = track.slides?.length ? track.slides : [{ index: 0, label: "First slide" }];
+  const [expanded, setExpanded] = useState(!playOnHover);
+  const [contextSlide, setContextSlide] = useState<number | null>(null);
+  const officeSource = /\.pptx?($|[?#])/i.test(track.url) && !track.url.startsWith("blob:")
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(track.url)}`
+    : track.url;
+  const slideUrl = (index: number) => `${officeSource}${officeSource.includes("?") ? "&" : "?"}slide=${index + 1}#slide=${index + 1}`;
+  const shown = expanded ? slides : slides.slice(0, 1);
+  return (
+    <div data-coach="ppt-slides" className={`${className} media-preview-deck overflow-y-auto p-2`} onPointerEnter={() => { if (playOnHover) { setExpanded(true); teach("ppt-slides"); } }} onPointerLeave={() => { if (playOnHover) setExpanded(false); }}>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {shown.map(slide => (
+          <div key={slide.index} className="group/slide relative overflow-hidden rounded-lg border border-border bg-background/70" onPointerDown={event => event.stopPropagation()} onContextMenu={event => { event.preventDefault(); setContextSlide(slide.index); }}>
+            <div className="aspect-video bg-black/30">
+              <iframe src={slideUrl(slide.index)} title={`${track.title}, ${slide.label}`} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full border-0" />
+            </div>
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <span className="min-w-0 flex-1 truncate font-control text-xs">{slide.label}</span>
+              {onLinkSlide && <Button data-coach="cue-links" size="sm" variant="light" className="shrink-0 text-[11px]" onPress={() => onLinkSlide(track.id, slide.index)}>Link audio</Button>}
+            </div>
+            {contextSlide === slide.index && onLinkSlide && <div role="menu" className="absolute right-2 top-2 z-20 flex w-36 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass" onClick={event => event.stopPropagation()}><Button size="sm" variant="light" className="justify-start" onPress={() => { setContextSlide(null); onLinkSlide(track.id, slide.index); }}>Link audio</Button><Button size="sm" variant="light" className="justify-start" onPress={() => setContextSlide(null)}>Close</Button></div>}
+
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function AudioPreview({ url, title }: { url: string; title: string }) {
@@ -1148,7 +1254,7 @@ function AudioPreview({ url, title }: { url: string; title: string }) {
     }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
   }, [url]);
-  return failed ? <span className="flex h-full items-center px-4 text-xs text-muted">Audio preview unavailable</span> : <><canvas ref={canvas} className="h-full w-full" aria-hidden /><span className="sr-only">Audio waveform preview for {title}</span></>;
+  return failed ? <span className="flex h-full items-center px-4 text-xs text-muted">Audio preview unavailable</span> : <div data-coach="waveforms" className="h-full w-full"><canvas ref={canvas} className="h-full w-full" aria-hidden /><span className="sr-only">Audio waveform preview for {title}</span></div>;
 }
 
 // "My library" is gone: the library has its own search box above this one, and two boxes that both
@@ -1292,7 +1398,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
         <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Manual cue deck</p><h2 className="flex items-center gap-1 text-xl font-bold">{seq ? seq.name : "Sequences"}<CoachHelp id="sequence" /></h2></div>
       </div>
       {!seq ? (
-        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Pick a sequence in the rail above, or make one. Then add sounds and slides from the Library. It never autoplays, drive it with the ← → arrow keys or click a cue.</div>
+        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Pick a sequence in the rail above, or make one. Then add sounds and slides from the Library. Audio responds to ← →, visual media responds to A / D, and every cue can still be clicked.</div>
       ) : (
         <div className="space-y-3">
           <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
@@ -1303,7 +1409,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
             {/* Off, a grip needs a long press so a thumb can still scroll the deck. On, grips drag
                 the moment you touch them and the list stops scrolling under your finger. */}
             <Switch size="sm" isSelected={cueDrag.reorder} onValueChange={cueDrag.setReorder}>Reorder mode</Switch>
-            <span className="ml-auto text-xs text-muted">{cueDrag.reorder ? "Drag any grip to move a cue. Scrolling is off while this is on." : cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → step every cue, A / D step slides only, W / S zoom"}</span>
+            <span className="ml-auto text-xs text-muted">{cueDrag.reorder ? "Drag any grip to move a cue. Scrolling is off while this is on." : cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → audio cues, A / D visual cues, W / S zoom"}</span>
           </div>
 
           {/* What the audience window is showing. Also the whole preview when no window is open. */}
@@ -1438,11 +1544,11 @@ function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, l
     // Docked flush to the bottom edge on a phone -- a floating card wastes the one strip of screen a
     // thumb reaches without moving the hand. It floats again once there is room.
     <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
-      className="glass fixed inset-x-0 bottom-0 z-20 mx-auto max-w-[1080px] rounded-none p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:inset-x-4 sm:bottom-4 sm:rounded-lg sm:p-4">
+      className="glass mobile-player fixed inset-x-3 bottom-[calc(var(--nav-h)+var(--safe-b)+.75rem)] z-30 mx-auto max-w-[1080px] rounded-2xl p-3 shadow-glass sm:inset-x-4 sm:bottom-4 sm:rounded-lg sm:p-4">
       {/* Phones get the title above the transport; there is no room for both on one line. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 truncate text-sm font-bold capitalize">
+          <p aria-live="polite" data-player-track-id={track.id} className="flex items-center gap-2 truncate text-sm font-bold capitalize">
             {track.title}
             {unsaved && <span className="shrink-0 rounded-full border border-secondary/40 bg-secondary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary">Unsaved edit</span>}
           </p>

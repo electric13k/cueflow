@@ -69,6 +69,36 @@ export const lessons: Record<string, Lesson> = {
     body: "No arrow keys on a phone, so armed decks dock this bar. The wide button fires the next cue; Back steps one in.",
     target: "[data-coach='transport']",
   },
+  waveforms: {
+    id: "waveforms",
+    title: "The shape is the sound",
+    body: "These bars are decoded from the actual audio file. Use them to recognize the cue before you fire it.",
+    target: "[data-coach='waveforms']",
+  },
+  "ppt-slides": {
+    id: "ppt-slides",
+    title: "A deck becomes slide cues",
+    body: "Hover a presentation to browse its slides. Adding it to a sequence keeps slide 1, slide 2, and every later slide in order.",
+    target: "[data-coach='ppt-slides']",
+  },
+  "cue-links": {
+    id: "cue-links",
+    title: "Link sound to picture",
+    body: "Select an audio cue, then use Link audio on a slide. Firing either cue fires its partner too.",
+    target: "[data-coach='cue-links']",
+  },
+  "mixed-media": {
+    id: "mixed-media",
+    title: "Mixed media stays in order",
+    body: "Pictures, every slide in a presentation, and video remain separate cues. The order you build is the order the room gets.",
+    target: "[data-tour='add-cue']",
+  },
+  "mobile-preview": {
+    id: "mobile-preview",
+    title: "Tap once to preview",
+    body: "On a phone, tap a recent sound to play it, a video or picture to expand it, or a presentation to browse its preview.",
+    target: ".recent-tile",
+  },
 };
 
 const KEY = "cueflow:taught";

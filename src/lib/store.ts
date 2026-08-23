@@ -152,8 +152,16 @@ export type SyncState = { cloud: boolean; ok: boolean; reason?: string; skipped?
  */
 let inFlight: Promise<SyncState> = Promise.resolve({ cloud: false, ok: true });
 let queued: (() => Promise<SyncState>) | null = null;
+let lastWriteSignature = "";
+const writeSignature = (tracks: Track[], sequences: Sequence[], projectId: string | null) => JSON.stringify({
+  projectId,
+  tracks: tracks.map(track => [track.id, track.title, track.url, track.kind, track.effects, track.visual]),
+  sequences: sequences.map(sequence => [sequence.id, sequence.name, sequence.items]),
+});
 export function persist(tracks: Track[], sequences: Sequence[], projectId: string | null = null): Promise<SyncState> {
-  const job = () => write(tracks, sequences, projectId);
+  const signature = writeSignature(tracks, sequences, projectId);
+  if (signature === lastWriteSignature && !queued) return Promise.resolve({ cloud: !!supabase, ok: true });
+  const job = () => write(tracks, sequences, projectId).then(result => { if (result.ok) lastWriteSignature = signature; return result; });
   queued = job;
   const run = inFlight.then(async () => {
     if (queued !== job) return { cloud: true, ok: true } as SyncState; // a newer save superseded this one
@@ -174,7 +182,7 @@ async function write(tracks: Track[], sequences: Sequence[], projectId: string |
   const cloudTracks = tracks.filter(track => isUuid(track.id));
   const { error: trackError } = await supabase.from("tracks").upsert(cloudTracks.map(track => ({
     id: track.id, user_id: user.id, title: track.title, source_url: track.url,
-    effects: track.effects, kind: track.kind ?? "audio", visual: track.visual ?? null,
+    effects: track.effects, kind: track.kind ?? "audio", visual: track.visual ? { ...track.visual, ...(track.slides ? { deckSlides: track.slides } : {}) } : null,
     project_id: projectId,
   })));
   if (trackError) return { cloud: true, ok: false, reason: trackError.message };
@@ -204,7 +212,7 @@ async function write(tracks: Track[], sequences: Sequence[], projectId: string |
     if (items.length) {
       const { error } = await supabase.from("sequence_items").upsert(items.map((item, position) => ({
         id: item.id, sequence_id: sequence.id, track_id: item.trackId, position,
-        label: item.label, effects: item.effects, visual: item.visual ?? null,
+        label: item.label, effects: item.effects, visual: item.visual || item.slideIndex !== undefined ? { ...(item.visual ?? {}), ...(item.slideIndex !== undefined ? { deckSlideIndex: item.slideIndex } : {}) } : null,
         // Only keep a link whose partner survived the track filter above, or it points at nothing.
         link: item.link && items.some(other => other.id === item.link) ? item.link : null,
       })), { onConflict: "id" });
@@ -249,5 +257,16 @@ export async function hydrateCloud(projectId: string | null = null) { if (!supab
   // question left is which of the two: a project's shared library, or the personal one. Filtering
   // by user_id as well would hide a collaborator's work, which is the whole point of a project.
   const where = projectId ? `eq.${projectId}` : "is.null";
-  const { data: tracks } = await supabase.from("tracks").select("id,title,source_url,effects,kind,visual,created_at").or(`project_id.${where}`); const { data: sequences } = await supabase.from("sequences").select("id,name,created_at").or(`project_id.${where}`); if (!tracks || !sequences) return null; const ids = sequences.map(sequence => sequence.id); const { data: items } = ids.length ? await supabase.from("sequence_items").select("id,sequence_id,track_id,label,effects,visual,link,position").in("sequence_id", ids).order("position") : { data: [] }; return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, kind: row.kind ?? "audio", visual: row.visual ?? undefined, createdAt: row.created_at } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, items: (items ?? []).filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects, visual: item.visual ?? undefined, link: item.link ?? undefined } as SequenceItem)) } as Sequence)) };
+  const [trackResult, sequenceResult] = await Promise.all([
+    supabase.from("tracks").select("id,title,source_url,effects,kind,visual,created_at").or(`project_id.${where}`),
+    supabase.from("sequences").select("id,name,created_at").or(`project_id.${where}`),
+  ]);
+  const tracks = trackResult.data;
+  const sequences = sequenceResult.data;
+  if (!tracks || !sequences) return null;
+  const ids = sequences.map(sequence => sequence.id);
+  const { data: items } = ids.length
+    ? await supabase.from("sequence_items").select("id,sequence_id,track_id,label,effects,visual,link,position").in("sequence_id", ids).order("position")
+    : { data: [] };
+  return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, kind: row.kind ?? "audio", visual: row.visual ?? undefined, slides: row.visual?.deckSlides ?? undefined, createdAt: row.created_at } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, items: (items ?? []).filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects, visual: item.visual ?? undefined, slideIndex: item.visual?.deckSlideIndex ?? undefined, link: item.link ?? undefined } as SequenceItem)) } as Sequence)) };
 }

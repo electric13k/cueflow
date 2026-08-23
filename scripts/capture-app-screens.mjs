@@ -9,7 +9,7 @@ await fs.mkdir(out, { recursive: true });
 const effects = { speed: 1, volume: 0.9, gain: 1, reverb: 0, fadeIn: 0, fadeOut: 0, distortion: 0, reverse: false, bass: 0, mid: 0, treble: 0 };
 const visual = { fit: "contain", zoom: 1, rotate: 0, flipH: false, brightness: 1, contrast: 1, saturate: 1, blur: 0, temp: 0, vignette: 0, caption: "", trimIn: 0, trimOut: 0, muted: false, rate: 1, loop: false, transition: "fade" };
 const tracks = [
-  { id: "demo:capture-door", title: "Door slam", url: `${base}/demo/door-slam.mp3`, kind: "audio", effects, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "demo:capture-door", title: "Door bell", url: `${base}/demo/door-bell.mp3`, kind: "audio", effects, createdAt: "2026-01-01T00:00:00.000Z" },
   { id: "demo:capture-thunder", title: "Thunder roll", url: `${base}/demo/thunder-roll.mp3`, kind: "audio", effects, createdAt: "2026-01-01T00:00:00.000Z" },
   { id: "demo:capture-act", title: "Act One title", url: `${base}/demo/act-one.jpg`, kind: "image", effects, visual: { ...visual, caption: "Act One, Scene i" }, createdAt: "2026-01-01T00:00:00.000Z" },
   { id: "demo:capture-curtain", title: "Curtain", url: `${base}/demo/curtain.jpg`, kind: "image", effects, visual: { ...visual, caption: "House to half" }, createdAt: "2026-01-01T00:00:00.000Z" },

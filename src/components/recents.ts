@@ -8,7 +8,7 @@
  * before the entries arrive.
  */
 import type { CSSProperties } from "react";
-import type { Kind } from "../types";
+import type { DeckSlide, Kind } from "../types";
 
 export type RecentKind = "session" | "sequence" | "audio" | "image" | "video" | "deck" | "show" | "script";
 
@@ -26,6 +26,8 @@ export type RecentEntry = {
   at?: string | null;
   /** Picture, clip or embedded deck. Absent means this kind has nothing to show on hover. */
   src?: string;
+  /** Ordered presentation slides, carried into the preview without re-reading project state. */
+  slides?: DeckSlide[];
   /** A sequence's cue list, precomputed so the preview is a pure render. */
   cues?: RecentCue[];
 };

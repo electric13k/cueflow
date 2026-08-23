@@ -1,10 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { motion, useScroll, useSpring } from "framer-motion";
 import { Button } from "../ui";
 import { Github } from "lucide-react";
 import LogoMark from "./LogoMark";
 import DarkToggle from "./DarkToggle";
-import AuthButton from "./AuthButton";
+const AuthButton = lazy(() => import("./AuthButton"));
 import { useSignedIn } from "./RequireAuth";
 
 /**
@@ -48,7 +49,7 @@ export default function Nav({ inShell }: { inShell?: boolean }) {
           {/* Inside the Shell the sidebar already owns this, so the bar does not repeat it. */}
           {!inShell && <Button data-tour="nav-work" href={work.to} size="sm" {...link(work.to)}>{work.label}</Button>}
           <DarkToggle className="inline-flex" />
-          <AuthButton />
+          <Suspense fallback={<span aria-hidden className="h-8 w-8" />}><AuthButton /></Suspense>
           {/* Repo link is a nicety, drop it before the nav starts wrapping on phones. */}
           <Button as="a" href="https://github.com/electric13k/cueflow" target="_blank" size="sm" variant="light" isIconOnly aria-label="GitHub" className="hidden sm:inline-flex"><Github size={17} /></Button>
         </div>

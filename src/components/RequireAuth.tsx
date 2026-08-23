@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { onAuth } from "../lib/store";
 import { AuthSkeleton } from "./Skeleton";
 
 /**
@@ -14,7 +13,16 @@ import { AuthSkeleton } from "./Skeleton";
  */
 export function useSignedIn(): boolean | null {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
-  useEffect(() => onAuth(email => setSignedIn(!!email)), []);
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    void import("../lib/store").then(({ onAuth }) => {
+      const stop = onAuth(email => { if (active) setSignedIn(!!email); });
+      if (active) unsubscribe = stop;
+      else stop();
+    });
+    return () => { active = false; unsubscribe?.(); };
+  }, []);
   return signedIn;
 }
 

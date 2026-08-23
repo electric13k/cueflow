@@ -3,6 +3,7 @@ export type Effects = { speed: number; volume: number; gain: number; reverb: num
 
 /** What a library asset is. Legacy tracks have no `kind`, so anything undefined is audio. */
 export type Kind = "audio" | "image" | "video" | "embed";
+export type DeckSlide = { index: number; label: string };
 export type Transition = "cut" | "fade" | "slide" | "zoom";
 
 /**
@@ -20,11 +21,13 @@ export type Visual = {
   caption: string;
   trimIn: number; trimOut: number; muted: boolean; rate: number; loop: boolean;
   transition: Transition;
+  /** Presentation slide metadata stored inside the existing visual JSON column. */
+  deckSlides?: DeckSlide[];
 };
 
 export type Track = {
   id: string; title: string; url: string; storagePath?: string; duration?: number;
-  kind?: Kind; mime?: string; visual?: Visual;
+  kind?: Kind; mime?: string; visual?: Visual; slides?: DeckSlide[];
   effects: Effects; createdAt: string; pending?: boolean; error?: boolean;
 };
 /**
@@ -32,11 +35,11 @@ export type Track = {
  * the other, which is how a slide and the sound under it stay together without becoming one cue --
  * they still have their own numbers, their own effects, and can still be called separately.
  */
-export type SequenceItem = { id: string; trackId: string; label: string; effects: Effects; visual?: Visual; link?: string };
+export type SequenceItem = { id: string; trackId: string; label: string; effects: Effects; visual?: Visual; slideIndex?: number; link?: string };
 export type Sequence = { id: string; name: string; items: SequenceItem[]; createdAt: string };
 
 /** What the audience window is showing right now. `n` bumps per cue so a repeat still animates. */
-export type Stage = { url: string; kind: Kind; visual: Visual; label: string; n: number } | null;
+export type Stage = { url: string; kind: Kind; visual: Visual; label: string; n: number; slideIndex?: number } | null;
 
 export const defaultEffects = (): Effects => ({ speed: 1, volume: 0.9, gain: 1, reverb: 0, fadeIn: 0, fadeOut: 0, distortion: 0, reverse: false, bass: 0, mid: 0, treble: 0 });
 export const cloneEffects = (effects: Effects): Effects => ({ ...effects });

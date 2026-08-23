@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FileText, Film, Image as ImageIcon, ListMusic, Pencil, Presentation, Radio, Volume2 } from "lucide-react";
+import { FileText, Film, Image as ImageIcon, ListMusic, Pencil, Presentation, Radio, Volume2, X } from "lucide-react";
 import { decodeAudioUrl, peaks } from "../lib/audio";
 import { cellStyle, type RecentEntry, type RecentKind } from "./recents";
 import { useDeviceCapabilities } from "../lib/layout";
+import { teach } from "../lib/coach";
 
 const ICON: Record<RecentKind, typeof Volume2> = {
   session: Pencil, sequence: ListMusic, audio: Volume2, image: ImageIcon,
@@ -36,6 +37,7 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const device = useDeviceCapabilities();
+  const touch = device.isTouch;
   const Icon = ICON[entry.kind];
 
   const enter = (e: React.PointerEvent) => {
@@ -61,6 +63,12 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
         onPointerEnter={enter}
         onPointerLeave={leave}
         onPointerCancel={leave}
+        onClick={event => {
+          if (!touch || open) return;
+          event.preventDefault();
+          teach("mobile-preview");
+          setOpen(true);
+        }}
         className="recent-tile relative flex h-full w-full flex-col overflow-hidden rounded-lg bg-surface/35 p-3 ring-1 ring-inset ring-border/50 transition-colors hover:bg-surface/70 hover:ring-border"
       >
         <span className="flex items-center gap-2">
@@ -85,7 +93,7 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
           {entry.kind === "session" ? "Resume" : entry.note}
         </span>
 
-        {open && <TilePreview entry={entry} />}
+        {open && <TilePreview entry={entry} interactive={touch} onClose={() => setOpen(false)} />}
       </Link>
     </motion.li>
   );
@@ -97,23 +105,21 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
  * `<img>`, a `<video>` and an `<iframe>` that leave the document stop loading by themselves. Only
  * the waveform has work of its own to call off.
  */
-function TilePreview({ entry }: { entry: RecentEntry }) {
+function TilePreview({ entry, interactive = false, onClose }: { entry: RecentEntry; interactive?: boolean; onClose?: () => void }) {
   const body = (() => {
-    if (entry.kind === "audio" && entry.src) return <Waveform url={entry.src} />;
+    if (entry.kind === "audio" && entry.src) return <div className="relative h-full w-full"><Waveform url={entry.src} /><audio src={entry.src} autoPlay={interactive} controls={interactive} className="absolute inset-x-3 bottom-3 z-10 h-9 max-w-[calc(100%-1.5rem)]" /></div>;
     if (entry.kind === "image" && entry.src) {
       return <img src={entry.src} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />;
     }
     if (entry.kind === "video" && entry.src) {
-      return <video src={entry.src} preload="metadata" muted playsInline className="h-full w-full object-contain" />;
+      return <video src={entry.src} preload="metadata" muted autoPlay={interactive} controls={interactive} playsInline className="h-full w-full object-contain" />;
     }
     // The embed opens on its first slide by itself: the URL the importer builds carries start=false.
     if (entry.kind === "deck" && entry.src) {
-      return (
-        <iframe
-          src={entry.src} title={`${entry.title}, first slide`} loading="lazy"
-          referrerPolicy="no-referrer" className="h-full w-full border-0"
-        />
-      );
+      const src = entry.src;
+      const slides = entry.slides?.length ? entry.slides : [{ index: 0, label: "First slide" }];
+      const slideUrl = (index: number) => `${src}${src.includes("?") ? "&" : "?"}slide=${index + 1}#slide=${index + 1}`;
+      return <div className="h-full overflow-y-auto p-2"><div className="grid gap-2">{slides.map(slide => <div key={slide.index} className="overflow-hidden rounded-lg border border-border"><iframe src={slideUrl(slide.index)} title={`${entry.title}, ${slide.label}`} loading="lazy" referrerPolicy="no-referrer" className="aspect-video h-auto w-full border-0" /><p className="px-2 py-1 font-control text-xs">{slide.label}</p></div>)}</div></div>;
     }
     if (entry.kind === "sequence" && entry.cues?.length) return <CueList cues={entry.cues} />;
     return null;
@@ -122,8 +128,10 @@ function TilePreview({ entry }: { entry: RecentEntry }) {
   return (
     <motion.span
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .18 }}
-      className="pointer-events-none absolute inset-0 z-10 block overflow-hidden rounded-lg bg-background/92"
+      onClick={event => { if (interactive) event.stopPropagation(); }}
+      className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute inset-0 z-10 block overflow-hidden rounded-lg bg-background/92`}
     >
+      {interactive && onClose && <button type="button" aria-label="Close preview" onClick={event => { event.stopPropagation(); onClose(); }} className="absolute right-2 top-2 z-20 grid h-8 w-8 place-items-center rounded-full bg-background/85 text-foreground shadow-lg"><X size={15} /></button>}
       {body}
     </motion.span>
   );
@@ -181,7 +189,11 @@ function draw(canvas: HTMLCanvasElement, buffer: AudioBuffer) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = getComputedStyle(canvas).color;
+  const style = getComputedStyle(canvas);
+  const gradient = ctx.createLinearGradient(0, 0, 0, h);
+  gradient.addColorStop(0, style.getPropertyValue("--cue-armed").trim() || "#D4A957");
+  gradient.addColorStop(1, style.getPropertyValue("--cue-forest").trim() || "#285B43");
+  ctx.fillStyle = gradient;
   const columns = Math.max(8, Math.floor(w / 2));
   const p = peaks(buffer, 0, 0, buffer.duration, columns);
   const mid = h / 2, step = w / columns;

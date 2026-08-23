@@ -1,9 +1,9 @@
 // Builds the demo media the tutorial loads, into public/demo/.
 //   node scripts/demo-assets.mjs      (needs ffmpeg on PATH and playwright installed)
 //
-// Generated rather than sourced. A tutorial needs half a dozen files that look like show material,
-// and generating them means there is no licence to track, no attribution to keep correct, and the
-// set is reproducible: delete public/demo and run this to get byte-identical files back.
+// Visual demo files remain reproducible locally. Audio files are sourced public-domain recordings
+// and are intentionally not regenerated here, so the tutorial never replaces real waveforms with
+// synthetic noise. See public/demo/README.md for provenance.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
@@ -33,17 +33,9 @@ function wav(path, seconds, sample) {
 let seed = 12345;
 const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff) * 2 - 1;
 
-const sounds = {
-  // A door slam: a hard transient with a low body that dies fast.
-  "door-slam": [1.0, (t, p) => (rand() * 0.5 + Math.sin(t * 90 * 6.283) * 0.8) * Math.exp(-p * 9)],
-  // Thunder: filtered noise swelling and rolling away.
-  "thunder-roll": [3.0, (t, p) => {
-    const body = rand() * 0.35 + Math.sin(t * 46 * 6.283) * 0.4 + Math.sin(t * 27 * 6.283) * 0.5;
-    return body * Math.min(1, p * 6) * Math.exp(-p * 2.2);
-  }],
-  // Applause: dense clatter with a slow swell in and out.
-  applause: [4.0, (_t, p) => rand() * 0.55 * Math.sin(Math.PI * Math.min(1, p * 1.1))],
-};
+// Audio is committed from public-domain sources. Keep this empty so a visual asset rebuild cannot
+// silently replace the real recordings used by the demo.
+const sounds = {};
 
 for (const [name, [secs, fn]] of Object.entries(sounds)) {
   seed = 12345;
@@ -115,9 +107,12 @@ writeFileSync(`${OUT}/deck.html`, `<!doctype html>
     <section class="slide"><p>Interval</p><h2>Fifteen minutes</h2></section>
   </div>
   <script>
-    const slides = document.querySelectorAll(".slide");
-    let i = 0;
-    setInterval(() => { slides[i].classList.remove("on"); i = (i + 1) % slides.length; slides[i].classList.add("on"); }, 4000);
+    const slides = [...document.querySelectorAll(".slide")];
+    const requested = Number(new URLSearchParams(location.search).get("slide") || location.hash.replace("#slide=", ""));
+    let i = Number.isInteger(requested) && requested > 0 && requested <= slides.length ? requested - 1 : 0;
+    slides.forEach(slide => slide.classList.remove("on"));
+    slides[i].classList.add("on");
+    if (!requested) setInterval(() => { slides[i].classList.remove("on"); i = (i + 1) % slides.length; slides[i].classList.add("on"); }, 4000);
   </script>
 </body></html>
 `);

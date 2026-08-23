@@ -17,15 +17,15 @@ export const PERMS = [
 export type Perm = typeof PERMS[number]["key"];
 
 /** `password` is the collaborator key. Each job's own join key lives on its role, not here. */
-export type Show = { id: string; name: string; password: string | null; sequenceId: string | null; startedAt: string | null };
+export type Show = { id: string; name: string; password: string | null; sequenceId: string | null; startedAt: string | null; owner?: string | null };
 export type Role = { id: string; name: string; perms: Perm[]; code: string | null };
 export type Ticket = { member: string; show: string; name: string; sequence: string | null; started: string | null; role: string | null; perms: Perm[]; host: boolean };
 
 const need = () => { if (!supabase) throw new Error("Cloud is not configured for this build."); return supabase; };
 const me = async () => (await need().auth.getUser()).data.user;
-const row = (s: { id: string; name: string; password: string | null; sequence_id: string | null; started_at: string | null }): Show =>
-  ({ id: s.id, name: s.name, password: s.password, sequenceId: s.sequence_id, startedAt: s.started_at });
-const COLUMNS = "id,name,password,sequence_id,started_at";
+const row = (s: { id: string; name: string; password: string | null; sequence_id: string | null; started_at: string | null; owner?: string | null }): Show =>
+  ({ id: s.id, name: s.name, password: s.password, sequenceId: s.sequence_id, startedAt: s.started_at, owner: s.owner ?? null });
+const COLUMNS = "id,name,password,sequence_id,started_at,owner";
 
 /**
  * Every key in the system -- every role code and every show password -- shares one namespace,
@@ -132,7 +132,7 @@ export async function refreshTicket(member: string): Promise<Ticket | null> {
 export type DeckCue = { id: string; label: string; number: string; kind: string };
 export type ShowMsg =
   /** The host, telling the room where it is. `deck` is the whole sequence, sent on request. */
-  | { type: "deck"; show: string; cues: DeckCue[]; index: number; script?: string; stage?: { url: string; kind: string; label: string } | null }
+  | { type: "deck"; show: string; cues: DeckCue[]; index: number; script?: string; stage?: { url: string; kind: string; label: string; slideIndex?: number } | null }
   | { type: "cue"; index: number; label: string }
   | { type: "start"; at: string }
   | { type: "end" }

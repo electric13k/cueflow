@@ -101,14 +101,14 @@ export default function Workspace() {
       if (resuming.has(t.id)) continue;
       list.push({
         id: `library:${t.id}`, kind: tileKind(t), title: t.title, note: kindOf(t),
-        href: `/studio?tab=editor&track=${t.id}`, at: t.createdAt, src: t.url,
+        href: `/studio?tab=editor&track=${t.id}`, at: t.createdAt, src: t.url, slides: t.slides,
       });
     }
 
     for (const s of shows) list.push({
       id: `show:${s.id}`, kind: "show", title: s.name,
       note: s.startedAt ? "live" : "standing by",
-      href: "/show", at: s.startedAt,
+      href: `/show?show=${encodeURIComponent(s.id)}`, at: s.startedAt,
     });
 
     if (script?.html) list.push({

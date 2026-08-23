@@ -1,4 +1,5 @@
-import { defaultEffects, defaultVisual, type Sequence, type Track } from "../types";
+import { defaultEffects, defaultVisual, type Track, type Sequence } from "../types";
+import { slideLabels } from "./presentation";
 import { emptyDoc, loadScript, saveScript, type ScriptDoc } from "./script";
 import { local } from "./store";
 
@@ -34,7 +35,7 @@ const SCRIPT_NAME = "A Winter's Tale (demo)";
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}demo/${file}`;
 
-const track = (id: string, title: string, file: string, kind: Track["kind"], caption = ""): Track => ({
+const track = (id: string, title: string, file: string, kind: Track["kind"], caption = "", slides?: Track["slides"]): Track => ({
   id: DEMO_PREFIX + id,
   title,
   url: asset(file),
@@ -42,17 +43,18 @@ const track = (id: string, title: string, file: string, kind: Track["kind"], cap
   effects: defaultEffects(),
   createdAt: new Date().toISOString(),
   ...(kind === "audio" ? {} : { visual: { ...defaultVisual(), caption } }),
+  ...(slides ? { slides } : {}),
 });
 
 /** Three sounds, two stills, a clip and a deck. Enough to build a cue list out of, and no more. */
 export const demoTracks = (): Track[] => [
-  track("door", "Door slam", "door-slam.mp3", "audio"),
+  track("door", "Door bell", "door-bell.mp3", "audio"),
   track("thunder", "Thunder roll", "thunder-roll.mp3", "audio"),
   track("applause", "Applause", "applause.mp3", "audio"),
   track("act-one", "Act One title", "act-one.jpg", "image", "Act One, Scene i"),
   track("curtain", "Curtain", "curtain.jpg", "image", "House to half"),
   track("house", "House lights", "house-lights.mp4", "video"),
-  track("deck", "Programme deck", "deck.html", "embed"),
+  track("deck", "Programme deck", "deck.html", "embed", "", slideLabels(3)),
 ];
 
 /**
@@ -73,7 +75,7 @@ export const demoScript = (): ScriptDoc => ({
     "<p class='script-dialogue'>Go on then. The winter is not done with us.</p>",
   ].join(""),
   cues: [
-    { id: DEMO_PREFIX + "cue-door", words: "door slams", message: "Stand by, door slam" },
+    { id: DEMO_PREFIX + "cue-door", words: "door bell", message: "Stand by, door bell" },
     { id: DEMO_PREFIX + "cue-thunder", words: "thunder", message: "Stand by, thunder and lights to half" },
   ],
 });
