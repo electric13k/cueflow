@@ -27,6 +27,7 @@ import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
 import { AudioEngine, decodeAudioUrl, makeReversedFile, peaks } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
+import { linkSequenceItems, unlinkSequenceItem } from "../lib/sequenceLinks";
 import { moved, useDragList } from "../lib/dragList";
 import CommandPalette, { type PaletteCommand } from "../components/CommandPalette";
 import { addToCollection, buildProjectExport, formatTimer, loadFeatures, makeTemplate, readProjectExport, recordHistory, redoSequences, removeFromCollections, saveDownload, saveFeatures, setCollection, toggleFavorite, undoSequences, type FeatureState } from "../lib/features";
@@ -107,6 +108,7 @@ export default function Studio() {
   const [selectedId, setSelectedId] = useState<string>(session.selectedId || local.get<Track[]>(key("tracks"), [])[0]?.id || "");
   const [selectedIds, setSelectedIds] = useState<string[]>([]); // multi-select for editor + add-to-sequence
   const lastPick = useRef(-1); // anchor for shift-click range selection in the library
+  const lastAudioId = useRef(""); // opening a visual card must not erase the audio chosen for slide linking
   const [loop, setLoop] = useState(false);
   const [loopSeq, setLoopSeq] = useState(false);
   // Read once. The keys are bound on the Settings page now; this screen only fires them.
@@ -351,6 +353,9 @@ export default function Studio() {
 
   const selected = tracks.find(t => t.id === selectedId) ?? tracks[0];
   const selectedSequence = sequences.find(s => s.id === sequenceId);
+  useEffect(() => {
+    if (selected && !isVisual(selected)) lastAudioId.current = selected.id;
+  }, [selected?.id]);
   // Armed effects belong to the audio cue currently under the playhead. If the deck is armed but
   // nothing has fired yet, use its first audio cue so operators can prepare the next hit.
   const armedAudioItem = (() => {
@@ -528,6 +533,7 @@ export default function Studio() {
   const playTrack = (track: Track) => {
     setSelectedId(track.id);
     if (isVisual(track)) return show(track);
+    lastAudioId.current = track.id;
     if (track.id === selectedId && playing) { audio.current.pause(); setPlaying(false); return; }
     void play(track, track.effects);
   };
@@ -600,15 +606,10 @@ export default function Studio() {
   };
   /** Both sides hold the link, and each cue has at most one partner, so an old pairing is dropped. */
   const linkCues = (aId: string, bId: string) => applySequences(all => all.map(s => s.id !== sequenceId ? s : ({
-    ...s,
-    items: s.items.map(it => {
-      if (it.id === aId) return { ...it, link: bId };
-      if (it.id === bId) return { ...it, link: aId };
-      return it.link === aId || it.link === bId ? { ...it, link: undefined } : it;
-    }),
+    ...s, items: linkSequenceItems(s.items, aId, bId),
   })), "Link cues");
   const unlinkCue = (id: string) => applySequences(all => all.map(s => s.id !== sequenceId ? s : ({
-    ...s, items: s.items.map(it => (it.id === id || it.link === id ? { ...it, link: undefined } : it)),
+    ...s, items: unlinkSequenceItem(s.items, id),
   })), "Unlink cues");
   const showSequenceIds = () => {
     if (!liveShow) return [] as string[];
@@ -778,7 +779,7 @@ export default function Studio() {
   const addItem = () => addTracksTo(sequenceId, selectedIds.length ? selectedIds : selected ? [selected.id] : []);
   const linkAudioToSlide = (deckId: string, slideIndex: number) => {
     teach("cue-links");
-    const audioTrack = tracks.find(track => track.id === selectedId);
+    const audioTrack = tracks.find(track => track.id === lastAudioId.current) ?? tracks.find(track => track.id === selectedId && !isVisual(track));
     const deckTrack = tracks.find(track => track.id === deckId);
     if (!audioTrack || isVisual(audioTrack) || deckTrack?.kind !== "embed") return toast("Select an audio cue first", "Choose an audio item, then link it to a presentation slide.", "info");
     if (!sequenceId) return toast("Choose a sequence first", "The linked audio and slide will be added to the selected sequence.", "info");
@@ -1516,6 +1517,8 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                           ) : (
                             <Tooltip content={item.link ? `Linked to cue ${numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}, click to unlink` : linking === item.id ? "Now click the cue this goes with" : "Fire this cue together with another"}>
                               <Button isIconOnly size="sm" variant={item.link || linking === item.id ? "solid" : "light"} color={item.link ? "secondary" : linking === item.id ? "primary" : "default"}
+                                aria-label={item.link ? `Unlink ${item.label}` : linking === item.id ? `Cancel linking ${item.label}` : `Link ${item.label} to another cue`}
+                                title={item.link ? "Unlink cue" : linking === item.id ? "Cancel linking" : "Link cue"}
                                 onPress={() => { if (item.link) { unlinkCue(item.id); setLinking(""); } else setLinking(l => (l === item.id ? "" : item.id)); }}>
                                 {item.link ? <Unlink size={14} /> : <Link2 size={15} />}
                               </Button>
