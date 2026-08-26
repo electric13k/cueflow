@@ -343,6 +343,15 @@ export default function Studio() {
 
   const selected = tracks.find(t => t.id === selectedId) ?? tracks[0];
   const selectedSequence = sequences.find(s => s.id === sequenceId);
+  // Armed effects belong to the audio cue currently under the playhead. If the deck is armed but
+  // nothing has fired yet, use its first audio cue so operators can prepare the next hit.
+  const armedAudioItem = (() => {
+    if (!selectedSequence) return undefined;
+    const before = cueIndex >= 0 ? selectedSequence.items.slice(0, cueIndex + 1).reverse() : [];
+    const candidates = [...before, ...selectedSequence.items];
+    return candidates.find(item => kindOf(tracks.find(track => track.id === item.trackId) ?? { kind: "audio" }) === "audio");
+  })();
+  const armedEffects: Effects = { ...defaultEffects(), ...(armedAudioItem?.effects ?? selected?.effects ?? {}) };
   const sequenceTrackSignature = selectedSequence?.items.map(item => item.trackId).join(",") ?? "";
   useEffect(() => { audio.current.loop = loop; }, [loop]);
   useEffect(() => {
@@ -464,6 +473,14 @@ export default function Studio() {
   useEffect(() => { send({ type: "stage", stage }); }, [stage]);
 
   const updateEffects = (fx: Effects) => { if (!selected) return; setTracks(all => patch(all, selected.id, { effects: fx })); engine.current.apply(audio.current, fx); };
+  const updateArmedEffects = (fx: Effects) => {
+    if (armedAudioItem) {
+      applySequences(all => all.map(sequence => sequence.id !== sequenceId ? sequence : {
+        ...sequence, items: sequence.items.map(item => item.id === armedAudioItem.id ? { ...item, effects: fx } : item),
+      }), "Update armed cue effects");
+    } else updateEffects(fx);
+    engine.current.apply(audio.current, fx);
+  };
   const updateVisual = (visual: Visual) => { if (!selected) return; setTracks(all => patch(all, selected.id, { visual })); setStage(s => s && s.url === selected.url ? { ...s, visual } : s); };
   // A fresh edit invalidates whatever the element has loaded: swap the source and rewind rather than
   // let the transport keep playing the pre-edit audio.
@@ -645,7 +662,12 @@ export default function Studio() {
       if (visualAt(i)) return playCue(i);
     }
   };
-  const nudge = (key: keyof Effects, delta: number, min: number, max: number) => { if (!selected) return; updateEffects({ ...selected.effects, [key]: clamp(Number(selected.effects[key]) + delta, min, max) }); };
+  const nudge = (key: keyof Effects, delta: number, min: number, max: number) => {
+    if (!selected) return;
+    const base = armed ? armedEffects : selected.effects;
+    const next = { ...base, [key]: clamp(Number(base[key]) + delta, min, max) };
+    if (armed) updateArmedEffects(next); else updateEffects(next);
+  };
   // Arms the deck without firing anything: cue 1 waits for the first arrow press, so nothing ever
   // hits the room the moment a window opens.
   // A phone has no arrow keys, so the armed lesson would be teaching a control that is not there:
@@ -1022,20 +1044,26 @@ export default function Studio() {
       )}
 
       {/* Hidden in the editor: that tab has its own transport, and three play buttons on one screen
-          is two too many. Visual assets have no transport at all. */}
-      {/* A phone has no arrow keys. Armed, the deck gets a thumb-sized transport of its own. */}
+          is two too many. Visual assets have no transport at all. Armed mode owns this responsive
+          transport on every viewport: phones get the large tap targets, desktop keeps the same
+          controls beside the keyboard-driven deck. */}
       {armed && (
         // Above the sign-in nudge and anything else that docks itself down here: while a deck is
         // armed, nothing gets to sit on top of the next-cue button.
-        <div data-coach="transport" className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-3 border-t border-white/10 bg-background/90 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
-          <Button className="h-16 w-24 shrink-0 text-base" variant="flat" onPress={() => advance(-1)}>← Back</Button>
-          {/* The one thing this screen exists to do, so it is the biggest thing on it. */}
-          <Button data-coach="fire" className="h-16 flex-1 text-lg font-bold" color="primary" onPress={() => advance(1)}>
-            {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
-          </Button>
-          {timerLeft > 0 && <span className="shrink-0 rounded-xl border border-armed/40 bg-armed/10 px-2 py-1 font-mono text-xs text-armed">{formatTimer(timerLeft)}</span>}
-          {features.rehearsal.active && <span className="shrink-0 rounded-xl border border-live/40 bg-live/10 px-2 py-1 text-xs text-live">Rehearsal</span>}
-          <CoachHelp id="transport" />
+        <div data-coach="transport" className="fixed inset-x-0 bottom-0 z-50 max-h-[58dvh] overflow-y-auto border-t border-white/10 bg-background/95 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:inset-x-4 lg:bottom-4 lg:mx-auto lg:max-w-[1080px] lg:rounded-2xl lg:border lg:p-4 lg:pb-4 lg:shadow-glass">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+            <div className="flex min-w-0 items-center gap-3 lg:shrink-0">
+              <Button className="h-16 w-24 shrink-0 text-base" variant="flat" onPress={() => advance(-1)}>← Back</Button>
+              {/* The one thing this screen exists to do, so it is the biggest thing on it. */}
+              <Button data-coach="fire" className="h-16 min-w-0 flex-1 text-lg font-bold lg:w-40 lg:flex-none" color="primary" onPress={() => advance(1)}>
+                {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
+              </Button>
+              {timerLeft > 0 && <span className="shrink-0 rounded-xl border border-armed/40 bg-armed/10 px-2 py-1 font-mono text-xs text-armed">{formatTimer(timerLeft)}</span>}
+              {features.rehearsal.active && <span className="shrink-0 rounded-xl border border-live/40 bg-live/10 px-2 py-1 text-xs text-live">Rehearsal</span>}
+              <CoachHelp id="transport" />
+            </div>
+            <ArmedEffectControls effects={armedEffects} update={updateArmedEffects} />
+          </div>
         </div>
       )}
 
@@ -1538,6 +1566,22 @@ function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effect
 
 // Centred with inset + auto margins rather than -translate-x-1/2: framer-motion writes its own
 // inline `transform` for the entry animation, which silently wins over a Tailwind translate.
+const ARMED_CONTROL_KEYS: (keyof Effects)[] = ["volume", "speed", "fadeIn", "fadeOut", "reverb"];
+
+function ArmedEffectControls({ effects, update }: { effects: Effects; update: (fx: Effects) => void }) {
+  return (
+    <div data-armed-effects className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-border/70 bg-surface/35 p-3 sm:grid-cols-3 lg:grid-cols-5">
+      {ARMED_CONTROL_KEYS.map(key => {
+        const control = controls.find(candidate => candidate.key === key)!;
+        return <Slider key={control.key} aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
+          minValue={control.min} maxValue={control.max} step={control.step} value={Number(effects[control.key])}
+          onChange={value => update({ ...effects, [control.key]: Array.isArray(value) ? value[0] : value })}
+          getValue={value => `${Number(value).toFixed(control.step < .1 ? 2 : 1)}${control.unit ?? ""}`} />;
+      })}
+    </div>
+  );
+}
+
 function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, loop, setLoop, effects, update }: any) {
   const [open, setOpen] = useState(false);
   const speed = Number(effects.speed) || 1;
