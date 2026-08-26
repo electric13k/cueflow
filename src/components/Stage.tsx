@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { tempAlpha, tempColour } from "../lib/image";
 import type { Stage as StageState, Visual } from "../types";
 
@@ -36,12 +36,16 @@ export const visualStyle = (v: Visual): CSSProperties => ({
  */
 export default function Stage({ stage, className = "", blank = "black" }: { stage: StageState; className?: string; blank?: "black" | "white" }) {
   const video = useRef<HTMLVideoElement>(null);
+  const [playBlocked, setPlayBlocked] = useState(false);
 
   // Trim is non-destructive: start at trimIn, and stop (or loop) at trimOut.
   useEffect(() => {
     const el = video.current;
     if (!el || !stage || stage.kind !== "video") return;
     const { visual } = stage;
+    setPlayBlocked(false);
+    el.autoplay = true;
+    el.playsInline = true;
     el.playbackRate = visual.rate || 1;
     el.muted = visual.muted;
     el.currentTime = visual.trimIn || 0;
@@ -53,8 +57,9 @@ export default function Stage({ stage, className = "", blank = "black" }: { stag
       }
     };
     el.addEventListener("timeupdate", watch);
-    // Autoplay can be refused if this document never saw a gesture; the operator's next key fixes it.
-    void el.play().catch(() => {});
+    // A cue mirrored from another device is not a user gesture on this document. Muted videos can
+    // autoplay; unmuted videos need the direct tap fallback below on mobile browsers.
+    void el.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true));
     return () => el.removeEventListener("timeupdate", watch);
   }, [stage?.url, stage?.n]);
 
@@ -71,7 +76,10 @@ export default function Stage({ stage, className = "", blank = "black" }: { stag
       {/* Keyed on the cue so firing the same slide twice replays its transition. */}
       <div key={`${stage.url}:${stage.slideIndex ?? "all"}:${stage.n}`} className={`absolute inset-0 cue-${stage.visual.transition}`}>
         {stage.kind === "image" && <img src={stage.url} alt={stage.label} className="h-full w-full" style={visualStyle(stage.visual)} />}
-        {stage.kind === "video" && <video ref={video} src={stage.url} playsInline className="h-full w-full" style={visualStyle(stage.visual)} />}
+        {stage.kind === "video" && <>
+          <video ref={video} src={stage.url} playsInline autoPlay muted={stage.visual.muted} className="h-full w-full" style={visualStyle(stage.visual)} />
+          {playBlocked && <button type="button" onClick={() => { const el = video.current; if (!el) return; el.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true)); }} className="absolute inset-0 m-auto h-fit w-fit rounded-xl bg-black/75 px-5 py-3 text-sm font-semibold text-white shadow-lg">Tap to play video</button>}
+        </>}
         {stage.kind === "embed" && <iframe src={presentationUrl} title={stage.label} allowFullScreen className="h-full w-full border-0" />}
         {stage.kind !== "embed" && <Grade v={stage.visual} />}
         {stage.visual.caption && (

@@ -10,24 +10,51 @@ const BANDS = [
   { key: "treble" as const, type: "highshelf" as BiquadFilterType, freq: 4000 },
 ];
 
+type AudioContextCtor = typeof AudioContext;
+const audioContextCtor = () => {
+  const scope = globalThis as typeof globalThis & { webkitAudioContext?: AudioContextCtor };
+  return scope.AudioContext ?? scope.webkitAudioContext;
+};
+
 export class AudioEngine {
   private context?: AudioContext; private source?: MediaElementAudioSourceNode; private output?: GainNode; private wet?: GainNode; private distortion?: WaveShaperNode; private reverb?: ConvolverNode; private element?: HTMLAudioElement; private eq: BiquadFilterNode[] = [];
+  /** Build the graph lazily: constructing/resuming AudioContext during preload loses mobile activation. */
   private connect(element: HTMLAudioElement) {
     if (this.element === element) return;
-    this.element = element; this.context = new AudioContext();
-    this.source = this.context.createMediaElementSource(element);
-    this.output = this.context.createGain(); this.wet = this.context.createGain();
-    this.distortion = this.context.createWaveShaper(); this.reverb = this.context.createConvolver();
-    // source -> distortion -> bass -> mid -> treble -> output, with a reverb send off the tone stack.
-    this.eq = BANDS.map(band => { const node = this.context!.createBiquadFilter(); node.type = band.type; node.frequency.value = band.freq; node.Q.value = 1; return node; });
-    const toned = this.eq.reduce<AudioNode>((prev, node) => { prev.connect(node); return node; }, this.distortion);
-    this.source.connect(this.distortion);
-    toned.connect(this.output);
-    toned.connect(this.reverb); this.reverb.connect(this.wet); this.wet.connect(this.output);
-    this.output.connect(this.context.destination);
+    this.element = element;
+    const Ctor = audioContextCtor();
+    if (!Ctor) return;
+    try {
+      this.context = new Ctor();
+      this.source = this.context.createMediaElementSource(element);
+      this.output = this.context.createGain(); this.wet = this.context.createGain();
+      this.distortion = this.context.createWaveShaper(); this.reverb = this.context.createConvolver();
+      // source -> distortion -> bass -> mid -> treble -> output, with a reverb send off the tone stack.
+      this.eq = BANDS.map(band => { const node = this.context!.createBiquadFilter(); node.type = band.type; node.frequency.value = band.freq; node.Q.value = 1; return node; });
+      const toned = this.eq.reduce<AudioNode>((prev, node) => { prev.connect(node); return node; }, this.distortion);
+      this.source.connect(this.distortion);
+      toned.connect(this.output);
+      toned.connect(this.reverb); this.reverb.connect(this.wet); this.wet.connect(this.output);
+      this.output.connect(this.context.destination);
+    } catch {
+      // A CORS-tainted source or an older browser may reject the graph. Native media still works.
+      this.context = undefined; this.source = undefined; this.output = undefined; this.wet = undefined; this.distortion = undefined; this.reverb = undefined; this.eq = [];
+    }
   }
-  apply(element: HTMLAudioElement, fx: Effects) { this.connect(element); if (!this.context || !this.output || !this.wet || !this.distortion || !this.reverb) return; const now = this.context.currentTime; element.playbackRate = fx.speed; element.volume = fx.volume; this.output.gain.setTargetAtTime(fx.gain, now, .02); this.wet.gain.setTargetAtTime(fx.reverb, now, .02); this.distortion.curve = curve(fx.distortion); this.eq.forEach((node, i) => node.gain.setTargetAtTime(fx[BANDS[i].key] ?? 0, now, .02)); if (fx.reverb) this.reverb.buffer = impulse(this.context); }
-  async play(element: HTMLAudioElement, fx: Effects) { this.apply(element, fx); if (this.context?.state === "suspended") await this.context.resume(); if (fx.fadeIn) { element.volume = 0; const started = performance.now(); const fade = () => { element.volume = Math.min(fx.volume, fx.volume * (performance.now() - started) / (fx.fadeIn * 1000)); if (element.volume < fx.volume) requestAnimationFrame(fade); }; fade(); } await element.play(); }
+  apply(element: HTMLAudioElement, fx: Effects) {
+    element.playbackRate = fx.speed; element.volume = fx.volume;
+    if (!this.context || !this.output || !this.wet || !this.distortion || !this.reverb || this.element !== element) return;
+    const now = this.context.currentTime;
+    this.output.gain.setTargetAtTime(fx.gain, now, .02); this.wet.gain.setTargetAtTime(fx.reverb, now, .02); this.distortion.curve = curve(fx.distortion); this.eq.forEach((node, i) => node.gain.setTargetAtTime(fx[BANDS[i].key] ?? 0, now, .02)); if (fx.reverb) this.reverb.buffer = impulse(this.context);
+  }
+  async play(element: HTMLAudioElement, fx: Effects) {
+    this.connect(element); this.apply(element, fx);
+    if (fx.fadeIn) { element.volume = 0; const started = performance.now(); const fade = () => { element.volume = Math.min(fx.volume, fx.volume * (performance.now() - started) / (fx.fadeIn * 1000)); if (element.volume < fx.volume) requestAnimationFrame(fade); }; fade(); }
+    // Call both operations synchronously while the click/tap activation is still live.
+    const resume = this.context?.state === "suspended" ? this.context.resume().catch(() => undefined) : Promise.resolve();
+    const playback = element.play();
+    await Promise.all([resume, playback]);
+  }
 }
 export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return new File([encodeWav(reversed)], `${name}-reversed.wav`, { type: "audio/wav" }); }
 // --- Buffer editing (waveform region trim, stereo/mono, per-channel gain) ---

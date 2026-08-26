@@ -79,7 +79,8 @@ const PANES = [
 type PaneId = (typeof PANES)[number]["id"];
 
 export default function Studio() {
-  const audio = useRef<HTMLAudioElement>(new Audio());
+  // crossOrigin must be set before src/load so MediaElementAudioSourceNode is not silenced by CORS.
+  const audio = useRef<HTMLAudioElement>(Object.assign(new Audio(), { crossOrigin: "anonymous", preload: "auto" }));
   const engine = useRef(new AudioEngine());
   const playRequest = useRef(0);
   const cuePreloaders = useRef<HTMLAudioElement[]>([]);
@@ -405,7 +406,7 @@ export default function Studio() {
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
   useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences, project)); }), []);
   useEffect(() => {
-    const a = audio.current; a.crossOrigin = "anonymous";
+    const a = audio.current;
     const tick = () => { setTime(a.currentTime); const fade = selected?.effects.fadeOut ?? 0; if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, selected!.effects.volume * (a.duration - a.currentTime) / fade); };
     const meta = () => setDuration(Number.isFinite(a.duration) ? a.duration : 0);
     const ended = () => setPlaying(false);
