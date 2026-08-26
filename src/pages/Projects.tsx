@@ -6,6 +6,7 @@ import Shell from "../components/Shell";
 import { ProjectsSkeleton } from "../components/Skeleton";
 import { CoachHelp } from "../components/Coach";
 import { teach } from "../lib/coach";
+import ShareButton from "../components/ShareButton";
 import { toast } from "../lib/toast";
 import { onAuth } from "../lib/store";
 import {
@@ -114,6 +115,7 @@ export default function Projects() {
                 <Button size="sm" variant={here === p.id ? "flat" : "bordered"} onPress={() => switchTo(p.id)}>
                   {here === p.id ? "Working here" : "Work here"}
                 </Button>
+                <ShareButton url={`/studio?project=${encodeURIComponent(p.id)}`} title={`${p.name} · CueFlow project`} text={`Open the ${p.name} project in CueFlow`} label="Share project" />
                 {p.role === "owner" && <Button size="sm" variant="light" startContent={<Pencil size={14} />} onPress={() => (openId === p.id ? setOpenId(null) : open(p))}>
                   {openId === p.id ? "Close manager" : "Edit and share"}
                 </Button>}

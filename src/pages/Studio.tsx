@@ -18,10 +18,11 @@ import ShowsBoard from "../components/ShowsBoard";
 import ShowManager from "../components/ShowManager";
 import DarkToggle, { WorkSurface } from "../components/DarkToggle";
 import { useSignedIn } from "../components/RequireAuth";
-import { currentProject } from "../lib/projects";
+import { currentProject, setCurrentProject } from "../lib/projects";
 import { createShow, deleteShow, listShows, SCRIPT_LIMIT, showChannel, updateShow, type Show, type ShowMsg } from "../lib/shows";
 import { linksOf, loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
+import ShareButton from "../components/ShareButton";
 import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
 import { AudioEngine, decodeAudioUrl, makeReversedFile, peaks } from "../lib/audio";
@@ -58,7 +59,14 @@ type Session = { selectedId: string; sequenceId: string; cueIndex: number; tab: 
  * swapping the state in place: the selection, the open deck, the cue index and what is on the stage
  * all belong to the project that was open, and carrying any of them across is a bug, not a feature.
  */
+const projectLink = new URLSearchParams(typeof location === "undefined" ? "" : location.search).get("project");
+if (projectLink) setCurrentProject(projectLink);
 const project = currentProject();
+const studioShareUrl = (params: Record<string, string>) => {
+  const search = new URLSearchParams(project ? { project } : {});
+  Object.entries(params).forEach(([key, value]) => search.set(key, value));
+  return `/studio?${search.toString()}`;
+};
 const key = (k: string) => (project ? `${k}:${project}` : k);
 const patch = (arr: Track[], id: string, p: Partial<Track>) => arr.map(t => t.id === id ? { ...t, ...p } : t);
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
@@ -945,6 +953,7 @@ export default function Studio() {
                     <Button isIconOnly size="sm" variant="light" aria-label={`Run ${s.name} in presenter mode`}
                       title="Run this sequence on its own, in presenter mode" isDisabled={!s.items.length}
                       onPress={() => startSequence(true, s)}><Play size={13} fill="currentColor" /></Button>
+                    <ShareButton iconOnly label={`Share ${s.name}`} url={studioShareUrl({ tab: "sequence", seq: s.id })} title={`${s.name} · CueFlow sequence`} text={`Open the ${s.name} sequence in CueFlow`} />
                     <div className="relative">
                       <Button isIconOnly size="sm" variant="light" className="sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" aria-label={`More actions for ${s.name}`} title="More actions" onPress={() => setSequenceMenuFor(sequenceMenuFor === s.id ? null : s.id)}><MoreHorizontal size={13} /></Button>
                       {sequenceMenuFor === s.id && <div className="absolute right-0 top-full z-40 mt-1 flex w-40 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass">
@@ -1179,6 +1188,7 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
                           {isChecked ? <span className="text-xs font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
                         </Button>
                       </Tooltip>
+                      <ShareButton iconOnly label={`Share ${t.title}`} url={studioShareUrl({ tab: "library", track: t.id })} title={`${t.title} · CueFlow`} text={`Open ${t.title} in CueFlow`} />
                       <div className="relative">
                         <Button isIconOnly size="sm" variant="light" className="sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100" aria-label={`More actions for ${t.title}`} title="More actions" onPress={() => setMenuFor(menuFor === t.id ? null : t.id)}><MoreHorizontal size={14} /></Button>
                         {menuFor === t.id && <div className="absolute right-0 top-full z-40 mt-1 flex w-44 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass">

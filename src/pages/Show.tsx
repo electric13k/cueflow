@@ -28,8 +28,8 @@ function Flash({ text }: { text: string }) {
   );
 }
 
-function Door({ onIn, onClose }: { onIn: (t: Ticket) => void; onClose: () => void }) {
-  const [key, setKey] = useState("");
+function Door({ onIn, onClose, initialKey = "" }: { onIn: (t: Ticket) => void; onClose: () => void; initialKey?: string }) {
+  const [key, setKey] = useState(initialKey);
   const [name, setName] = useState(() => localStorage.getItem("cueflow:showName") ?? "");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -78,7 +78,9 @@ export default function Show() {
   // Whatever job you hold, the screen you hold it on is yours: the toggle is on this page for every
   // role, not just the host, and what it writes never leaves the device.
   const navigate = useNavigate();
-  const requestedShow = new URLSearchParams(location.search).get("show");
+  const requestedParams = new URLSearchParams(location.search);
+  const requestedShow = requestedParams.get("show");
+  const requestedKey = requestedParams.get("key") ?? "";
   const saved = savedTicket();
   const closeDoor = () => { if (window.history.length > 1) navigate(-1); else navigate("/studio"); };
   const [theme] = useStudioTheme();
@@ -162,7 +164,7 @@ export default function Show() {
   }, [started]);
 
   const marked = useMemo(() => doc, [doc]);
-  if (!ticket) return <Door onClose={closeDoor} onIn={t => { setTicket(t); setStarted(t.started); }} />;
+  if (!ticket) return <Door initialKey={requestedKey} onClose={closeDoor} onIn={t => { setTicket(t); setStarted(t.started); }} />;
 
   const sendFlash = () => {
     if (!outgoing.trim()) return;

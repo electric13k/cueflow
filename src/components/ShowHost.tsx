@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Input, Switch } from "../ui";
-import { Copy, Plus, RefreshCw, Send, Square, Trash2, Radio } from "lucide-react";
+import { Button, Input, Select, Switch } from "../ui";
+import ShareButton from "./ShareButton";
+import { Plus, RefreshCw, Send, Square, Trash2, Radio } from "lucide-react";
 import { toast } from "../lib/toast";
 import {
   addRole, createShow, deleteRole, deleteShow, joinShow, listRoles, listShows, PERMS, regeneratePassword,
@@ -98,10 +99,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
           <p className="font-mono text-3xl font-black tracking-[.3em] text-accent">{show.password ?? "-"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="bordered" startContent={<Copy size={14} />}
-            onPress={() => void navigator.clipboard?.writeText(`${location.origin}/show, ${show.password ?? ""}`).then(() => toast("Copied", "Only give that to someone who should run the show with you.", "success"))}>
-            Copy
-          </Button>
+          <ShareButton variant="bordered" label="Share show" url={`/show?show=${encodeURIComponent(show.id)}${show.password ? `&key=${encodeURIComponent(show.password)}` : ""}`} title={`${show.name} · CueFlow show`} text={`Join the ${show.name} show in CueFlow. Your name will be requested before you enter.`} />
           <Button size="sm" variant="light" startContent={<RefreshCw size={14} />} isLoading={busy}
             onPress={() => void run(async () => { await regeneratePassword(show.id); await refresh(); }, "New password. The old one no longer works.")}>
             New password

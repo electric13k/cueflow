@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import Shell from "../components/Shell";
+import ShareButton from "../components/ShareButton";
 import { listen, send } from "../lib/bus";
 import { emptyDoc, loadScript, type ScriptDoc } from "../lib/script";
 import { loadAlertScope, type AlertScope } from "../lib/alerts";
@@ -43,6 +44,7 @@ export default function Script() {
       <div className="flex items-baseline gap-3">
         <h1 className="text-lg font-black tracking-tight">{doc.name || "Script"}</h1>
         <span className="text-xs text-muted">{note}</span>
+        {!bare && <ShareButton className="ml-auto" url="/script" title={`${doc.name || "Script"} · CueFlow`} text={`Open ${doc.name || "Script"} in CueFlow`} />}
       </div>
       <div className="min-h-0 flex-1">
         <ScriptReader doc={doc} setDoc={setDoc} alertScope={alertScope} onAlert={(level, message, cue) => send({ type: "alert", level, message, cue })} />
