@@ -3,6 +3,7 @@ import { HelpCircle } from "lucide-react";
 import { Button } from "../ui";
 import Spotlight, { useAnchor } from "./Spotlight";
 import { lessons, markLearned, replay, type Lesson } from "../lib/coach";
+import { useOnStage } from "../lib/stageRoute";
 
 /**
  * The "?" a pane wears: it gives back that pane's lesson and no other. Deliberately not a reset --
@@ -29,6 +30,8 @@ export function CoachHelp({ id, className = "" }: { id: string; className?: stri
  * looked broken.
  */
 export default function Coach() {
+  // Mounted outside <Routes>, so it renders on the projected window too unless it says otherwise.
+  const onStage = useOnStage();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   // Two panes can mount in the same tick (a sidebar and the page beside it). Whoever asked first
   // gets the screen; the loser is never marked learned, so it comes back next time you open it.
@@ -69,7 +72,7 @@ export default function Coach() {
     return () => window.removeEventListener("keydown", key);
   }, [lesson]);
 
-  if (!lesson || state !== "found") return null;
+  if (onStage || !lesson || state !== "found") return null;
 
   return (
     <Spotlight spot={spot} label={lesson.title} onDismiss={() => close(true)}>

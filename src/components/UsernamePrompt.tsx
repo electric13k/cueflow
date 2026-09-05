@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "../ui";
 import { onAuth } from "../lib/store";
 import { getProfile, saveProfile, usernameFree, usernameProblem } from "../lib/account";
+import { useOnStage } from "../lib/stageRoute";
 
 /**
  * Asks once, the first time someone signs in without a username. It is how collaborators find each
@@ -10,6 +11,8 @@ import { getProfile, saveProfile, usernameFree, usernameProblem } from "../lib/a
  * Skippable: an account with no username still works for everything except being invited by name.
  */
 export default function UsernamePrompt() {
+  // Mounted outside <Routes>, so it renders on the projected window too unless it says otherwise.
+  const onStage = useOnStage();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
@@ -47,7 +50,7 @@ export default function UsernamePrompt() {
   };
 
   return (
-    <Modal isOpen={open} onOpenChange={v => { if (!v) dismiss(); }}>
+    <Modal isOpen={open && !onStage} onOpenChange={v => { if (!v) dismiss(); }}>
       <ModalContent>
         <ModalHeader>Pick a username</ModalHeader>
         <ModalBody>

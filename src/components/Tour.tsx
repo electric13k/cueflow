@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useOnStage } from "../lib/stageRoute";
 import { Button } from "../ui";
 import Spotlight, { findAnchor, useAnchor } from "./Spotlight";
 import { clearDemo, demoPresent, loadDemo } from "../lib/demo";
@@ -16,6 +17,8 @@ const TUTORIAL_ACTIVE = "cueflow:tutorial-active";
 export const startTour = () => window.dispatchEvent(new Event("cueflow:tour"));
 
 export default function Tour() {
+  // Mounted outside <Routes>, so it renders on the projected window too unless it says otherwise.
+  const onStage = useOnStage();
   const [step, setStep] = useState(-1);
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -174,7 +177,7 @@ export default function Tour() {
     return () => window.removeEventListener("keydown", key);
   }, [active]);
 
-  if (!active || !current || state !== "found" || !pathname.endsWith(routeFor(current))) return null;
+  if (onStage || !active || !current || state !== "found" || !pathname.endsWith(routeFor(current))) return null;
 
   return (
     <Spotlight spot={spot} label={current.say} onDismiss={() => finish(false)}>

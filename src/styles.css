@@ -212,6 +212,34 @@
    * can brighten what the room sees.
    */
   [data-stage] { background: #000 !important; color-scheme: dark; }
+  /**
+   * The projected document, black to its own edges.
+   *
+   * `[data-stage]` blacks the element; this blacks the page under it. Two things used to show
+   * through at the bottom-left: the `4% 108%` corner wash in `body::before` above, wherever the
+   * stage element did not reach the bottom of the document, and the UA focus ring, which resolves
+   * from `color-scheme` and is a saturated `#005FCC` in light mode. Setting the scheme on the root
+   * of this document, rather than only on the stage element, keeps that ring off the projector.
+   */
+  html[data-audience] { color-scheme: dark; background: #000; }
+  html[data-audience] body { background: #000; }
+  html[data-audience] body::before { display: none; }
+  /**
+   * One focus ring, everywhere, in the brand colour.
+   *
+   * There was no global `:focus-visible` rule at all, only four scoped ones, so every other
+   * focusable element fell through to the UA default -- `#005FCC` blue under a light `color-scheme`.
+   * Several inputs also set `outline-none` and replaced it with a 1px border tint measuring about
+   * 1.3:1 against the page, well under the 3:1 a focus indicator needs; `:focus-visible` outranks
+   * those utilities here so the ring comes back.
+   */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  /* Keyboard focus only. A mouse click on a button should not leave a ring behind it. */
+  :focus:not(:focus-visible) { outline: none; }
   /* The one alternative, and it is the same kind of thing: a literal, not a token. A house holding
      an empty screen sometimes wants white -- a projector cannot be focused or lined up on black --
      and `Stage` only ever asks for it while nothing is up. */

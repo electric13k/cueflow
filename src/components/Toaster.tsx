@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CircleAlert, CircleCheck, Info, X } from "lucide-react";
 import { onToast, type Toast } from "../lib/toast";
+import { useOnStage } from "../lib/stageRoute";
 
 const icons = { info: Info, success: CircleCheck, warn: CircleAlert };
 const tones = { info: "text-accent", success: "text-success", warn: "text-warning" };
 
 export default function Toaster() {
+  const onStage = useOnStage();
   const [items, setItems] = useState<Toast[]>([]);
   const drop = (id: number) => setItems(list => list.filter(t => t.id !== id));
 
@@ -16,7 +18,7 @@ export default function Toaster() {
   }), []);
 
   // Never surface on the projected audience window, it must stay pure black.
-  if (location.pathname === "/audience") return null;
+  if (onStage) return null;
   return (
     /**
      * Under the bar, not across it. The bar is sticky at the top of every page, so a toast pinned at

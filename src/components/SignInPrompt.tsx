@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CloudUpload, X } from "lucide-react";
 import { onAuth } from "../lib/store";
 import { CONSENT_COOKIE, getCookie } from "../lib/cookies";
+import { useOnStage } from "../lib/stageRoute";
 
 const KEY = "cueflow:signin-prompt";
 
@@ -26,7 +27,8 @@ export default function SignInPrompt() {
 
   // Waits its turn behind the cookie banner: both sit bottom-centre, so two at once is one on top
   // of the other.
-  const show = email === null && !dismissed && consented && location.pathname !== "/audience";
+  const onStage = useOnStage();
+  const show = email === null && !dismissed && consented && !onStage;
   const close = () => { localStorage.setItem(KEY, "dismissed"); setDismissed(true); };
 
   return (

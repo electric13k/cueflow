@@ -3,26 +3,30 @@ import { Button } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { Cookie } from "lucide-react";
 import { getConsent, saveConsent, type ConsentState } from "../lib/cookies";
+import { useOnStage } from "../lib/stageRoute";
 
 // Necessary storage keeps CueFlow usable. Optional analytics is off until the user explicitly opts in.
 export default function CookieConsent() {
+  const onStage = useOnStage();
   const [, setConsent] = useState<ConsentState>(() => ({ analytics: "unset", performance: "accepted" }));
-  const [show, setShow] = useState(false);
+  const [asking, setAsking] = useState(false);
 
   useEffect(() => {
     const sync = () => {
       const next = getConsent();
       setConsent(next);
-      setShow(location.pathname !== "/audience" && next.analytics === "unset");
+      setAsking(next.analytics === "unset");
     };
     sync();
     window.addEventListener("cueflow:consent", sync);
     return () => window.removeEventListener("cueflow:consent", sync);
   }, []);
+  // Kept out of the effect so the answer follows navigation instead of being frozen at mount.
+  const show = asking && !onStage;
 
   const choose = (analytics: "accepted" | "declined") => {
     saveConsent({ analytics, performance: "accepted" });
-    setShow(false);
+    setAsking(false);
   };
 
   return (
