@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 const origin = process.env.CUEFLOW_URL || "http://127.0.0.1:5177";
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox"] });
 const context = await browser.newContext();
 const page = await context.newPage();
 page.setDefaultTimeout(5000);

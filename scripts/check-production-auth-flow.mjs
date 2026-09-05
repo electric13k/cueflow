@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 const origins = (process.env.CUEFLOW_ORIGINS || "https://cueflow.pages.dev,https://cuefloww.vercel.app").split(",");
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox"] });
 const results = [];
 
 for (const origin of origins) {

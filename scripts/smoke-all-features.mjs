@@ -10,7 +10,7 @@ const safeControls = [
   /^most useful$/i, /^newest$/i, /^oldest$/i,
   /^light mode$/i, /^dark mode$/i, /^toggle theme$/i,
 ];
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox"] });
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 await context.addInitScript(() => {
   localStorage.setItem("cueflow:onboarded", "1");

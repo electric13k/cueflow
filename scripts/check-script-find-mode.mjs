@@ -7,7 +7,7 @@ const doc = {
   cues: [],
   lookahead: 260,
 };
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox", "--disable-gpu"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox", "--disable-gpu"] });
 const context = await browser.newContext({ reducedMotion: "reduce" });
 await context.addInitScript(value => {
   localStorage.setItem("cueflow:script", JSON.stringify(value.doc));

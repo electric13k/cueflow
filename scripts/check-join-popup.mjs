@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 const origin = process.env.CUEFLOW_URL || "http://127.0.0.1:4177";
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox"] });
 const results = [];
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
   const context = await browser.newContext({ viewport });

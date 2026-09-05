@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 const base = process.env.CUEFLOW_URL || "http://127.0.0.1:4175";
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox", "--disable-gpu"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox", "--disable-gpu"] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
 await context.addInitScript(() => {
   localStorage.setItem("cueflow:layout", JSON.stringify({ pane: "panel", density: "comfy" }));

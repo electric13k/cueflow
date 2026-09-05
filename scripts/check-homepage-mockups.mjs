@@ -1,7 +1,7 @@
 import { chromium, devices } from "playwright";
 
 const base = process.env.CUEFLOW_URL || "http://127.0.0.1:5177";
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox", "--disable-gpu"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox", "--disable-gpu"] });
 const context = await browser.newContext({ ...devices["iPhone 13"], reducedMotion: "no-preference" });
 const page = await context.newPage();
 await page.goto(`${base}/`, { waitUntil: "networkidle" });

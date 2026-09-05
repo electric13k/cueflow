@@ -1,7 +1,7 @@
 import { chromium, devices } from "playwright";
 
 const base = process.env.CUEFLOW_URL || "https://5177-id2uudnq630vo4xwq7j8n-e90bf284.us3.manus.computer";
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox", "--disable-gpu"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox", "--disable-gpu"] });
 const context = await browser.newContext({ ...devices["iPhone 13"], reducedMotion: "reduce" });
 const page = await context.newPage();
 const errors = [];

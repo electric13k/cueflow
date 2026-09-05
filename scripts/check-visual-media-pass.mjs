@@ -1,7 +1,7 @@
 import { chromium, devices } from "playwright";
 
 const base = process.env.CUEFLOW_URL || "http://127.0.0.1:4175";
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox", "--disable-gpu"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox", "--disable-gpu"] });
 const errors = [];
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();

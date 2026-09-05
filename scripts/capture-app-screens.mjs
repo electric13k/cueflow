@@ -40,14 +40,14 @@ async function prepare(context, theme) {
 }
 
 for (const theme of ["light", "dark"]) {
-  const desktop = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox", "--disable-gpu"] });
+  const desktop = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox", "--disable-gpu"] });
   const desktopContext = await desktop.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
   const desktopPage = await prepare(desktopContext, theme);
   await desktopPage.screenshot({ path: path.join(out, `studio-library-desktop-${theme}.png`), fullPage: false });
   await desktopPage.locator('button[data-tour="pane-deck"]').count();
   await desktop.close();
 
-  const phone = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox", "--disable-gpu"] });
+  const phone = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined, args: ["--no-sandbox", "--disable-gpu"] });
   const phoneContext = await phone.newContext({ ...devices["iPhone 13"], reducedMotion: "reduce" });
   const phonePage = await prepare(phoneContext, theme);
   await phonePage.screenshot({ path: path.join(out, `studio-library-phone-${theme}.png`), fullPage: false });
