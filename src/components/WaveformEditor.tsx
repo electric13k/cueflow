@@ -69,6 +69,14 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   const [sel, setSel] = useState<Sel | null>(null);
   const [chan, setChan] = useState<Chan[]>([]);
   const [mono, setMono] = useState(false);
+  /**
+   * Re-encoding is a whole-file pass -- `processBuffer` over every sample, `encodeWav`, then a full
+   * wavesurfer re-decode. Dragging a gain fader used to trigger one every 200 ms, so a five minute
+   * file re-encoded five times a second. The fader now only moves the number; the render happens
+   * when the drag ends, and immediately for the discrete controls (mute, mono) that have no drag.
+   */
+  const [renderTick, setRenderTick] = useState(0);
+  const rerender = () => setRenderTick(tick => tick + 1);
   const [saving, setSaving] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [hasClip, setHasClip] = useState(!!clipboard);
@@ -181,7 +189,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       }).catch(() => { /* superseded by the next load, or the editor closed */ });
     }, 200);
     return () => clearTimeout(t);
-  }, [ws, buffer, chan, mono]);
+  }, [ws, buffer, renderTick, mono]);
 
   // Drop the blob and put the original back the moment the editor goes away.
   useEffect(() => () => {
@@ -512,10 +520,10 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
                 {labels[i]}
               </span>
               <Tooltip content={`${c.mute ? "Unmute" : "Mute"} ${labels[i]}`}>
-                <Button isIconOnly size="sm" variant={c.mute ? "solid" : "light"} color={c.mute ? "danger" : "default"} aria-label={`${c.mute ? "Unmute" : "Mute"} ${labels[i]}`} onPress={() => setC(i, { mute: !c.mute })}>{c.mute ? <VolumeX size={14} /> : <Volume2 size={14} />}</Button>
+                <Button isIconOnly size="sm" variant={c.mute ? "solid" : "light"} color={c.mute ? "danger" : "default"} aria-label={`${c.mute ? "Unmute" : "Mute"} ${labels[i]}`} onPress={() => { setC(i, { mute: !c.mute }); rerender(); }}>{c.mute ? <VolumeX size={14} /> : <Volume2 size={14} />}</Button>
               </Tooltip>
             </div>
-            <Slider size="sm" color="primary" aria-label={`${labels[i]} gain`} minValue={0} maxValue={2} step={0.05} isDisabled={c.mute} value={c.gain} onChange={v => setC(i, { gain: Array.isArray(v) ? v[0] : v })} getValue={v => `${Number(v).toFixed(2)}x`} />
+            <Slider size="sm" color="primary" aria-label={`${labels[i]} gain`} minValue={0} maxValue={2} step={0.05} isDisabled={c.mute} value={c.gain} onChange={v => setC(i, { gain: Array.isArray(v) ? v[0] : v })} onChangeEnd={rerender} getValue={v => `${Number(v).toFixed(2)}x`} />
           </div>
         ))}
         <Switch size="sm" isSelected={mono} onValueChange={setMono}>Mix to mono</Switch>

@@ -58,12 +58,51 @@ export class AudioEngine {
 }
 export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return new File([encodeWav(reversed)], `${name}-reversed.wav`, { type: "audio/wav" }); }
 // --- Buffer editing (waveform region trim, stereo/mono, per-channel gain) ---
-const decodeCache = new Map<string, AudioBuffer>(); // ponytail: unbounded, fine for a session's handful of tracks
+/**
+ * Decoded audio, kept but not hoarded.
+ *
+ * This used to build a fresh `AudioContext` per call and cache every buffer forever. Both hurt on a
+ * library rather than "a session's handful of tracks": browsers cap concurrent contexts around six,
+ * so opening a full library serialised the decodes and then started rejecting them, and a five
+ * minute stereo clip is roughly 50 MB of Float32 that was never released. One shared context does
+ * the decoding, and the cache evicts oldest-first once it is holding too much.
+ *
+ * Insertion order is the eviction order, which is what a `Map` already gives us; re-reading a buffer
+ * moves it back to the end so a file in active use is not the one dropped.
+ */
+const DECODE_BUDGET = 128 * 1024 * 1024;
+const decodeCache = new Map<string, AudioBuffer>();
+const decoding = new Map<string, Promise<AudioBuffer>>();
+let decodeContext: AudioContext | null = null;
+const sharedDecodeContext = () => (decodeContext ??= new AudioContext());
+const bufferBytes = (buffer: AudioBuffer) => buffer.length * buffer.numberOfChannels * 4;
+
+function remember(url: string, decoded: AudioBuffer) {
+  decodeCache.set(url, decoded);
+  let held = 0;
+  for (const buffer of decodeCache.values()) held += bufferBytes(buffer);
+  for (const [key, buffer] of decodeCache) {
+    if (held <= DECODE_BUDGET || key === url) break;
+    decodeCache.delete(key);
+    held -= bufferBytes(buffer);
+  }
+}
+
 export async function decodeAudioUrl(url: string) {
-  const hit = decodeCache.get(url); if (hit) return hit;
-  const res = await fetch(url); if (!res.ok) throw new Error("Could not load this audio");
-  const bytes = await res.arrayBuffer(); const ctx = new AudioContext(); const decoded = await ctx.decodeAudioData(bytes); await ctx.close();
-  decodeCache.set(url, decoded); return decoded;
+  const hit = decodeCache.get(url);
+  if (hit) { decodeCache.delete(url); decodeCache.set(url, hit); return hit; }
+  // Every card showing the same sound asks at once; one fetch and one decode answers all of them.
+  const running = decoding.get(url);
+  if (running) return running;
+  const work = (async () => {
+    const res = await fetch(url); if (!res.ok) throw new Error("Could not load this audio");
+    const bytes = await res.arrayBuffer();
+    const decoded = await sharedDecodeContext().decodeAudioData(bytes);
+    remember(url, decoded);
+    return decoded;
+  })().finally(() => decoding.delete(url));
+  decoding.set(url, work);
+  return work;
 }
 export function sliceBuffer(src: AudioBuffer, from: number, to: number) {
   const start = Math.max(0, Math.floor(from * src.sampleRate)), end = Math.min(src.length, Math.floor(to * src.sampleRate));

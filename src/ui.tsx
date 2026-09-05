@@ -107,7 +107,7 @@ export function Switch({ isSelected, onValueChange, size, children, className }:
 export function Slider({ label, getValue, value, className, ...rest }: {
   label?: ReactNode; getValue?: (v: number) => string; value?: number; className?: string;
   minValue?: number; maxValue?: number; step?: number; isDisabled?: boolean; size?: "sm" | "md" | "lg";
-  color?: string; onChange?: (v: number) => void; "aria-label"?: string;
+  color?: string; onChange?: (v: number) => void; onChangeEnd?: (v: number) => void; "aria-label"?: string;
 }) {
   // v2's `size`/`color` are gone in v3, the theme drives both now.
   const { size: _size, color: _color, ...sliderProps } = rest as Record<string, unknown>;

@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
@@ -142,8 +142,10 @@ export default function Studio() {
     return () => window.removeEventListener("cueflow:tour-pane", onTourPane);
   }, [phone]);
   const [playing, setPlaying] = useState(false);
-  const [time, setTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  // `time` and `duration` used to live here. Only the Player reads them, and `timeupdate` fires
+  // about four times a second, so holding them here re-rendered all of Studio -- the whole library
+  // grid and cue list, each wrapped in `motion.div layout` -- four times a second during playback.
+  // The Player subscribes to the element itself now; the fade-out below needs no state at all.
   const [busy, setBusy] = useState(false);
   const [editUrl, setEditUrl] = useState(""); // unsaved editor buffer, as a blob URL, takes over playback for the selected track
   const wasEditing = useRef(false);
@@ -204,14 +206,19 @@ export default function Studio() {
   const [showsGrid, setShowsGrid] = useState(() => local.get(key("grid:shows"), false));
   const [features, setFeatures] = useState<FeatureState>(() => loadFeatures(project));
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [timerLeft, setTimerLeft] = useState(0);
   const featureRef = useRef(features); featureRef.current = features;
   const sequenceRef = useRef(sequences); sequenceRef.current = sequences;
+  /**
+   * One index instead of a linear scan per cue per render. Every `tracks.find(t => t.id === …)` on a
+   * hot path used to be O(n) inside an O(m) loop, and those loops run on the 4 Hz playback render and
+   * the 10 Hz cue-timer render, not only on edits.
+   */
+  const trackById = useMemo(() => new Map(tracks.map(track => [track.id, track])), [tracks]);
   useEffect(() => {
     let changed = false;
     const expanded = sequences.map(sequence => {
       const items = sequence.items.flatMap(item => {
-        const track = tracks.find(candidate => candidate.id === item.trackId);
+        const track = trackById.get(item.trackId);
         if (track?.kind !== "embed" || !track.slides?.length || item.slideIndex !== undefined) return [item];
         changed = true;
         return track.slides.map(slide => ({
@@ -285,12 +292,23 @@ export default function Studio() {
   const [libKind, setLibKind] = useState<string[]>([]);
   const [libScope, setLibScope] = useState("");
   const trackFacet: Facet<Track> = t => ({ text: [t.title], kind: kindOf(t), createdAt: t.createdAt });
-  const scopedTracks = libScope === "favorites" ? tracks.filter(t => features.favorites.includes(t.id)) : libScope ? tracks.filter(t => (features.collections[libScope] ?? []).includes(t.id)) : tracks;
-  const shownTracks = rank(scopedTracks, trackFacet, { query: libQuery, filter: { kind: libKind }, sort: libSort });
+  const scopedTracks = useMemo(
+    () => libScope === "favorites" ? tracks.filter(t => features.favorites.includes(t.id)) : libScope ? tracks.filter(t => (features.collections[libScope] ?? []).includes(t.id)) : tracks,
+    [tracks, libScope, features.favorites, features.collections],
+  );
+  // `rank` maps, filters and sorts the whole list, and `norm` NFD-normalises per item per comparison.
+  // Unmemoised it ran on every render, which includes the 4 Hz playback tick and the 10 Hz cue timer.
+  const shownTracks = useMemo(
+    () => rank(scopedTracks, trackFacet, { query: libQuery, filter: { kind: libKind }, sort: libSort }),
+    [scopedTracks, libQuery, libKind, libSort],
+  );
   const [seqQuery, setSeqQuery] = useState("");
   const [seqSort, setSeqSort] = useState<SortKey>("importance");
   const seqFacet: Facet<Sequence> = s => ({ text: [s.name, ...s.items.map(i => i.label)], kind: "sequence", createdAt: s.createdAt });
-  const shownSequences = rank(sequences, seqFacet, { query: seqQuery, sort: seqSort });
+  const shownSequences = useMemo(
+    () => rank(sequences, seqFacet, { query: seqQuery, sort: seqSort }),
+    [sequences, seqQuery, seqSort],
+  );
 
   const undo = () => {
     const result = undoSequences(featureRef.current, sequenceRef.current);
@@ -351,37 +369,47 @@ export default function Studio() {
   useEffect(() => { if (liveShow) showBus.current?.send(liveShow.startedAt ? { type: "start", at: liveShow.startedAt } : { type: "end" }); }, [liveShow?.startedAt]);
   useEffect(() => { if (liveShow) showBus.current?.send(deck()); }, [stage?.n, liveShow?.id]);
 
-  const selected = tracks.find(t => t.id === selectedId) ?? tracks[0];
-  const selectedSequence = sequences.find(s => s.id === sequenceId);
+  const selected = trackById.get(selectedId) ?? tracks[0];
+  const selectedRef = useRef(selected); selectedRef.current = selected;
+  const selectedSequence = useMemo(() => sequences.find(s => s.id === sequenceId), [sequences, sequenceId]);
   useEffect(() => {
     if (selected && !isVisual(selected)) lastAudioId.current = selected.id;
   }, [selected?.id]);
   // Armed effects belong to the audio cue currently under the playhead. If the deck is armed but
   // nothing has fired yet, use its first audio cue so operators can prepare the next hit.
-  const armedAudioItem = (() => {
+  const armedAudioItem = useMemo(() => {
     if (!selectedSequence) return undefined;
     const before = cueIndex >= 0 ? selectedSequence.items.slice(0, cueIndex + 1).reverse() : [];
     const candidates = [...before, ...selectedSequence.items];
-    return candidates.find(item => kindOf(tracks.find(track => track.id === item.trackId) ?? { kind: "audio" }) === "audio");
-  })();
+    return candidates.find(item => kindOf(trackById.get(item.trackId) ?? { kind: "audio" }) === "audio");
+  }, [selectedSequence, cueIndex, trackById]);
   const armedEffects: Effects = { ...defaultEffects(), ...(armedAudioItem?.effects ?? selected?.effects ?? {}) };
-  const sequenceTrackSignature = selectedSequence?.items.map(item => item.trackId).join(",") ?? "";
   useEffect(() => { audio.current.loop = loop; }, [loop]);
-  useEffect(() => {
-    cuePreloaders.current.forEach(preloader => { preloader.pause(); preloader.removeAttribute("src"); preloader.load(); });
-    cuePreloaders.current = [];
+  /**
+   * The URLs the deck is about to need, and nothing else. This used to key off `tracks`, so any
+   * `setTracks` -- a rename, an upload progress patch, one frame of an effects slider -- tore down
+   * and rebuilt up to eight media elements, each with its own `load()`. Keying off the URLs
+   * themselves means the preloaders are rebuilt when what they should hold actually changes.
+   */
+  const cueAudioUrls = useMemo(() => {
     const ids = [...new Set((selectedSequence?.items ?? []).map(item => item.trackId))];
-    ids.map(id => tracks.find(track => track.id === id)).filter(track => track && !isVisual(track)).slice(0, 8).forEach(track => {
-      const preloader = new Audio(track!.url);
-      preloader.preload = "auto";
-      preloader.load();
-      cuePreloaders.current.push(preloader);
-    });
-    return () => {
+    return ids.map(id => trackById.get(id)).filter((t): t is Track => !!t && !isVisual(t)).slice(0, 8).map(t => t.url);
+  }, [selectedSequence, trackById]);
+  const cueAudioSignature = cueAudioUrls.join("\n");
+  useEffect(() => {
+    const drop = () => {
       cuePreloaders.current.forEach(preloader => { preloader.pause(); preloader.removeAttribute("src"); preloader.load(); });
       cuePreloaders.current = [];
     };
-  }, [sequenceTrackSignature, selectedSequence?.id, tracks]);
+    drop();
+    cuePreloaders.current = cueAudioSignature ? cueAudioSignature.split("\n").map(url => {
+      const preloader = new Audio(url);
+      preloader.preload = "auto";
+      preloader.load();
+      return preloader;
+    }) : [];
+    return drop;
+  }, [cueAudioSignature]);
   // Prime the browser media element and Web Audio graph before a cue is called. The first call should
   // spend its time making sound, not fetching metadata or constructing the filter chain.
   useEffect(() => {
@@ -429,12 +457,15 @@ export default function Studio() {
   useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences, project)); }), []);
   useEffect(() => {
     const a = audio.current;
-    const tick = () => { setTime(a.currentTime); const fade = selected?.effects.fadeOut ?? 0; if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, selected!.effects.volume * (a.duration - a.currentTime) / fade); };
-    const meta = () => setDuration(Number.isFinite(a.duration) ? a.duration : 0);
+    const tick = () => {
+      const fx = selectedRef.current?.effects;
+      const fade = fx?.fadeOut ?? 0;
+      if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, fx!.volume * (a.duration - a.currentTime) / fade);
+    };
     const ended = () => setPlaying(false);
-    a.addEventListener("timeupdate", tick); a.addEventListener("loadedmetadata", meta); a.addEventListener("durationchange", meta); a.addEventListener("ended", ended);
-    return () => { a.removeEventListener("timeupdate", tick); a.removeEventListener("loadedmetadata", meta); a.removeEventListener("durationchange", meta); a.removeEventListener("ended", ended); };
-  }, [selected]);
+    a.addEventListener("timeupdate", tick); a.addEventListener("ended", ended);
+    return () => { a.removeEventListener("timeupdate", tick); a.removeEventListener("ended", ended); };
+  }, []);
 
   // One place to run a bound key, whether it was pressed in this window or forwarded from the
   // audience one. Returns true if it matched something, so the caller can preventDefault.
@@ -460,15 +491,23 @@ export default function Studio() {
     }
     return true;
   };
+  /**
+   * Same ref indirection as the bus handler below, and for the same reason. This effect had no
+   * dependency array, so the listener was removed and re-added on every render -- including the
+   * 4 Hz playback ticks and the 10 Hz cue timer -- and a keydown landing between the two was lost.
+   * The ref is reassigned per render instead, so the handler still sees current state.
+   */
+  const onKeyDown = useRef<(e: KeyboardEvent) => void>(() => {});
+  onKeyDown.current = e => {
+    const el = e.target as HTMLElement; if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+    if (runKey(e.key)) e.preventDefault();
+  };
   useEffect(() => {
-    const keys = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement; if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable) return;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
-      if (runKey(e.key)) e.preventDefault();
-    };
+    const keys = (e: KeyboardEvent) => onKeyDown.current(e);
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
-  });
+  }, []);
   // The audience window is a separate document, so keys pressed while it has focus never reach this
   // one; it forwards them over the same-origin channel instead, and a window that reloads asks for
   // the current cue again with "hello". The channel is opened once: re-opening it per render drops
@@ -486,13 +525,29 @@ export default function Studio() {
   useEffect(() => { send({ type: "stage", stage }); }, [stage]);
 
   const updateEffects = (fx: Effects) => { if (!selected) return; setTracks(all => patch(all, selected.id, { effects: fx })); engine.current.apply(audio.current, fx); };
+  /**
+   * A slider drag is one edit, not sixty. Recording history per frame meant two
+   * `JSON.stringify(all sequences)` plus a `structuredClone` of them plus a synchronous
+   * localStorage write of the whole feature state -- undo stack and run log included -- on every
+   * pointermove, during a live show. The frames now only move the value; the undo entry is written
+   * once, on release, against the state the drag started from.
+   */
+  const armedDragFrom = useRef<Sequence[] | null>(null);
   const updateArmedEffects = (fx: Effects) => {
     if (armedAudioItem) {
-      applySequences(all => all.map(sequence => sequence.id !== sequenceId ? sequence : {
+      armedDragFrom.current ??= sequenceRef.current;
+      const next = sequenceRef.current.map(sequence => sequence.id !== sequenceId ? sequence : {
         ...sequence, items: sequence.items.map(item => item.id === armedAudioItem.id ? { ...item, effects: fx } : item),
-      }), "Update armed cue effects");
+      });
+      sequenceRef.current = next;
+      setSequences(next);
     } else updateEffects(fx);
     engine.current.apply(audio.current, fx);
+  };
+  const commitArmedEffects = () => {
+    const before = armedDragFrom.current;
+    armedDragFrom.current = null;
+    if (before) updateFeatures(state => recordHistory(state, before, sequenceRef.current, "Update armed cue effects"));
   };
   const updateVisual = (visual: Visual) => { if (!selected) return; setTracks(all => patch(all, selected.id, { visual })); setStage(s => s && s.url === selected.url ? { ...s, visual } : s); };
   // A fresh edit invalidates whatever the element has loaded: swap the source and rewind rather than
@@ -502,7 +557,7 @@ export default function Studio() {
     wasEditing.current = !!editUrl;
     audio.current.pause(); setPlaying(false);
     audio.current.src = editUrl || selected?.url || "";
-    audio.current.currentTime = 0; setTime(0); setDuration(0);
+    audio.current.currentTime = 0;
   }, [editUrl]);
 
   // restart=false resumes where it paused; the default fires the cue from the top, cutting off
@@ -515,8 +570,8 @@ export default function Studio() {
     const swap = a.src !== new URL(src, location.href).href;
     if (restart || swap) { a.pause(); setPlaying(false); }
     const request = ++playRequest.current;
-    if (swap) { a.src = src; a.preload = "auto"; a.load(); setDuration(0); }
-    if (restart || swap) { a.currentTime = 0; setTime(0); }
+    if (swap) { a.src = src; a.preload = "auto"; a.load(); }
+    if (restart || swap) { a.currentTime = 0; }
     try {
       await engine.current.play(a, fx);
       if (request === playRequest.current) setPlaying(true);
@@ -549,10 +604,10 @@ export default function Studio() {
     return ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
   });
   const jump = (s: number) => { audio.current.currentTime = Math.max(0, Math.min(audio.current.duration || 0, audio.current.currentTime + s)); };
-  const seek = (v: number) => { audio.current.currentTime = v; setTime(v); };
+  const seek = (v: number) => { audio.current.currentTime = v; };
   /** Sends one cue to the room. No index bookkeeping, so a linked partner can go out through it too. */
   const fire = (item: SequenceItem) => {
-    const track = tracks.find(t => t.id === item.trackId);
+    const track = trackById.get(item.trackId);
     if (!track) return;
     if (isVisual(track)) show(track, item.visual ?? track.visual ?? defaultVisual(), item.slideIndex);
     else void play(track, item.effects);
@@ -580,14 +635,17 @@ export default function Studio() {
    * What the room is allowed to know: the sequence as labels, and the script. No source URLs
    * for sounds, because a device that only reads cues has no business being able to download them.
    */
-  const cueLabels = selectedSequence ? cueNumbers(selectedSequence.items.map(it => kindOf(tracks.find(t => t.id === it.trackId) ?? { kind: "audio" }))) : [];
+  const cueLabels = useMemo(
+    () => selectedSequence ? cueNumbers(selectedSequence.items.map(it => kindOf(trackById.get(it.trackId) ?? { kind: "audio" }))) : [],
+    [selectedSequence, trackById],
+  );
   const deck = (): ShowMsg => ({
     type: "deck",
     show: selectedSequence?.name ?? "Show",
     index: cueIndex,
     cues: (selectedSequence?.items ?? []).map((it, i) => ({
       id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1),
-      kind: kindOf(tracks.find(t => t.id === it.trackId) ?? { kind: "audio" }),
+      kind: kindOf(trackById.get(it.trackId) ?? { kind: "audio" }),
     })),
     script: scriptDoc.html.length > SCRIPT_LIMIT ? undefined : scriptDoc.html,
     stage: stage ? { url: stage.url, kind: stage.kind, label: stage.label, slideIndex: stage.slideIndex } : null,
@@ -636,35 +694,33 @@ export default function Studio() {
     const i = loopSeq ? (cueIndex + dir + n) % n : clamp(cueIndex + dir, 0, n - 1);
     playCue(i);
   };
-  useEffect(() => {
-    if (!armed || !selectedSequence || cueIndex < 0) { setTimerLeft(0); return; }
+  /**
+   * How long the current cue holds, or 0 for "no timer". The countdown itself lives in its own leaf
+   * component: ticking it here meant `setTimerLeft` re-rendered all 1600 lines of Studio ten times a
+   * second to update one `<span>`, and the `features.cueTimers` dependency -- a fresh object on
+   * every unrelated feature write -- restarted the interval each time as well.
+   */
+  const countdownSeconds = (() => {
+    if (!armed || !selectedSequence || cueIndex < 0) return 0;
     const item = selectedSequence.items[cueIndex];
-    const seconds = Number(item ? featureRef.current.cueTimers[item.id] ?? 0 : 0);
-    if (!seconds || (!loopSeq && cueIndex >= selectedSequence.items.length - 1)) { setTimerLeft(0); return; }
-    const started = Date.now();
-    const tick = () => {
-      const left = seconds - (Date.now() - started) / 1000;
-      setTimerLeft(Math.max(0, left));
-      if (left <= 0) { clearInterval(id); advance(1); }
-    };
-    const id = window.setInterval(tick, 100);
-    tick();
-    return () => clearInterval(id);
-  }, [armed, cueIndex, loopSeq, selectedSequence?.id, selectedSequence?.items.length, features.cueTimers]);
+    const seconds = Number(item ? features.cueTimers[item.id] ?? 0 : 0);
+    if (!seconds || (!loopSeq && cueIndex >= selectedSequence.items.length - 1)) return 0;
+    return seconds;
+  })();
   /** Arrow keys step audio cues only, so visual slides can be advanced independently with WASD. */
   const advanceAudio = (dir: 1 | -1) => {
     const items = selectedSequence?.items ?? []; if (!items.length) return;
     for (let step = 1; step <= items.length; step++) {
       const i = loopSeq ? (cueIndex + dir * step + items.length * step) % items.length : cueIndex + dir * step;
       if (i < 0 || i >= items.length) break;
-      const track = tracks.find(x => x.id === items[i]?.trackId);
+      const track = trackById.get(items[i]?.trackId ?? "");
       if (track && !isVisual(track)) return playCue(i);
     }
   };
   /** WASD steps the deck's visuals only, so slides move without disturbing the sound already running. */
   const advanceVisual = (dir: 1 | -1) => {
     const items = selectedSequence?.items ?? []; if (!items.length) return;
-    const visualAt = (i: number) => { const t = tracks.find(x => x.id === items[i]?.trackId); return t && isVisual(t); };
+    const visualAt = (i: number) => { const t = trackById.get(items[i]?.trackId ?? ""); return t && isVisual(t); };
     for (let step = 1; step <= items.length; step++) {
       const i = loopSeq ? (cueIndex + dir * step + items.length * step) % items.length : cueIndex + dir * step;
       if (i < 0 || i >= items.length) break;
@@ -1068,16 +1124,16 @@ export default function Studio() {
               <Button data-coach="fire" className="h-16 min-w-0 flex-1 text-lg font-bold lg:w-40 lg:flex-none" color="primary" onPress={() => advance(1)}>
                 {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
               </Button>
-              {timerLeft > 0 && <span className="shrink-0 rounded-xl border border-armed/40 bg-armed/10 px-2 py-1 font-mono text-xs text-armed">{formatTimer(timerLeft)}</span>}
+              {countdownSeconds > 0 && <CueCountdown seconds={countdownSeconds} cueKey={`${selectedSequence?.id ?? ""}:${cueIndex}`} onElapsed={() => advance(1)} />}
               {features.rehearsal.active && <span className="shrink-0 rounded-xl border border-live/40 bg-live/10 px-2 py-1 text-xs text-live">Rehearsal</span>}
               <CoachHelp id="transport" />
             </div>
-            <ArmedEffectControls effects={armedEffects} update={updateArmedEffects} />
+            <ArmedEffectControls effects={armedEffects} update={updateArmedEffects} commit={commitArmedEffects} />
           </div>
         </div>
       )}
 
-      <AnimatePresence>{selected && !isVisual(selected) && !editingId && !armed && <Player key={`player-${selected.id}`} track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} time={time} duration={duration} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+      <AnimatePresence>{selected && !isVisual(selected) && !editingId && !armed && <Player key={`player-${selected.id}`} track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} audio={audio.current} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -1235,7 +1291,12 @@ function TrackPreview({ track, kind, playOnHover, onLinkSlide }: { track: Track;
 
 function DeckPreview({ track, className, playOnHover, onLinkSlide }: { track: Track; className: string; playOnHover: boolean; onLinkSlide?: (deckId: string, slideIndex: number) => void }) {
   const slides = track.slides?.length ? track.slides : [{ index: 0, label: "First slide" }];
-  const [expanded, setExpanded] = useState(!playOnHover);
+  /**
+   * Collapsed until asked. Every slide is a live Office Online iframe, and this defaulted to open on
+   * any device without hover -- so a forty-slide deck opened forty iframes the moment a tablet
+   * scrolled past the card. Hover still expands it on a desktop; touch gets a button instead.
+   */
+  const [expanded, setExpanded] = useState(false);
   const [contextSlide, setContextSlide] = useState<number | null>(null);
   const officeSource = /\.pptx?($|[?#])/i.test(track.url) && !track.url.startsWith("blob:")
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(track.url)}`
@@ -1259,6 +1320,11 @@ function DeckPreview({ track, className, playOnHover, onLinkSlide }: { track: Tr
           </div>
         ))}
       </div>
+      {!playOnHover && slides.length > 1 && (
+        <Button size="sm" variant="light" className="mt-2 w-full text-xs" onPress={() => { setExpanded(open => !open); if (!expanded) teach("ppt-slides"); }}>
+          {expanded ? "Show first slide only" : `Show all ${slides.length} slides`}
+        </Button>
+      )}
     </div>
   );
 }
@@ -1266,9 +1332,25 @@ function DeckPreview({ track, className, playOnHover, onLinkSlide }: { track: Tr
 function AudioPreview({ url, title }: { url: string; title: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
+  /**
+   * Only draw what someone can see. Every audio card used to fetch and fully PCM-decode its file the
+   * moment the library mounted, so opening a library of thirty sounds decoded thirty sounds. The
+   * observer disconnects on the first intersection: a waveform, once drawn, does not need redrawing.
+   */
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
     const el = canvas.current;
     if (!el) return;
+    if (typeof IntersectionObserver === "undefined") { setVisible(true); return; }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { setVisible(true); observer.disconnect(); }
+    }, { rootMargin: "200px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el || !visible) return;
     let cancelled = false;
     void decodeAudioUrl(url).then(buffer => {
       if (cancelled || !el.isConnected) return;
@@ -1293,7 +1375,7 @@ function AudioPreview({ url, title }: { url: string; title: string }) {
       }
     }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
-  }, [url]);
+  }, [url, visible]);
   return failed ? <span className="flex h-full items-center px-4 text-xs text-muted">Audio preview unavailable</span> : <div data-coach="waveforms" className="h-full w-full"><canvas ref={canvas} className="h-full w-full" aria-hidden /><span className="sr-only">Audio waveform preview for {title}</span></div>;
 }
 
@@ -1422,12 +1504,13 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [cueMenuFor]);
+  const byId = useMemo(() => new Map((tracks as Track[]).map(t => [t.id, t])), [tracks]);
   const seq = sequences.find((s: Sequence) => s.id === sequenceId);
   const cueDrag = useDragList(reorder);
   // Rendered order is the drag preview while a drag is in flight, and the real order otherwise.
   const order: SequenceItem[] = !seq ? [] : cueDrag.drag ? moved(seq.items, cueDrag.drag.from, cueDrag.drag.to) : seq.items;
   const numbers = cueNumbers(order.map(item => {
-    const track = tracks.find((t: Track) => t.id === item.trackId);
+    const track = byId.get(item.trackId);
     return track ? kindOf(track) : "audio";
   }));
   return (
@@ -1464,7 +1547,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
               {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (
                 <ol className="space-y-2" ref={cueDrag.list}>
                   <AnimatePresence>{order.map((item: SequenceItem, i: number) => {
-                    const track = tracks.find((t: Track) => t.id === item.trackId);
+                    const track = byId.get(item.trackId);
                     const kind: Kind = track ? kindOf(track) : "audio";
                     const Icon = kindIcon[kind];
                     const held = cueDrag.drag?.to === i;
@@ -1581,7 +1664,30 @@ function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effect
 // inline `transform` for the entry animation, which silently wins over a Tailwind translate.
 const ARMED_CONTROL_KEYS: (keyof Effects)[] = ["volume", "speed", "fadeIn", "fadeOut", "reverb"];
 
-function ArmedEffectControls({ effects, update }: { effects: Effects; update: (fx: Effects) => void }) {
+/**
+ * The auto-advance countdown, isolated so its 10 Hz tick re-renders one `<span>` instead of the
+ * whole Studio. `cueKey` restarts the clock when the cue changes; `onElapsed` goes through a ref so
+ * a new closure from the parent does not restart it.
+ */
+function CueCountdown({ seconds, cueKey, onElapsed }: { seconds: number; cueKey: string; onElapsed: () => void }) {
+  const [left, setLeft] = useState(seconds);
+  const elapsed = useRef(onElapsed); elapsed.current = onElapsed;
+  useEffect(() => {
+    const started = Date.now();
+    const tick = () => {
+      const remaining = seconds - (Date.now() - started) / 1000;
+      setLeft(Math.max(0, remaining));
+      if (remaining <= 0) { clearInterval(id); elapsed.current(); }
+    };
+    const id = window.setInterval(tick, 100);
+    tick();
+    return () => clearInterval(id);
+  }, [seconds, cueKey]);
+  if (left <= 0) return null;
+  return <span className="shrink-0 rounded-xl border border-armed/40 bg-armed/10 px-2 py-1 font-mono text-xs text-armed">{formatTimer(left)}</span>;
+}
+
+function ArmedEffectControls({ effects, update, commit }: { effects: Effects; update: (fx: Effects) => void; commit: () => void }) {
   return (
     <div data-armed-effects className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-border/70 bg-surface/35 p-3 sm:grid-cols-3 lg:grid-cols-5">
       {ARMED_CONTROL_KEYS.map(key => {
@@ -1589,14 +1695,38 @@ function ArmedEffectControls({ effects, update }: { effects: Effects; update: (f
         return <Slider key={control.key} aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
           minValue={control.min} maxValue={control.max} step={control.step} value={Number(effects[control.key])}
           onChange={value => update({ ...effects, [control.key]: Array.isArray(value) ? value[0] : value })}
+          onChangeEnd={commit}
           getValue={value => `${Number(value).toFixed(control.step < .1 ? 2 : 1)}${control.unit ?? ""}`} />;
       })}
     </div>
   );
 }
 
-function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, loop, setLoop, effects, update }: any) {
+/**
+ * The transport, and the only thing that needs to know where the playhead is. It reads the media
+ * element directly rather than being handed `time` as a prop: `timeupdate` fires roughly four times
+ * a second, and holding that in Studio's state re-rendered the entire page at the same rate.
+ */
+function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setLoop, effects, update }: any) {
   const [open, setOpen] = useState(false);
+  const [time, setTime] = useState(() => (audio as HTMLAudioElement | null)?.currentTime ?? 0);
+  const [duration, setDuration] = useState(() => {
+    const d = (audio as HTMLAudioElement | null)?.duration;
+    return Number.isFinite(d) ? (d as number) : 0;
+  });
+  useEffect(() => {
+    const a = audio as HTMLAudioElement | null;
+    if (!a) return;
+    const tick = () => setTime(a.currentTime);
+    const meta = () => setDuration(Number.isFinite(a.duration) ? a.duration : 0);
+    tick(); meta();
+    a.addEventListener("timeupdate", tick); a.addEventListener("seeked", tick);
+    a.addEventListener("loadedmetadata", meta); a.addEventListener("durationchange", meta); a.addEventListener("emptied", meta);
+    return () => {
+      a.removeEventListener("timeupdate", tick); a.removeEventListener("seeked", tick);
+      a.removeEventListener("loadedmetadata", meta); a.removeEventListener("durationchange", meta); a.removeEventListener("emptied", meta);
+    };
+  }, [audio]);
   const speed = Number(effects.speed) || 1;
   return (
     // Docked flush to the bottom edge on a phone -- a floating card wastes the one strip of screen a
@@ -1625,7 +1755,7 @@ function Player({ track, unsaved, playing, toggle, time, duration, seek, jump, l
           <Tooltip content="Live effects"><Button isIconOnly variant={open ? "solid" : "flat"} color={open ? "primary" : "default"} radius="full" onPress={() => setOpen(o => !o)}><SlidersHorizontal size={18} /></Button></Tooltip>
         </div>
       </div>
-      <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => seek(Array.isArray(v) ? v[0] : v)} />
+      <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => { const next = Array.isArray(v) ? v[0] : v; setTime(next); seek(next); }} />
       <AnimatePresence>{open && (
         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
           <div className="mt-3 grid gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
