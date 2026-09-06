@@ -1158,7 +1158,7 @@ export default function Studio() {
             <Tooltip content="Redo"><Button isIconOnly size="sm" variant="light" aria-label="Redo sequence edit" isDisabled={!features.redo.length} onPress={redo}><Redo2 size={16} /></Button></Tooltip>
             <Tooltip content="Run history"><Button isIconOnly size="sm" variant="light" aria-label="Open run history" onPress={historyModal.onOpen}><History size={16} /></Button></Tooltip>
             <Button size="sm" variant="light" startContent={<FileJson size={15} />} onPress={exportProject}>Export</Button>
-            <Button size="sm" variant="light" startContent={<Upload size={15} />} as="label">Import<input hidden type="file" accept="application/json,.json" onChange={importFile} /></Button>
+            <Button size="sm" variant="light" startContent={<Upload size={15} aria-hidden />} as="label">Import<input className="sr-only" type="file" accept="application/json,.json" aria-label="Import a project backup" onChange={importFile} /></Button>
             {/* Dark is a property of this desk, not of the app and not of the show: it darkens the
                 surface below and nothing on anybody else's device. */}
             <DarkToggle />
@@ -1465,7 +1465,7 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
         <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Soundboard and slides</p><h2 className="flex items-center gap-1 text-xl font-bold">Click a card to fire it<CoachHelp id="library" /></h2></div>
         <div className="flex flex-wrap gap-2">
           <Tooltip content="A blank 16:9 slide you can put a title on"><Button variant="bordered" isDisabled={busy} startContent={<Presentation size={16} />} onPress={onAddSlide}>New slide</Button></Tooltip>
-          <Tooltip content="Audio, images and video from this device"><Button data-coach="add" as="label" color="primary" startContent={<Upload size={17} />}>Upload<input hidden type="file" accept={UPLOAD_ACCEPT} multiple onChange={onAdd} /></Button></Tooltip>
+          <Tooltip content="Audio, images and video from this device"><Button data-coach="add" as="label" color="primary" startContent={<Upload size={17} aria-hidden />}>Upload<input className="sr-only" type="file" accept={UPLOAD_ACCEPT} multiple aria-label="Upload audio, images and video from this device" onChange={onAdd} /></Button></Tooltip>
         </div>
       </div>
 
@@ -1478,7 +1478,7 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
       <SearchPanel importAsset={importAsset} />
 
       {shown.length === 0 ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center rounded-2xl border border-dashed border-default-200 py-16 text-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center rounded-2xl border border-dashed border-border py-16 text-center">
           <LogoMark size={40} className="opacity-45" />
           <p className="mt-3 font-semibold">{total ? "Nothing matches that" : "Nothing here yet"}</p>
           <p className="text-sm text-muted">{total ? "Clear the search to see everything." : "Upload audio, images or video, or search the free libraries above."}</p>
@@ -1728,7 +1728,7 @@ function SearchPanel({ importAsset }: { importAsset: (title: string, url: string
 }
 
 function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, onPreview, onRename }: any) {
-  if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Select something in the Library to edit it.</div>;
+  if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-border py-16 text-center text-muted">Select something in the Library to edit it.</div>;
   const kind = kindOf(track);
   const heading = (
     <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Non-destructive editor</p>
@@ -1787,7 +1787,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
         <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Manual cue deck</p><h2 className="flex items-center gap-1 text-xl font-bold">{seq ? seq.name : "Sequences"}<CoachHelp id="sequence" /></h2></div>
       </div>
       {!seq ? (
-        <div className="rounded-2xl border border-dashed border-default-200 py-16 text-center text-muted">Pick a sequence in the rail above, or make one. Then add sounds and slides from the Library. Audio responds to ← →, visual media responds to A / D, and every cue can still be clicked.</div>
+        <div className="rounded-2xl border border-dashed border-border py-16 text-center text-muted">Pick a sequence in the rail above, or make one. Then add sounds and slides from the Library. Audio responds to ← →, visual media responds to A / D, and every cue can still be clicked.</div>
       ) : (
         <div className="space-y-3">
           <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
@@ -1810,7 +1810,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                 <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected items</b>.</> : <>Adds the selected item{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
                 <Button data-tour="add-cue" size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
               </div>
-              {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-default-200 py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (
+              {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-border py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (
                 <ol className="space-y-2" ref={cueDrag.list}>
                   <AnimatePresence>{order.map((item: SequenceItem, i: number) => {
                     const track = byId.get(item.trackId);

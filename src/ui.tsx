@@ -45,9 +45,18 @@ export function Button({
   if (href && (/^https?:/.test(href) || target)) {
     return <a {...rest} href={href} target={target} rel={target === "_blank" ? "noreferrer" : undefined} className={styled}>{inner}</a>;
   }
-  // `as="label"` wraps a hidden file input, it has to stay a real <label> or the click never
-  // reaches the input. A RAC Button would swallow it.
-  if (_as === "label") return <label className={cn(styled, "cursor-pointer")}>{inner}</label>;
+  /**
+   * `as="label"` wraps a file input: it has to stay a real `<label>` or the click never reaches the
+   * input, and a RAC Button would swallow it.
+   *
+   * The input inside must be `sr-only`, never `hidden`. `hidden` is `display: none`, which takes the
+   * only focusable thing in here out of the tab order -- upload was reachable by mouse and by
+   * nothing else. Visually hidden keeps it focusable, and the ring below is what the keyboard user
+   * sees, since the focus is on the input rather than on the label they are looking at.
+   */
+  if (_as === "label") {
+    return <label className={cn(styled, "cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus)]")}>{inner}</label>;
+  }
   const press = href
     // Hash links scroll in place; everything else is an in-app route.
     ? () => (href.startsWith("#") ? document.querySelector(href)?.scrollIntoView({ behavior: "smooth" }) : navigate(href))

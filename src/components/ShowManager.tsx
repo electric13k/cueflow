@@ -163,7 +163,7 @@ export default function ShowManager({
       <CurtainTransition open={curtain} />
       <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-3 p-4 text-sm text-white/70">
         <span className="font-semibold text-white/90">{show.name}</span>
-        <span className="text-white/40">{show.startedAt ? "live" : "standing by"} · audience mode</span>
+        <span className="text-muted">{show.startedAt ? "live" : "standing by"} · audience mode</span>
         <span className="ml-auto flex flex-wrap items-center gap-2">
           {!stage && (
             <button type="button" onClick={() => hold(blank === "black" ? "white" : "black")}

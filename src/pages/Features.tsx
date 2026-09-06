@@ -107,8 +107,11 @@ export default function Features() {
         <section className="mt-16 grid gap-5 md:grid-cols-2">
           {mainFeatures.map((feature, index) => {
             const Icon = feature.icon;
+            // `data-reveal` only. GSAP's reveal already animates opacity and y on these, and framer's
+            // `rise` was animating the same two properties on the same node: two runtimes writing one
+            // opacity is a card that flickers, or lands at the wrong value and stays there.
             return (
-              <motion.article key={feature.number} {...rise(index * .04)} data-reveal
+              <article key={feature.number} data-reveal
                 className="glass feature-card group relative overflow-hidden p-6 sm:p-8">
                 <span className="pointer-events-none absolute -right-3 -top-8 font-display text-[8rem] font-bold leading-none text-accent/10">{feature.number}</span>
                 <div className="relative">
@@ -124,7 +127,7 @@ export default function Features() {
                     {feature.tags.map(tag => <span key={tag} className="rounded-full border border-white/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[.15em] text-muted">{tag}</span>)}
                   </div>
                 </div>
-              </motion.article>
+              </article>
             );
           })}
         </section>
@@ -139,11 +142,11 @@ export default function Features() {
             {alsoIncluded.map((item, index) => {
               const Icon = item.icon;
               return (
-                <motion.div key={item.title} {...rise(index * .05)} data-reveal className="margin-rule">
+                <div key={item.title} data-reveal className="margin-rule">
                   <Icon size={20} className="text-accent" aria-hidden />
                   <h3 className="mt-4 text-xl font-bold">{item.title}</h3>
                   <p className="mt-3 leading-relaxed text-muted">{item.body}</p>
-                </motion.div>
+                </div>
               );
             })}
           </div>

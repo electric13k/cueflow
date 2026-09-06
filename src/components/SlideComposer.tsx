@@ -136,9 +136,10 @@ export default function SlideComposer({ open, onClose, onCreate }: {
               <div className="flex flex-wrap items-center gap-2">
                 <Select aria-label="Slide layout" value={current.layout} onChange={value => patch({ layout: value as Layout })}
                   options={LAYOUTS.map(l => ({ value: l.id, label: l.name }))} size="sm" className="min-w-36" />
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-border px-2 py-1 text-sm hover:border-accent">
-                  <ImagePlus size={14} />{current.image ? "Replace image" : "Image"}
-                  <input type="file" accept="image/*" className="hidden" onChange={e => void pick(e.target.files?.[0])} />
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-border px-2 py-1 text-sm hover:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus)]">
+                  <ImagePlus size={14} aria-hidden />{current.image ? "Replace image" : "Image"}
+                  {/* sr-only, not hidden: `display: none` takes it out of the tab order entirely. */}
+                  <input type="file" accept="image/*" className="sr-only" aria-label={current.image ? "Replace the slide image" : "Add a slide image"} onChange={e => void pick(e.target.files?.[0])} />
                 </label>
                 {current.image && (
                   <Button size="sm" variant="light" startContent={<X size={13} />} onPress={() => { drop(current.image); patch({ image: undefined }); }}>Clear image</Button>

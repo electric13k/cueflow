@@ -64,12 +64,29 @@ export function Section({ title, id, children }: { title: string; id?: string; c
   );
 }
 
+/**
+ * The first thing in the tab order on every page, and invisible until it has focus.
+ *
+ * Without it, reaching the content by keyboard meant tabbing past the whole navigation on every
+ * single page load. It is the cheapest accessibility control there is and the site had none.
+ */
+export function SkipLink() {
+  return (
+    <a href="#main"
+      className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-xl focus:border focus:border-accent focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground">
+      Skip to the main content
+    </a>
+  );
+}
+
 export default function Page({ children, width = "max-w-7xl" }: { children: ReactNode; width?: string }) {
   return (
     <div className="relative min-h-screen">
+      <SkipLink />
       <Backdrop />
       <Nav />
       <motion.main
+        id="main"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}

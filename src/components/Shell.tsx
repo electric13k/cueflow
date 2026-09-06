@@ -4,7 +4,7 @@ import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Backdrop from "./Backdrop";
 import Nav from "./Nav";
 import Sidebar from "./Sidebar";
-import { SiteFooter } from "./Page";
+import { SiteFooter, SkipLink } from "./Page";
 import { Button } from "../ui";
 import { useDeviceCapabilities, useLayout } from "../lib/layout";
 
@@ -68,6 +68,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
     // highlight on panels: decoration belongs on the pages that are selling the thing, not on the
     // one somebody is running a show from.
     <div data-app className="relative min-h-screen">
+      <SkipLink />
       <Backdrop />
       <Nav inShell />
       <div className={`mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 ${pane === "wide" ? "max-w-none" : "max-w-7xl"}`}>
@@ -140,6 +141,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
           )}
         </AnimatePresence>
         <motion.main
+          id="main"
           layout={layoutMotion}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

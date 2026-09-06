@@ -18,13 +18,22 @@
   /* The house palette, named for where each colour comes from. */
   --color-curtain: var(--cue-curtain);   /* house tabs, the brand */
   --color-foolscap: var(--cue-foolscap); /* script paper */
-  --color-brass: var(--cue-armed);       /* the rail, the footlights */
+  /**
+   * Brass and crimson are two colours each: the thing, and the word.
+   *
+   * `--cue-armed` is the armed frame, the dot, the rail -- an object, judged on whether it reads as
+   * amber. `text-brass` is a word someone has to read, and at the object's value it came out at
+   * 4.18:1 on the light page, under the 4.5:1 a body of text needs. `text-live` had the same
+   * problem in the dark theme, at 4.40:1 on a panel. Splitting them means the label is legible
+   * without the armed frame turning brown.
+   */
+  --color-brass: var(--cue-brass-text);  /* the rail, the footlights -- as a word */
   /* One hue per idea, so colour carries meaning instead of decoration. Each resolves to a token
      that both themes set, because a shade that reads on black is invisible on white. */
   --color-audio: var(--cue-audio);     /* anything you hear */
   --color-visual: var(--cue-visual);   /* anything the room sees */
   --color-armed: var(--cue-armed);     /* deck loaded, nothing fired yet */
-  --color-live: var(--cue-live);       /* on air */
+  --color-live: var(--cue-live-text);  /* on air -- as a word */
   --color-ready: var(--cue-ready);     /* saved, synced, safe */
   --color-emerald: var(--cue-emerald); /* hierarchy and confirmation */
   --animate-float: float 6s ease-in-out infinite;
@@ -53,7 +62,9 @@
     --cue-audio: #46583A;   /* olive: the crew's colour, gaffer and flight case */
     --cue-visual: #8C4A2F;  /* rust: lamp on skin */
     --cue-armed: #8A6A2A;   /* brass */
+    --cue-brass-text: #7A5C22;  /* 5.16:1 on the page, 5.77:1 on a panel */
     --cue-live: #A32330;    /* crimson */
+    --cue-live-text: #A32330;   /* already 6.15:1 on the page; no second value needed */
     --cue-forest: #285B43;     /* restrained hierarchy outlines and ready state */
     --cue-ready: #285B43;
     --cue-emerald: #285B43;    /* compatibility token, now intentionally forest */
@@ -105,7 +116,9 @@
     --cue-audio: #A3B37A;
     --cue-visual: #D98A5A;
     --cue-armed: #D4A957;
+    --cue-brass-text: #D4A957;  /* 8.22:1 on the page; the object value already reads */
     --cue-live: #E05566;
+    --cue-live-text: #E8626F;   /* 5.48:1 on the page, 4.98:1 on a panel */
     --cue-forest: #75A586;     /* softened forest green for dark-theme hierarchy */
     --cue-ready: #75A586;
     --cue-emerald: #75A586;    /* compatibility token, now intentionally forest */
