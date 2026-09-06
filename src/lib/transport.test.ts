@@ -184,7 +184,7 @@ describe("payload limits", () => {
     const ble = fake("ble", { cap: capability({ maxPayload: 180 }) });
     const router = await openShowLink("show-1", [ble.transport], () => {});
     const script = "x".repeat(4000);
-    expect(() => router.send({ type: "deck", show: "show-1", cues: [], index: 0, script })).toThrow(PayloadTooLarge);
+    expect(() => router.send({ type: "deck", show: "show-1", sequence: "seq-1", cues: [], index: 0, script })).toThrow(PayloadTooLarge);
   });
 
   it("still carries an ordinary cue over that same narrow link", async () => {
@@ -197,7 +197,7 @@ describe("payload limits", () => {
   it("names the transport and both sizes, so the operator can see what happened", async () => {
     const ble = fake("ble", { cap: capability({ maxPayload: 180 }) });
     const router = await openShowLink("show-1", [ble.transport], () => {});
-    expect(() => router.send({ type: "flash", text: "y".repeat(500), from: "crew" }))
+    expect(() => router.send({ type: "flash", text: "y".repeat(500), from: "crew", member: "m1" }))
       .toThrow(/ble link carries 180 bytes per message/);
   });
 });

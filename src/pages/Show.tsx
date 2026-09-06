@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input } from "../ui";
-import { Lock, Maximize, MessageSquare, Send, Unlock, X } from "lucide-react";
+import { Lock, Maximize, MessageSquare, Send, Unlock, Volume2, VolumeX, X } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import DarkToggle from "../components/DarkToggle";
 import CurtainTransition from "../components/CurtainTransition";
@@ -10,9 +10,10 @@ import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
 import { themeClass, useStudioTheme } from "../lib/theme";
 import { defaultVisual, type Kind, type Stage as StageState } from "../types";
 import {
-  forgetTicket, joinShow, listShows, refreshTicket, savedTicket, showChannel,
+  forgetTicket, joinShow, listShows, refreshTicket, savedTicket,
   type DeckCue, type Perm, type ShowMsg, type Ticket,
 } from "../lib/shows";
+import { useShowLink } from "../lib/showLink";
 import { currentProject } from "../lib/projects";
 import { supabase } from "../lib/store";
 
@@ -95,7 +96,15 @@ export default function Show() {
   const [flash, setFlash] = useState("");
   const [outgoing, setOutgoing] = useState("");
   const [note, setNote] = useState("");
-  const bus = useRef<{ send: (m: ShowMsg) => void; close: () => void } | null>(null);
+  /** The sequence the deck came from, sent back with every `fire` so the host cannot misindex it. */
+  const [deckSequence, setDeckSequence] = useState("");
+  /**
+   * A stage video arrives muted. The host's own setting used to be discarded and rebuilt with
+   * `defaultVisual()`, which is `muted: false`, so every crew phone in the wings played the
+   * soundtrack out loud -- the exact opposite of what a device in a dark auditorium should do.
+   * Whether this device wants to hear it is this device's business, so the toggle is local.
+   */
+  const [hearStage, setHearStage] = useState(false);
   const flashTimer = useRef(0);
 
   useEffect(() => {
@@ -136,23 +145,39 @@ export default function Show() {
     });
   }, [ticket?.member]);
 
-  useEffect(() => {
-    if (!ticket) return;
-    const channel = showChannel(ticket.show, msg => {
-      if (msg.type === "deck") {
-        setCues(msg.cues); setIndex(msg.index); setStage(msg.stage ? { ...msg.stage, kind: msg.stage.kind as Kind, visual: defaultVisual(), n: Date.now() } : null);
-        // Arrives from another device, so it is untrusted markup: sanitise before it can be rendered.
-        if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
-      }
-      if (msg.type === "cue") { setIndex(msg.index); setNote(`Cue ${msg.label}`); }
-      if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
-      if (msg.type === "end") { setStarted(null); setNote("Show ended"); }
-      if (msg.type === "flash") show(msg.text);
-    });
-    bus.current = channel;
-    channel.send({ type: "here", who: "device", role: ticket.role });
-    return () => { channel.close(); bus.current = null; };
-  }, [ticket?.show]);
+  const onShowMsg = (msg: ShowMsg) => {
+    if (msg.type === "deck") {
+      // A deck can be addressed: the host tailors it to one member's perms. One meant for somebody
+      // else is not ours to apply, and applying it would blank a list we can legitimately see.
+      if (msg.to && msg.to !== ticketRef.current?.member) return;
+      setDeckSequence(msg.sequence ?? "");
+      setCues(msg.cues); setIndex(msg.index);
+      setStage(msg.stage ? { ...msg.stage, kind: msg.stage.kind as Kind, visual: { ...defaultVisual(), muted: true }, n: Date.now() } : null);
+      // Arrives from another device, so it is untrusted markup: sanitise before it can be rendered.
+      if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
+    }
+    if (msg.type === "cue") { setIndex(msg.index); setNote(`Cue ${msg.label}`); }
+    if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
+    if (msg.type === "end") { setStarted(null); setNote("Show ended"); }
+    if (msg.type === "flash") show(msg.text);
+  };
+  const ticketRef = useRef(ticket); ticketRef.current = ticket;
+  const handlerRef = useRef(onShowMsg); handlerRef.current = onShowMsg;
+  /**
+   * `here` is what asks the host for the deck, and it used to be sent the instant the channel object
+   * existed -- before the socket had joined -- so it was routinely dropped and the device sat on
+   * "Waiting for the host to send the deck" for the rest of the night. The link queues it until it
+   * is actually connected, and re-sends it on every reconnect.
+   */
+  const link = useShowLink(
+    ticket?.show ?? null,
+    msg => handlerRef.current(msg),
+    () => {
+      const held = ticketRef.current;
+      return held ? { type: "here", who: held.name, role: held.role, member: held.member } : null;
+    },
+  );
+  const bus = { send: link.send };
 
   useEffect(() => () => { if (curtainTimer.current) window.clearTimeout(curtainTimer.current); }, []);
 
@@ -168,7 +193,7 @@ export default function Show() {
 
   const sendFlash = () => {
     if (!outgoing.trim()) return;
-    bus.current?.send({ type: "flash", text: outgoing.trim(), from: ticket.role ?? "crew" });
+    bus.send({ type: "flash", text: outgoing.trim(), from: ticket.role ?? "crew", member: ticket.member });
     show(outgoing.trim());
     setOutgoing("");
   };
@@ -190,8 +215,8 @@ export default function Show() {
         <div className="flex items-center gap-2">
           {/* A collaborator holds the show password, which is the host's own key: they can call it on. */}
           {ticket.host && (started
-            ? <Button size="sm" variant="flat" color="danger" onPress={() => { bus.current?.send({ type: "end" }); setStarted(null); }}>End</Button>
-            : <Button size="sm" color="primary" onPress={() => { const at = new Date().toISOString(); bus.current?.send({ type: "start", at }); setStarted(at); startCurtain(); }}>Start the show</Button>)}
+            ? <Button size="sm" variant="flat" color="danger" onPress={() => { bus.send({ type: "end" }); setStarted(null); }}>End</Button>
+            : <Button size="sm" color="primary" onPress={() => { const at = new Date().toISOString(); bus.send({ type: "start", at }); setStarted(at); startCurtain(); }}>Start the show</Button>)}
           {started
             ? <span className="flex items-center gap-1 text-xs text-live"><Lock size={13} />Locked in</span>
             : <span className="flex items-center gap-1 text-xs text-muted"><Unlock size={13} />Not started</span>}
@@ -221,13 +246,13 @@ export default function Show() {
                       onClick={() => {
                         const label = prompt("Rename this cue", cue.label);
                         if (label && label !== cue.label) {
-                          bus.current?.send({ type: "relabel", id: cue.id, label, from: ticket.role ?? "crew" });
+                          bus.send({ type: "relabel", id: cue.id, label, from: ticket.role ?? "crew", member: ticket.member });
                           setCues(cs => cs.map(c => (c.id === cue.id ? { ...c, label } : c)));
                         }
                       }}>{cue.label}</button>
                   ) : <span className="min-w-0 flex-1 truncate">{cue.label}</span>}
                   {can(ticket, "fire") && (
-                    <Button size="sm" variant="flat" onPress={() => bus.current?.send({ type: "fire", index: i, from: ticket.role ?? "crew" })}>Go</Button>
+                    <Button size="sm" variant="flat" onPress={() => bus.send({ type: "fire", index: i, sequence: deckSequence, from: ticket.role ?? "crew", member: ticket.member })}>Go</Button>
                   )}
                 </li>
               ))}
@@ -246,10 +271,18 @@ export default function Show() {
 
         {can(ticket, "stage") && (
           <section className="glass flex min-h-0 flex-col p-3">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-muted">On the screen</h2>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[.2em] text-muted">On the screen</h2>
+              {stage?.kind === "video" && (
+                <Button size="sm" variant="light" onPress={() => setHearStage(h => !h)}
+                  aria-pressed={hearStage} title={hearStage ? "Mute the stage video on this device" : "Hear the stage video on this device"}>
+                  {hearStage ? <><Volume2 size={13} aria-hidden /> Sound on</> : <><VolumeX size={13} aria-hidden /> Muted</>}
+                </Button>
+              )}
+            </div>
             <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-black/40">
               {!stage && <p className="text-sm text-muted">Nothing up.</p>}
-              {stage && <Stage stage={stage} className="h-full w-full" />}
+              {stage && <Stage stage={{ ...stage, visual: { ...stage.visual, muted: !hearStage } }} className="h-full w-full" />}
             </div>
           </section>
         )}

@@ -19,7 +19,8 @@ import ShowManager from "../components/ShowManager";
 import DarkToggle, { WorkSurface } from "../components/DarkToggle";
 import { useSignedIn } from "../components/RequireAuth";
 import { currentProject, setCurrentProject } from "../lib/projects";
-import { createShow, deleteShow, listShows, SCRIPT_LIMIT, showChannel, updateShow, type Show, type ShowMsg } from "../lib/shows";
+import { createShow, deleteShow, listShows, memberPerms, SCRIPT_LIMIT, updateShow, type Perm, type Show, type ShowMsg } from "../lib/shows";
+import { useShowLink } from "../lib/showLink";
 import { linksOf, loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
 import ShareButton from "../components/ShareButton";
@@ -190,8 +191,17 @@ export default function Studio() {
   // leaves `liveShow` alone on purpose: the channel outlives the panel, or a host who shut the
   // manager would stop hearing the room.
   const [managing, setManaging] = useState(false);
-  const showBus = useRef<{ send: (m: ShowMsg) => void; close: () => void } | null>(null);
   const onShowMsg = useRef<(m: ShowMsg) => void>(() => {});
+  /**
+   * Who is in the room, learned from their own `here` and kept until the show closes.
+   *
+   * The host needs this for two things. One is the roster the manager draws. The other is that a
+   * deck is now addressed: the script goes only to a member the server says holds `script`, so the
+   * host has to know who asked before it can answer. A resend with an empty roster carries no
+   * script at all, which is the safe way round.
+   */
+  const roster = useRef(new Map<string, { name: string; role: string | null; perms: Perm[]; at: number }>());
+  const [members, setMembers] = useState<{ member: string; name: string; role: string | null; perms: Perm[] }[]>([]);
   // The shows section above the tabs. Shows are an account feature, so signed out there is none.
   const signedIn = useSignedIn();
   const [shows, setShows] = useState<Show[]>([]);
@@ -357,17 +367,13 @@ export default function Studio() {
     relink(withScript(links, showId));
     toast("Added to the show", `The script goes out with ${shows.find(s => s.id === showId)?.name ?? "the show"}.`, "success");
   };
-  useEffect(() => {
-    if (!liveShow) return;
-    const channel = showChannel(liveShow.id, m => onShowMsg.current(m));
-    showBus.current = channel;
-    return () => { channel.close(); showBus.current = null; };
-  }, [liveShow?.id]);
+  const showLink = useShowLink(liveShow?.id ?? null, m => onShowMsg.current(m));
+  const sendShow = showLink.send;
+  useEffect(() => { roster.current.clear(); setMembers([]); }, [liveShow?.id]);
   // Starting and ending are the two moments every device has to hear about, and the stage changing
   // is the only other thing a device might be mirroring. Both resend rather than diff: a deck is
   // small, and a device that missed one message would otherwise stay wrong all night.
-  useEffect(() => { if (liveShow) showBus.current?.send(liveShow.startedAt ? { type: "start", at: liveShow.startedAt } : { type: "end" }); }, [liveShow?.startedAt]);
-  useEffect(() => { if (liveShow) showBus.current?.send(deck()); }, [stage?.n, liveShow?.id]);
+  useEffect(() => { if (liveShow) sendShow(liveShow.startedAt ? { type: "start", at: liveShow.startedAt } : { type: "end" }); }, [liveShow?.startedAt, showLink.ready]);
 
   const selected = trackById.get(selectedId) ?? tracks[0];
   const selectedRef = useRef(selected); selectedRef.current = selected;
@@ -623,7 +629,7 @@ export default function Studio() {
     if (linked) fire(linked);
     if (featureRef.current.rehearsal.active) markRehearsed(item.id);
     updateFeatures(state => ({ ...state, runHistory: [...state.runHistory, { id: crypto.randomUUID(), at: new Date().toISOString(), type: "cue" as const, sequenceId: selectedSequence.id, sequenceName: selectedSequence.name, cueIndex: i, label: cueLabels[i] ?? String(i + 1) }].slice(-500) }));
-    showBus.current?.send({ type: "cue", index: i, label: cueLabels[i] ?? String(i + 1) });
+    sendShow({ type: "cue", index: i, label: cueLabels[i] ?? String(i + 1) });
     if (armed && !loopSeq && i === selectedSequence.items.length - 1) {
       const ids = showSequenceIds();
       const next = sequences.find(sequence => sequence.id === ids[ids.indexOf(selectedSequence.id) + 1]);
@@ -639,28 +645,99 @@ export default function Studio() {
     () => selectedSequence ? cueNumbers(selectedSequence.items.map(it => kindOf(trackById.get(it.trackId) ?? { kind: "audio" }))) : [],
     [selectedSequence, trackById],
   );
-  const deck = (): ShowMsg => ({
-    type: "deck",
-    show: selectedSequence?.name ?? "Show",
-    index: cueIndex,
-    cues: (selectedSequence?.items ?? []).map((it, i) => ({
-      id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1),
-      kind: kindOf(trackById.get(it.trackId) ?? { kind: "audio" }),
-    })),
-    script: scriptDoc.html.length > SCRIPT_LIMIT ? undefined : scriptDoc.html,
-    stage: stage ? { url: stage.url, kind: stage.kind, label: stage.label, slideIndex: stage.slideIndex } : null,
-  });
+  /**
+   * The deck as one member is allowed to see it.
+   *
+   * Cues and the stage were always broadcast. The script was too -- to anybody who sent `here`,
+   * which is anybody holding the show id. Now it goes only to a member the server says holds
+   * `script`, and the message names who it is for. Broadcast is still broadcast, so another device
+   * already in the channel could read a payload addressed to someone else; this narrows who is
+   * *sent* the script, not who could intercept it. Per-member delivery needs the server.
+   */
+  const deck = (to: string | undefined, perms: Perm[]): ShowMsg => {
+    const may = (p: Perm) => perms.includes(p);
+    return {
+      type: "deck",
+      to,
+      show: selectedSequence?.name ?? "Show",
+      sequence: selectedSequence?.id ?? "",
+      index: cueIndex,
+      cues: may("cues") ? (selectedSequence?.items ?? []).map((it, i) => ({
+        id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1),
+        kind: kindOf(trackById.get(it.trackId) ?? { kind: "audio" }),
+      })) : [],
+      script: may("script") && scriptDoc.html.length <= SCRIPT_LIMIT ? scriptDoc.html : undefined,
+      stage: may("stage") && stage ? { url: stage.url, kind: stage.kind, label: stage.label, slideIndex: stage.slideIndex } : null,
+    };
+  };
+  /** What goes out when the host does not yet know who is listening: no script, ever. */
+  const PUBLIC_DECK: Perm[] = ["cues", "stage"];
+  const resendDeck = () => {
+    if (!liveShow) return;
+    const seen = [...roster.current.entries()];
+    if (!seen.length) { sendShow(deck(undefined, PUBLIC_DECK)); return; }
+    for (const [member, who] of seen) sendShow(deck(member, who.perms));
+  };
+  const resendRef = useRef(resendDeck); resendRef.current = resendDeck;
+  /**
+   * The deck used to resend on `[stage.n, liveShow.id]` alone, so renaming a cue, reordering the
+   * sequence or loading a script left every crew device quietly holding a stale list all night.
+   * Signature over what the room can actually see, so a resend happens when their copy is wrong and
+   * not on every keystroke in the studio.
+   */
+  const deckSignature = useMemo(
+    () => JSON.stringify([selectedSequence?.id, selectedSequence?.name, (selectedSequence?.items ?? []).map(it => [it.id, it.label, it.trackId]), cueLabels]),
+    [selectedSequence, cueLabels],
+  );
+  useEffect(() => {
+    if (!liveShow || !showLink.ready) return;
+    const timer = setTimeout(() => resendRef.current(), 200);
+    return () => clearTimeout(timer);
+  }, [deckSignature, scriptDoc.html, stage?.n, liveShow?.id, showLink.ready]);
+
+  /**
+   * Nothing the room says is acted on until the server confirms the sender may say it.
+   *
+   * Perms used to decide which buttons a crew device drew and nothing else: the host ran any `fire`,
+   * `relabel` or `flash` that arrived, from anyone who knew the show id. `memberPerms` asks the same
+   * RPC the door does, so a job whose key was revoked stops being able to call cues here too.
+   */
+  const onCrewMsg = async (msg: Extract<ShowMsg, { member: string }>, show: Show) => {
+    const perms = await memberPerms(msg.member, show.id);
+    if (!perms.length) return;
+    if (msg.type === "here") {
+      const who = { name: msg.who, role: msg.role, perms, at: Date.now() };
+      roster.current.set(msg.member, who);
+      setMembers([...roster.current.entries()].map(([member, m]) => ({ member, name: m.name, role: m.role, perms: m.perms })));
+      sendShow(deck(msg.member, perms));
+      toast("Someone joined", `${msg.role ?? msg.who ?? "A device"} is in the show.`, "info");
+      return;
+    }
+    if (msg.type === "fire") {
+      if (!perms.includes("fire")) return;
+      // Pinned to the sequence the crew device is actually looking at. Without this, an operator who
+      // switched sequences turned a crew "Go" on cue 4 into whatever now sits at position 4.
+      if (msg.sequence && msg.sequence !== selectedSequence?.id) {
+        toast("Cue not fired", `${msg.from} called a cue from a different sequence.`, "warn");
+        return;
+      }
+      playCue(msg.index);
+      return;
+    }
+    if (msg.type === "flash") { if (perms.includes("message")) showAlert("warn", msg.text); return; }
+    if (msg.type === "relabel") {
+      if (!perms.includes("edit")) return;
+      setSequences(all => all.map(s => s.id !== sequenceId ? s : ({
+        ...s, items: s.items.map(it => (it.id === msg.id ? { ...it, label: msg.label } : it)),
+      })));
+    }
+  };
   onShowMsg.current = msg => {
-    if (msg.type === "here") { showBus.current?.send(deck()); toast("Someone joined", `${msg.role ?? "A device"} is in the show.`, "info"); }
-    if (msg.type === "fire") playCue(msg.index);
-    if (msg.type === "flash") showAlert("warn", msg.text);
     // A collaborator holds the show password, so calling the show on is theirs to do as well. The
     // host's copy is still the one that gets written down.
-    if (msg.type === "start" && liveShow) { setLiveShow({ ...liveShow, startedAt: msg.at }); void updateShow(liveShow.id, { started_at: msg.at }); }
-    if (msg.type === "end" && liveShow) { setLiveShow({ ...liveShow, startedAt: null }); void updateShow(liveShow.id, { started_at: null }); }
-    if (msg.type === "relabel") setSequences(all => all.map(s => s.id !== sequenceId ? s : ({
-      ...s, items: s.items.map(it => (it.id === msg.id ? { ...it, label: msg.label } : it)),
-    })));
+    if (msg.type === "start" && liveShow) { setLiveShow({ ...liveShow, startedAt: msg.at }); void updateShow(liveShow.id, { started_at: msg.at }); return; }
+    if (msg.type === "end" && liveShow) { setLiveShow({ ...liveShow, startedAt: null }); void updateShow(liveShow.id, { started_at: null }); return; }
+    if (liveShow && "member" in msg) void onCrewMsg(msg, liveShow);
   };
   /** Both sides hold the link, and each cue has at most one partner, so an old pairing is dropped. */
   const linkCues = (aId: string, bId: string) => applySequences(all => all.map(s => s.id !== sequenceId ? s : ({
@@ -1168,8 +1245,8 @@ export default function Studio() {
           projectId={project} sequences={sequences} tracks={tracks} script={scriptDoc.html ? scriptDoc : null}
           links={links} stage={stage} onClose={() => setManaging(false)}
           armedSequenceId={armed ? sequenceId : ""} cueIndex={cueIndex}
-          onFlash={text => { showBus.current?.send({ type: "flash", text, from: "host" }); showAlert("warn", text); }}
-          onResend={() => showBus.current?.send(deck())}
+          onFlash={text => { sendShow({ type: "flash", text, from: "host", member: "host" }); showAlert("warn", text); }}
+          onResend={resendDeck}
           onAddSequence={seqId => sequenceToShow(seqId, liveShow.id)} onAddScript={() => scriptToShow(liveShow.id)}
           onRunSequence={runSequence} onStage={t => show(t)}
           onAddToSequence={(seqId, trackId) => addTracksTo(seqId, [trackId])}

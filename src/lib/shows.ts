@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase, local } from "./store";
 import { codeProblem, newCode } from "./projects";
 
@@ -131,16 +130,26 @@ export async function refreshTicket(member: string): Promise<Ticket | null> {
  */
 export type DeckCue = { id: string; label: string; number: string; kind: string };
 export type ShowMsg =
-  /** The host, telling the room where it is. `deck` is the whole sequence, sent on request. */
-  | { type: "deck"; show: string; cues: DeckCue[]; index: number; script?: string; stage?: { url: string; kind: string; label: string; slideIndex?: number } | null }
+  /**
+   * The host, telling the room where it is. `deck` is the whole sequence, sent on request.
+   *
+   * `sequence` is the id of the sequence these cues came from, and it is what makes a crew `fire`
+   * safe: the host used to index whatever sequence the operator happened to have open, so switching
+   * sequences mid-show turned a crew "Go" on cue 4 into whatever now sat at position 4.
+   */
+  | { type: "deck"; to?: string; show: string; sequence: string; cues: DeckCue[]; index: number; script?: string; stage?: { url: string; kind: string; label: string; slideIndex?: number } | null }
   | { type: "cue"; index: number; label: string }
   | { type: "start"; at: string }
   | { type: "end" }
-  /** …and the room, talking back. */
-  | { type: "here"; who: string; role: string | null }
-  | { type: "fire"; index: number; from: string }
-  | { type: "relabel"; id: string; label: string; from: string }
-  | { type: "flash"; text: string; from: string };
+  /**
+   * …and the room, talking back. Every one of these carries `member`, the id the server handed out
+   * at the door, because the host verifies what the sender is allowed to do before acting on it.
+   * A message with no member is from something that never came through the door, and is ignored.
+   */
+  | { type: "here"; who: string; role: string | null; member: string }
+  | { type: "fire"; index: number; sequence: string; from: string; member: string }
+  | { type: "relabel"; id: string; label: string; from: string; member: string }
+  | { type: "flash"; text: string; from: string; member: string };
 
 /**
  * Realtime refuses a payload much past 256 KB, and a long script is the only thing here that gets
@@ -148,13 +157,37 @@ export type ShowMsg =
  */
 export const SCRIPT_LIMIT = 180_000;
 
-export function showChannel(showId: string, onMessage: (m: ShowMsg) => void): { send: (m: ShowMsg) => void; close: () => void } {
-  const client = supabase;
-  if (!client) return { send: () => {}, close: () => {} };
-  const channel: RealtimeChannel = client.channel(`show:${showId}`, { config: { broadcast: { self: false } } });
-  channel.on("broadcast", { event: "msg" }, ({ payload }) => onMessage(payload as ShowMsg)).subscribe();
-  return {
-    send: m => void channel.send({ type: "broadcast", event: "msg", payload: m }),
-    close: () => void client.removeChannel(channel),
-  };
+/**
+ * What a member of this show is allowed to do, according to the server rather than according to the
+ * message that just arrived.
+ *
+ * The room is a broadcast, so anyone holding the show id can put a `fire` on the wire, and until now
+ * the host acted on it: the perms decided which buttons a crew device drew, not what the host would
+ * accept. `show_state` is the same call the door uses, so this asks the database the same question
+ * the joiner's own ticket answers, and a revoked role stops working here too.
+ *
+ * Cached briefly. Without it a busy show re-asks on every cue; with it a revocation takes at most
+ * `TICKET_TTL` to bite, which is the trade worth making.
+ */
+const TICKET_TTL = 15_000;
+const ticketCache = new Map<string, { at: number; ticket: Promise<Ticket | null> }>();
+
+export function forgetMemberPerms(member?: string) {
+  if (member) ticketCache.delete(member); else ticketCache.clear();
 }
+
+export async function memberPerms(member: string, showId: string): Promise<Perm[]> {
+  if (!member || !supabase) return [];
+  const held = ticketCache.get(member);
+  const fresh = held && Date.now() - held.at < TICKET_TTL
+    ? held.ticket
+    : refreshTicket(member).catch(() => null);
+  if (fresh !== held?.ticket) ticketCache.set(member, { at: Date.now(), ticket: fresh });
+  const ticket = await fresh;
+  // A real member of some other show is still a stranger to this one.
+  if (!ticket || ticket.show !== showId) return [];
+  return ticket.host ? PERMS.map(p => p.key) : (ticket.perms ?? []);
+}
+
+export const memberCan = async (member: string, showId: string, perm: Perm) =>
+  (await memberPerms(member, showId)).includes(perm);
