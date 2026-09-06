@@ -1,4 +1,5 @@
 import { local } from "./store";
+import { scopedKey } from "./projects";
 import type { Sequence } from "../types";
 
 /**
@@ -47,8 +48,8 @@ export const setTour = (s: Partial<State>) => localStorage.setItem(KEY, JSON.str
 export const tourSeen = () => localStorage.getItem(KEY) !== null;
 
 type Session = { selectedId?: string; sequenceId?: string; cueIndex?: number };
-const session = (): Session => local.get<Session>("session", {});
-const sequences = () => local.get<Sequence[]>("sequences", []);
+const session = (): Session => local.get<Session>(scopedKey("session"), {});
+const sequences = () => local.get<Sequence[]>(scopedKey("sequences"), []);
 const onScreen = (sel: string) => !!document.querySelector(sel);
 
 export const steps: Step[] = [
@@ -59,14 +60,21 @@ export const steps: Step[] = [
     anchor: "[data-tour='nav-work'], [data-tour='studio-link'], [data-tour='menu']",
     route: "/workspace",
     say: "This is where your work lives. Open the Studio.",
-    done: () => location.pathname.endsWith("/studio") || location.pathname.endsWith("/workspace"),
+    // Watch for the Studio actually being on screen, not for the path. The old test was
+    // `endsWith("/studio") || endsWith("/workspace")`, and the polling interval only runs when the
+    // path already ends in one of those -- true on the first tick, by construction, so the step
+    // completed itself in under a second and the user was dumped at step 3 with no idea why.
+    done: () => onScreen("[data-tour='library-card']"),
   },
   {
     id: "library",
     anchor: "[data-tour='library-card']",
     route: "/studio",
     say: "A demo library is loaded. Press a card to hear it.",
-    done: () => !!session().selectedId,
+    // Not `session().selectedId`: the Studio seeds a selection from the first track before it
+    // paints, so that was also true before the step was ever shown. A card marks itself while it is
+    // making sound, which is the thing the step actually asked for.
+    done: () => onScreen("[data-tour='library-card'][data-playing='true']"),
   },
   {
     id: "sequence",

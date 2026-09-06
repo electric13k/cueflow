@@ -139,11 +139,28 @@ export default function Studio() {
     const frame = requestAnimationFrame(() => { reset(); second = requestAnimationFrame(reset); });
     return () => { cancelAnimationFrame(frame); if (second !== null) cancelAnimationFrame(second); };
   }, [pane, phone]);
+  /**
+   * The tutorial writes a demo library straight to localStorage and then asks the page to re-read
+   * it. It used to call `location.reload()` for this, which threw away an unsaved edit, a fired cue
+   * and any open show in order to show somebody a demo.
+   */
+  useEffect(() => {
+    const reread = () => {
+      setTracks(local.get(key("tracks"), []));
+      setSequences(local.get(key("sequences"), []));
+    };
+    window.addEventListener("cueflow:demo-loaded", reread);
+    return () => window.removeEventListener("cueflow:demo-loaded", reread);
+  }, []);
   useEffect(() => {
     const onTourPane = (event: Event) => {
-      if (!phone) return;
       const next = (event as CustomEvent<PaneId>).detail;
-      if (PANES.some(candidate => candidate.id === next)) setPane(next);
+      if (!PANES.some(candidate => candidate.id === next)) return;
+      if (phone) { setPane(next); return; }
+      // A desk has tabs where a phone has panes. This used to bail out on desktop entirely, so tour
+      // steps 6 and 7 pointed at controls inside a tab the tour had no way of opening.
+      if (next === "library") setTab("library");
+      if (next === "deck") setTab("sequence");
     };
     window.addEventListener("cueflow:tour-pane", onTourPane);
     return () => window.removeEventListener("cueflow:tour-pane", onTourPane);
@@ -721,6 +738,15 @@ export default function Studio() {
   };
   armedRef.current = armed;
   firePadRef.current = firePad;
+  /**
+   * Which tracks are making a noise right now. Was `playing ? selected.id : ""`, which was already
+   * only ever one card and is now wrong outright: cues run on their own voices, so the sound the
+   * room can hear is often not the track the editor has open.
+   */
+  const soundingIds = useMemo(
+    () => voices.current.playing().map(voice => voice.trackId!).concat(playing && selected && !isVisual(selected) ? [selected.id] : []),
+    [voiceTick, playing, selected?.id],
+  );
 
   /** The voice a transport control acts on: whatever went out most recently and is still sounding. */
   const liveVoice = () => voices.current.playing()[0] ?? voices.current.all().find(v => v.trackId) ?? null;
@@ -1291,10 +1317,17 @@ export default function Studio() {
              and follows it. Two tab strips for one choice is how the phone layout read as a
              shrunken desktop rather than a design. */
           <Tabs selectedKey={phone ? (pane === "deck" ? "sequence" : "library") : tab}
-            onSelectionChange={k => { setTab(k as string); teach(k as "library" | "sequence"); }}
+            onSelectionChange={k => {
+              setTab(k as string);
+              teach(k as "library" | "sequence");
+              // `waveforms` had no trigger anywhere in the app, so a written lesson was simply never
+              // shown. The coach runs one at a time and does not mark the loser learned, so this
+              // queues behind the library lesson rather than stacking on it.
+              if (k === "library" && scopedTracks.some(track => !isVisual(track))) teach("waveforms");
+            }}
             classNames={{ tabList: armed || phone ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
-              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingId={playing ? selected?.id ?? "" : ""} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
+              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingIds={soundingIds} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
               <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
@@ -1415,7 +1448,7 @@ export default function Studio() {
   );
 }
 
-function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onLinkSlide, onRename, onDeleteTrack, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
+function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onLinkSlide, onRename, onDeleteTrack, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
   const shown: Track[] = tracks;
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const device = useDeviceCapabilities();
@@ -1453,11 +1486,11 @@ function Library({ tracks, total, selectedId, playingId, selectedIds, busy, drag
       ) : (
         <motion.div layout className="auto-grid">
           <AnimatePresence>{shown.map((t: Track, i: number) => {
-            const isPlaying = playingId === t.id, pick = selectedIds.indexOf(t.id), isChecked = pick >= 0;
+            const isPlaying = (playingIds as string[]).includes(t.id), pick = selectedIds.indexOf(t.id), isChecked = pick >= 0;
             const kind = kindOf(t), Icon = kindIcon[kind];
             return (
             <motion.div key={t.id} layout initial={{ opacity: 0, scale: .95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }} transition={{ delay: Math.min(i * .03, .3) }} whileHover={hoverPreview ? { y: -3 } : undefined}>
-              <Card data-tour={i === 0 ? "library-card" : undefined} isPressable onPress={() => { setMenuFor(null); onPlay(t); }} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setMenuFor(t.id); }} className={`group media-card media-card--${kind} relative z-0 w-full border ${menuFor === t.id ? "z-20" : ""} ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
+              <Card data-tour={i === 0 ? "library-card" : undefined} data-playing={isPlaying ? "true" : undefined} isPressable onPress={() => { setMenuFor(null); onPlay(t); }} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setMenuFor(t.id); }} className={`group media-card media-card--${kind} relative z-0 w-full border ${menuFor === t.id ? "z-20" : ""} ${isPlaying ? "border-accent bg-accent/15" : selectedId === t.id ? "border-accent/60 bg-accent/5" : "border-border bg-surface/60"} ${t.pending ? "opacity-70" : ""}`}>
                 <TrackPreview track={t} kind={kind} playOnHover={hoverPreview} onLinkSlide={onLinkSlide} />
                 <CardBody className="gap-2">
                   <div className="flex items-start gap-2">

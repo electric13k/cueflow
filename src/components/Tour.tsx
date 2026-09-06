@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useOnStage } from "../lib/stageRoute";
 import { Button } from "../ui";
-import Spotlight, { findAnchor, useAnchor } from "./Spotlight";
+import Spotlight, { findAnchor, useAnchor, useSpotlightSlot } from "./Spotlight";
 import { clearDemo, demoPresent, loadDemo } from "../lib/demo";
 import { getTour, setTour, steps } from "../lib/tour";
 import { onAuth } from "../lib/store";
@@ -27,6 +27,7 @@ export default function Tour() {
   const active = step >= 0 && step < steps.length;
   const current = active ? steps[step] : undefined;
   const { spot, state } = useAnchor(current?.anchor, active);
+  useSpotlightSlot("tour", active);
   const pressed = useRef(false);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -34,6 +35,12 @@ export default function Tour() {
     if (!candidate) return pathname;
     return candidate.id === "sidebar" ? (signedIn ? "/workspace" : "/studio") : (candidate.route ?? pathname);
   };
+  /**
+   * `signedIn` is three-valued: null while the session is still being read. During that beat the
+   * first step's route resolves to `/studio`, and once it settles to `/workspace`, so a signed-in
+   * operator who opened `/studio` directly sat on step 0 for ever, its route never matching.
+   */
+  const routeSettled = signedIn !== null || !active || current?.id !== "sidebar";
 
   const paneFor = (id: string) => {
     if (id === "library") return "library";
@@ -58,13 +65,14 @@ export default function Tour() {
     clearAdvanceTimer();
     loadDemo();
     setTour({ done: false, step: from });
+    setStep(from);
     const route = routeFor(steps[from]);
-    if (pathname.endsWith(route)) {
-      setStep(from);
-      location.reload();
-    } else {
-      moveToStep(from);
-    }
+    // `loadDemo` writes to localStorage, and the Studio reads it on mount, so starting the tour on
+    // the page you are already on used to `location.reload()` to make the new material appear. That
+    // threw away the whole session -- an unsaved edit, a fired cue, an open show -- to show a demo.
+    // The event asks the page to re-read instead.
+    if (pathname.endsWith(route)) window.dispatchEvent(new Event("cueflow:demo-loaded"));
+    else moveToStep(from);
   };
 
   useEffect(() => {
@@ -93,14 +101,6 @@ export default function Tour() {
 
   useEffect(() => {
     if (!pathname.endsWith("/workspace") && !pathname.endsWith("/studio")) return;
-    // Keep the pre-existing completion flag compatible with the current tour store. This matters
-    // for returning operators and for deep links into Script, where an old flag must not resurrect
-    // a spotlight over an unrelated consent or editor control.
-    if (localStorage.getItem("cueflow:tutorial:complete") === "1") {
-      setTour({ done: true, step: 0 });
-      setStep(-1);
-      return;
-    }
     const saved = getTour();
     if (saved.done) return;
     if (localStorage.getItem("cueflow:tour") === null) begin(0);
@@ -141,7 +141,7 @@ export default function Tour() {
   };
 
   useEffect(() => {
-    if (!current || !pathname.endsWith(routeFor(current))) return;
+    if (!current || !routeSettled || !pathname.endsWith(routeFor(current))) return;
     const pane = paneFor(current.id);
     if (pane) window.dispatchEvent(new CustomEvent("cueflow:tour-pane", { detail: pane }));
     const timer = setInterval(() => {
@@ -177,7 +177,7 @@ export default function Tour() {
     return () => window.removeEventListener("keydown", key);
   }, [active]);
 
-  if (onStage || !active || !current || state !== "found" || !pathname.endsWith(routeFor(current))) return null;
+  if (onStage || !active || !current || !routeSettled || state !== "found" || !pathname.endsWith(routeFor(current))) return null;
 
   return (
     <Spotlight spot={spot} label={current.say} onDismiss={() => finish(false)}>

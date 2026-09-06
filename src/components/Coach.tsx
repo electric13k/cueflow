@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HelpCircle } from "lucide-react";
 import { Button } from "../ui";
-import Spotlight, { useAnchor } from "./Spotlight";
+import Spotlight, { spotlightTaken, useAnchor, useSpotlightSlot } from "./Spotlight";
 import { lessons, markLearned, replay, type Lesson } from "../lib/coach";
 import { useOnStage } from "../lib/stageRoute";
 
@@ -36,6 +36,7 @@ export default function Coach() {
   // Two panes can mount in the same tick (a sidebar and the page beside it). Whoever asked first
   // gets the screen; the loser is never marked learned, so it comes back next time you open it.
   const showing = useRef(false);
+  useSpotlightSlot("coach", !!lesson);
   const { spot, state } = useAnchor(lesson?.target, !!lesson);
 
   useEffect(() => {
@@ -47,7 +48,9 @@ export default function Coach() {
       // A completed first-run tutorial must not resurrect an automatic coach over a deep-linked
       // control. Explicitly pressing a question-mark help button still uses force and can replay it.
       const consentOpen = !!document.querySelector('[role="dialog"][aria-label="Cookie consent"]');
-      if (!next || showing.current || (!force && (consentOpen || localStorage.getItem("cueflow:tutorial:complete") === "1"))) return;
+      // The tour and the coach both draw a Spotlight, and tour steps 5 and 6 each trigger a lesson,
+      // so without this they stacked two cards over the same control.
+      if (!next || showing.current || spotlightTaken("coach") || (!force && consentOpen)) return;
       showing.current = true;
       setLesson(next);
     };

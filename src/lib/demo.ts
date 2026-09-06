@@ -2,6 +2,7 @@ import { defaultEffects, defaultVisual, type Track, type Sequence } from "../typ
 import { slideLabels } from "./presentation";
 import { emptyDoc, loadScript, saveScript, type ScriptDoc } from "./script";
 import { local } from "./store";
+import { scopedKey } from "./projects";
 
 /**
  * The material the tutorial runs on. A board with nothing on it cannot teach anything: the lessons
@@ -91,8 +92,10 @@ export function loadDemo() {
   // Replaying from Settings or the tutorial must restore every demo scope, not append to stale demo
   // rows left by an interrupted run. clearDemo preserves every non-demo resource by contract.
   if (demoPresent()) clearDemo();
-  const mine = local.get<Track[]>("tracks", []).filter(t => !isDemo(t.id));
-  local.set("tracks", [...demoTracks(), ...mine]);
+  // Scoped, because the Studio reads a project-scoped key: unscoped demo tracks were written to a
+  // library nobody inside a project could see, and the tutorial then pointed at an empty grid.
+  const mine = local.get<Track[]>(scopedKey("tracks"), []).filter(t => !isDemo(t.id));
+  local.set(scopedKey("tracks"), [...demoTracks(), ...mine]);
   // Only if there is no script already. Someone replaying the tutorial three weeks in has a real
   // script loaded, and overwriting it to teach them about scripts would be its own punchline.
   if (!loadScript().html) saveScript(demoScript());

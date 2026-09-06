@@ -26,6 +26,14 @@ const me = async () => (await need().auth.getUser()).data.user;
 
 /** The project a device is working in. Null is the personal library, which is what existed before. */
 export const currentProject = () => local.get<string | null>("project", null);
+/**
+ * Storage keys are per project, so two projects on one device never read each other's work.
+ *
+ * Shared rather than re-derived: the Studio scoped its keys and the tutorial did not, so inside a
+ * project the tour was watching an empty `cueflow:session` and `cueflow:sequences` and could never
+ * see the user do anything. Four of its nine steps were unfinishable.
+ */
+export const scopedKey = (name: string) => { const project = currentProject(); return project ? `${name}:${project}` : name; };
 export const setCurrentProject = (id: string | null) => local.set("project", id);
 
 export async function listProjects(): Promise<Project[]> {

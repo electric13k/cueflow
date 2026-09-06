@@ -1,7 +1,8 @@
 import { useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import Page from "../components/Page";
+import ClosingCta from "../components/ClosingCta";
 import { useReveal } from "../lib/motion";
 import ScreenCard, { type Screen } from "../components/ScreenCard";
 import { Button } from "../ui";
@@ -89,19 +90,12 @@ export default function Tutorial() {
         <p className="mt-4 text-sm text-muted">All of them rebindable in <a className="text-accent underline-offset-4 hover:underline" href="/settings">Settings</a>.</p>
       </section>
 
-      <motion.div {...rise()} className="glass mt-16 flex flex-wrap items-center justify-between gap-5 p-8">
-        <div>
-          <h2 className="text-3xl font-bold">Open it and add one sound.</h2>
-          <p className="mt-2 text-muted">That is genuinely the first step.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="bordered" startContent={<RotateCcw size={16} />}
-            onPress={() => { forgetLessons(); toast("Tips reset", "The Studio will explain each part again as you open it.", "success"); }}>
-            Show the tips again
-          </Button>
-          <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="font-semibold">Open the Studio</Button>
-        </div>
-      </motion.div>
+      <ClosingCta title="Open it and add one sound." note="That is genuinely the first step.">
+        <Button variant="bordered" startContent={<RotateCcw size={16} aria-hidden />}
+          onPress={() => { forgetLessons(); toast("Tips reset", "The Studio will explain each part again as you open it.", "success"); }}>
+          Show the tips again
+        </Button>
+      </ClosingCta>
       </div>
     </Page>
   );

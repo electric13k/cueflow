@@ -80,13 +80,15 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/legal" element={<LegalRedirect />} />
         <Route path="*" element={<Home />} />
       </Routes>
+      {/* Inside the boundary: the tour anchors onto controls that live in lazily loaded route
+          chunks, so mounted outside it, it started polling for them before they could exist. */}
+      <Tour />
       </Suspense>
       <Toaster />
       <CookieConsent />
       <SignInPrompt />
       <UsernamePrompt />
       <Coach />
-        <Tour />
       </BrowserRouter>
     </MotionConfig>
   </StrictMode>

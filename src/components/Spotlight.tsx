@@ -100,12 +100,15 @@ export function useAnchor(selector: string | undefined, active: boolean): { spot
     addEventListener("scroll", onScroll, { passive: true, capture: true });
     addEventListener("resize", onScroll, { passive: true });
     sync();
-    timer = setTimeout(() => {
-      if (!stopped && !found) {
-        observer.disconnect();
-        setState("missing");
-      }
-    }, PATIENCE);
+    /**
+     * Say so when the anchor has not turned up, but keep watching.
+     *
+     * This used to disconnect the observer, and the effect only re-runs on `[selector, active]`, so
+     * a control that arrived late -- a lazily loaded route chunk is the common case -- was never
+     * noticed. The step rendered nothing for the rest of the session while its `done()` interval
+     * carried on polling invisibly, which is a tutorial that has silently stopped existing.
+     */
+    timer = setTimeout(() => { if (!stopped && !found) setState("missing"); }, PATIENCE);
     return () => {
       stopped = true;
       observer.disconnect();
@@ -117,6 +120,23 @@ export function useAnchor(selector: string | undefined, active: boolean): { spot
   }, [selector, active]);
 
   return { spot, state };
+}
+
+/**
+ * One spotlight on screen at a time.
+ *
+ * The tour and the coach are separate components that both draw a `Spotlight`, and two tour steps
+ * trigger a coach lesson as part of the step, so both could light up over the same control at once.
+ * Whoever claims the slot first keeps it; the other stays quiet and comes back later.
+ */
+let spotlightHolder: string | null = null;
+export const spotlightTaken = (who: string) => spotlightHolder !== null && spotlightHolder !== who;
+export function useSpotlightSlot(who: string, wants: boolean) {
+  useEffect(() => {
+    if (!wants) { if (spotlightHolder === who) spotlightHolder = null; return; }
+    if (spotlightHolder === null) spotlightHolder = who;
+    return () => { if (spotlightHolder === who) spotlightHolder = null; };
+  }, [who, wants]);
 }
 
 type CardRect = { width: number; height: number };

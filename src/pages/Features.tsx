@@ -1,7 +1,8 @@
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Cloud, Image, Keyboard, ListMusic, Monitor, Presentation, Radio, SlidersHorizontal, Users, Zap } from "lucide-react";
+import { AudioWaveform, BookOpen, Cloud, Command, FolderTree, Keyboard, KeyRound, Link2, ListMusic, Monitor, Radio, SlidersHorizontal, Users, Zap } from "lucide-react";
 import Page from "../components/Page";
+import ClosingCta from "../components/ClosingCta";
 import { useReveal } from "../lib/motion";
 import { Button } from "../ui";
 
@@ -63,10 +64,22 @@ const mainFeatures = [
   },
 ];
 
-const workflow = [
-  { icon: Image, title: "Prepare", body: "Collect the media, make the cue order, and shape the material before anyone is waiting on the next call." },
-  { icon: Presentation, title: "Rehearse", body: "Run the real sequence, use timers and notes, and mark the places that need another pass." },
-  { icon: Monitor, title: "Operate", body: "Arm, fire, and hand off the show with one readable surface for the operator and the crew." },
+/**
+ * The rest of what is in the app.
+ *
+ * This section used to be a "Prepare / Rehearse / Operate" trio that restated cards 01, 03 and 02
+ * in different words -- the page said the same three things twice and never mentioned the script
+ * reader, the editors, per-job permissions or the audience window at all.
+ */
+const alsoIncluded = [
+  { icon: FolderTree, title: "Projects and collaborators", body: "Keep separate productions apart, and invite people into one by name. Their library, sequences and shows come with it." },
+  { icon: BookOpen, title: "Script reader with pre-alerts", body: "Scroll the script beside the deck. Name the words that matter and it warns you before they arrive, at whatever distance you set." },
+  { icon: AudioWaveform, title: "Audio and image editors", body: "Trim, fade, normalise, reverse, split channels or downmix to mono, and crop a still, without leaving for another app." },
+  { icon: Link2, title: "Linked cues", body: "Pair a slide with the sound that belongs under it. Calling either one sends both, and the deck keeps its place on the cue you called." },
+  { icon: Monitor, title: "Audience window", body: "A second window with nothing on it but the show: no chrome, no toasts, no cursor. Put it on the projector and forget it." },
+  { icon: KeyRound, title: "Permissions per job", body: "A key is a job. Followspot gets the cue list; the deputy gets everything but the stage. Six switches, and the host decides." },
+  { icon: Command, title: "Command palette", body: "One shortcut to every action in the Studio, so a control you use twice a year is still one search away." },
+  { icon: Cloud, title: "Cloud sync and backups", body: "Signed in, the library and sequences follow you between devices. Signed out, everything still works and stays on the device." },
 ];
 
 export default function Features() {
@@ -119,30 +132,24 @@ export default function Features() {
         <section ref={workflowRef} className="relative mt-20 border-y border-white/10 py-14 sm:py-16">
           <motion.div aria-hidden className="workflow-rail" style={{ scaleX: workflowRail }} />
           <motion.div {...rise()}>
-            <p className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">The working loop</p>
-            <h2 className="mt-3 max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">Less setup. More confidence when the room goes dark.</h2>
+            <p className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Also in the box</p>
+            <h2 className="mt-3 max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">The parts that only matter once you are running it.</h2>
           </motion.div>
           <div className="workflow-grid relative mt-10 grid gap-8 md:grid-cols-3">
-            {workflow.map((step, index) => {
-              const Icon = step.icon;
+            {alsoIncluded.map((item, index) => {
+              const Icon = item.icon;
               return (
-                <motion.div key={step.title} {...rise(index * .08)} data-reveal className="margin-rule">
+                <motion.div key={item.title} {...rise(index * .05)} data-reveal className="margin-rule">
                   <Icon size={20} className="text-accent" aria-hidden />
-                  <h3 className="mt-4 text-2xl font-bold">{step.title}</h3>
-                  <p className="mt-3 leading-relaxed text-muted">{step.body}</p>
+                  <h3 className="mt-4 text-xl font-bold">{item.title}</h3>
+                  <p className="mt-3 leading-relaxed text-muted">{item.body}</p>
                 </motion.div>
               );
             })}
           </div>
         </section>
 
-        <motion.div {...rise()} className="glass mt-16 flex flex-wrap items-center justify-between gap-5 p-8 sm:p-10">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[.3em] text-brass">Ready when you are</p>
-            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Build the cue order. Run the room.</h2>
-          </div>
-          <Button href="/studio" color="primary" size="lg" endContent={<ArrowRight size={18} />} className="cue-ribbon-hitbox font-semibold">Open the Studio</Button>
-        </motion.div>
+        <ClosingCta eyebrow="Ready when you are" title="Build the cue order. Run the room." />
       </div>
     </Page>
   );
