@@ -5,11 +5,12 @@ import { local } from "./store";
  * live effects. Shared by the Studio (which listens for them) and Settings (which changes them),
  * so there is one list and one storage key rather than two that drift.
  */
-export type Action = "nextCue" | "prevCue" | "playPause" | "nextVisual" | "prevVisual" | "zoomIn" | "zoomOut" | "volUp" | "volDown" | "speedUp" | "speedDown" | "reverbUp" | "reverbDown";
+export type Action = "nextCue" | "prevCue" | "playPause" | "stopAll" | "nextVisual" | "prevVisual" | "zoomIn" | "zoomOut" | "volUp" | "volDown" | "speedUp" | "speedDown" | "reverbUp" | "reverbDown";
 
 export const keyActions: { id: Action; label: string; def: string }[] = [
   { id: "nextCue", label: "Next cue", def: "ArrowRight" }, { id: "prevCue", label: "Previous cue", def: "ArrowLeft" },
   { id: "playPause", label: "Play / pause", def: " " },
+  { id: "stopAll", label: "Stop all sound", def: "." },
   { id: "nextVisual", label: "Next slide or video", def: "d" }, { id: "prevVisual", label: "Previous slide or video", def: "a" },
   { id: "zoomIn", label: "Zoom the stage in", def: "w" }, { id: "zoomOut", label: "Zoom the stage out", def: "s" },
   { id: "volUp", label: "Volume +", def: "ArrowUp" }, { id: "volDown", label: "Volume −", def: "ArrowDown" },

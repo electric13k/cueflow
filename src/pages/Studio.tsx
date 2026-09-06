@@ -2,7 +2,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Square, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal } from "lucide-react";
 import { useDeviceCapabilities, useIsPhone } from "../lib/layout";
 import LogoMark from "../components/LogoMark";
 import MediaEditor from "../components/MediaEditor";
@@ -26,7 +26,7 @@ import Stage from "../components/Stage";
 import ShareButton from "../components/ShareButton";
 import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
-import { AudioEngine, decodeAudioUrl, makeReversedFile, peaks } from "../lib/audio";
+import { AudioEngine, decodeAudioUrl, makeReversedFile, peaks, VoicePool } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
 import { linkSequenceItems, unlinkSequenceItem } from "../lib/sequenceLinks";
 import { moved, useDragList } from "../lib/dragList";
@@ -92,6 +92,12 @@ export default function Studio() {
   // crossOrigin must be set before src/load so MediaElementAudioSourceNode is not silenced by CORS.
   const audio = useRef<HTMLAudioElement>(Object.assign(new Audio(), { crossOrigin: "anonymous", preload: "auto" }));
   const engine = useRef(new AudioEngine());
+  /**
+   * Cues get their own voices, so two sounds can be out at once. The element above stays the
+   * editor's: scrubbing, the waveform and the Player all act on the track you have open, and firing
+   * a cue no longer yanks that out from under you.
+   */
+  const voices = useRef(new VoicePool());
   const playRequest = useRef(0);
   const cuePreloaders = useRef<HTMLAudioElement[]>([]);
   // Arriving from the workspace: ?tab=editor&track=<id> opens that sound in the editor, so "edit
@@ -143,6 +149,30 @@ export default function Studio() {
     return () => window.removeEventListener("cueflow:tour-pane", onTourPane);
   }, [phone]);
   const [playing, setPlaying] = useState(false);
+  /** Bumped whenever a voice starts, stops or is stolen, so the transport redraws. Cheap on purpose. */
+  const [voiceTick, setVoiceTick] = useState(0);
+  /** The soundboard, and which bank of ten it is showing. Open by default once a deck is armed. */
+  const [padsOpen, setPadsOpen] = useState(true);
+  const [padBank, setPadBank] = useState(0);
+  /**
+   * One level over everything, which the desk has never had: per-cue volume was the only control, so
+   * "the whole show is too loud in this room" meant editing every cue. Scales what each voice plays
+   * at rather than touching the stored effects, so it is a monitor control and never edits the show.
+   */
+  const [master, setMaster] = useState(() => {
+    const held = Number(localStorage.getItem("cueflow:master"));
+    return Number.isFinite(held) && held >= 0 && held <= 1 ? held : 1;
+  });
+  const masterRef = useRef(master); masterRef.current = master;
+  const commitMaster = () => { try { localStorage.setItem("cueflow:master", String(masterRef.current)); } catch { /* storage is off; the level still holds for this session */ } };
+  /** What each voice would play at with the master wide open, so moving the master is not cumulative. */
+  const voiceLevel = useRef(new Map<number, number>());
+  useEffect(() => {
+    for (const voice of voices.current.all()) {
+      if (voice.trackId) voice.element.volume = (voiceLevel.current.get(voice.id) ?? 1) * master;
+    }
+    audio.current.volume = (selectedRef.current?.effects.volume ?? 1) * master;
+  }, [master]);
   // `time` and `duration` used to live here. Only the Player reads them, and `timeupdate` fires
   // about four times a second, so holding them here re-rendered all of Studio -- the whole library
   // grid and cue list, each wrapped in `motion.div layout` -- four times a second during playback.
@@ -480,6 +510,8 @@ export default function Studio() {
     if ((action === "nextCue" || action === "prevCue" || action === "nextVisual" || action === "prevVisual") && !selectedSequence) return false;
     if ((action === "zoomIn" || action === "zoomOut") && !stage) return false;
     if (["volUp", "volDown", "speedUp", "speedDown", "reverbUp", "reverbDown"].includes(action) && !selected) return false;
+    // Nothing to play or pause on a still image, and swallowing the key would only look broken.
+    if (action === "playPause" && !voices.current.playing().length && (!selected || isVisual(selected))) return false;
     switch (action) {
       case "nextCue": advanceAudio(1); break;
       case "prevCue": advanceAudio(-1); break;
@@ -487,7 +519,8 @@ export default function Studio() {
       case "prevVisual": advanceVisual(-1); break;
       case "zoomIn": zoomStage(.1); break;
       case "zoomOut": zoomStage(-.1); break;
-      case "playPause": toggle(); break;
+      case "playPause": pauseOrResume(); break;
+      case "stopAll": stopAllSound(); break;
       case "volUp": nudge("volume", .05, 0, 1); break;
       case "volDown": nudge("volume", -.05, 0, 1); break;
       case "speedUp": nudge("speed", .05, .5, 2); break;
@@ -503,9 +536,19 @@ export default function Studio() {
    * 4 Hz playback ticks and the 10 Hz cue timer -- and a keydown landing between the two was lost.
    * The ref is reassigned per render instead, so the handler still sees current state.
    */
+  const armedRef = useRef(false);
+  const firePadRef = useRef<(slot: number) => boolean>(() => false);
   const onKeyDown = useRef<(e: KeyboardEvent) => void>(() => {});
   onKeyDown.current = e => {
     const el = e.target as HTMLElement; if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable) return;
+    // Space on a focused button already presses it. Letting the bind through as well fired the cue
+    // twice, which on a live deck is a wrong sound and a lost place in the sequence.
+    if (el.tagName === "BUTTON" && (e.key === " " || e.key === "Enter")) return;
+    // Number keys are the pads, and only while a deck is armed -- outside a show they are still
+    // free for anything else, and inside one they are the fastest control on the desk.
+    if (armedRef.current && !e.metaKey && !e.ctrlKey && !e.altKey && /^[0-9]$/.test(e.key)) {
+      if (firePadRef.current(e.key === "0" ? 9 : Number(e.key) - 1)) { e.preventDefault(); return; }
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
     if (runKey(e.key)) e.preventDefault();
   };
@@ -549,6 +592,8 @@ export default function Studio() {
       setSequences(next);
     } else updateEffects(fx);
     engine.current.apply(audio.current, fx);
+    const sounding = voices.current.playing()[0];
+    if (sounding) sounding.engine.apply(sounding.element, fx);
   };
   const commitArmedEffects = () => {
     const before = armedDragFrom.current;
@@ -595,8 +640,11 @@ export default function Studio() {
     setSelectedId(track.id);
     if (isVisual(track)) return show(track);
     lastAudioId.current = track.id;
-    if (track.id === selectedId && playing) { audio.current.pause(); setPlaying(false); return; }
-    void play(track, track.effects);
+    // A pad that is sounding stops on the second press; anything else starts alongside it, which is
+    // what makes the library usable as a soundboard rather than a one-at-a-time preview list.
+    const held = voices.current.find(track.id);
+    if (held && !held.element.paused) { voices.current.release(held); setVoiceTick(n => n + 1); return; }
+    void playVoice(track, track.effects);
   };
   // Shift-click picks a whole run in one go instead of one checkmark at a time. selectedIds stays
   // ordered, so a card can show the position it will take in the sequence.
@@ -616,7 +664,72 @@ export default function Studio() {
     const track = trackById.get(item.trackId);
     if (!track) return;
     if (isVisual(track)) show(track, item.visual ?? track.visual ?? defaultVisual(), item.slideIndex);
-    else void play(track, item.effects);
+    else void playVoice(track, item.effects ?? track.effects);
+  };
+  /** Fires a sound on its own voice. Anything already sounding keeps sounding. */
+  const playVoice = async (track: Track, fx = track.effects) => {
+    const voice = voices.current.claim(track.id);
+    const src = editUrl && track.id === selectedRef.current?.id ? editUrl : track.url;
+    if (voice.element.src !== new URL(src, location.href).href) { voice.element.src = src; voice.element.load(); }
+    voice.element.currentTime = 0;
+    voiceLevel.current.set(voice.id, fx.volume);
+    setVoiceTick(n => n + 1);
+    try {
+      await voice.engine.play(voice.element, fx);
+      voice.element.volume = fx.volume * masterRef.current;
+    } catch { voices.current.release(voice); }
+    setVoiceTick(n => n + 1);
+  };
+  /**
+   * Panic. Every voice stops and the editor's own element with them, but the stage is left alone --
+   * killing the sound and blacking the projection are two different emergencies, and an operator
+   * reaching for this one usually still wants the audience looking at something.
+   */
+  const stopAllSound = () => {
+    voices.current.stopAll();
+    audio.current.pause();
+    setPlaying(false);
+    setVoiceTick(n => n + 1);
+  };
+  /**
+   * The pads.
+   *
+   * A cue board is a running order; a soundboard is everything else -- the door slam, the phone
+   * ring, the thing the director asks for in the interval. Favourites come first because that is
+   * already the operator saying "these are the ones I reach for", and ten to a bank because that is
+   * how many number keys a keyboard has above the letters.
+   */
+  const PADS_PER_BANK = 10;
+  const padTracks = useMemo(
+    () => scopedTracks.filter(track => !isVisual(track))
+      .sort((a, b) => Number(features.favorites.includes(b.id)) - Number(features.favorites.includes(a.id))),
+    [scopedTracks, features.favorites],
+  );
+  const padBanks = Math.max(1, Math.ceil(padTracks.length / PADS_PER_BANK));
+  const bank = Math.min(padBank, padBanks - 1);
+  const padsShown = padTracks.slice(bank * PADS_PER_BANK, bank * PADS_PER_BANK + PADS_PER_BANK);
+  const padsRef = useRef(padsShown); padsRef.current = padsShown;
+  /** "1".."9" then "0", the order they sit on the keyboard. */
+  const padKey = (slot: number) => String((slot + 1) % 10);
+  const firePad = (slot: number) => {
+    const track = padsRef.current[slot];
+    if (!track) return false;
+    const held = voices.current.find(track.id);
+    if (held && !held.element.paused) { voices.current.release(held); setVoiceTick(n => n + 1); return true; }
+    void playVoice(track, track.effects);
+    return true;
+  };
+  armedRef.current = armed;
+  firePadRef.current = firePad;
+
+  /** The voice a transport control acts on: whatever went out most recently and is still sounding. */
+  const liveVoice = () => voices.current.playing()[0] ?? voices.current.all().find(v => v.trackId) ?? null;
+  const pauseOrResume = () => {
+    const voice = liveVoice();
+    if (!voice) { toggle(); return; }
+    if (voice.element.paused) void voice.element.play().catch(() => undefined);
+    else voice.element.pause();
+    setVoiceTick(n => n + 1);
   };
   const playCue = (i: number) => {
     if (!selectedSequence) return;
@@ -1035,12 +1148,55 @@ export default function Studio() {
               {cueIndex < 0 ? "Deck armed. Nothing has gone out yet." : `Cue ${cueIndex + 1} of ${selectedSequence?.items.length ?? 0} is out.`}
             </span>
             <span className="text-xs text-muted">Press → for the next cue, ← to go back.</span>
+            <CueTransport element={liveVoice()?.element ?? null} label={liveVoice()?.trackId ? (trackById.get(liveVoice()!.trackId!)?.title ?? "the cue") : "the cue"}
+              onToggle={pauseOrResume} onStop={stopAllSound} master={master} setMaster={setMaster} commitMaster={commitMaster} />
             <span className="ml-auto flex items-center gap-1">
               <Button data-coach="presenter" size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button>
               <Button data-coach="script" size="sm" variant="flat" startContent={<FileText size={15} />} onPress={() => openScript("split")}>Open script</Button>
               <CoachHelp id="armed" />
             </span>
           </div>
+        )}
+
+        {armed && (
+          <section className="mt-3" aria-label="Soundboard">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="light" aria-expanded={padsOpen} onPress={() => setPadsOpen(open => !open)}
+                startContent={padsOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}>
+                Soundboard
+              </Button>
+              {padsOpen && padBanks > 1 && (
+                <span className="flex items-center gap-1 text-xs text-muted">
+                  {Array.from({ length: padBanks }, (_, index) => (
+                    <Button key={index} size="sm" variant={index === bank ? "flat" : "light"} aria-pressed={index === bank}
+                      aria-label={`Pad bank ${index + 1}`} onPress={() => setPadBank(index)}>{index + 1}</Button>
+                  ))}
+                </span>
+              )}
+            </div>
+            {padsOpen && (padsShown.length ? (
+              <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {padsShown.map((track, slot) => {
+                  const voice = voices.current.find(track.id);
+                  const sounding = !!voice && !voice.element.paused;
+                  return (
+                    <li key={track.id}>
+                      <button type="button" onClick={() => firePad(slot)}
+                        aria-pressed={sounding}
+                        title={`${track.title} — press ${padKey(slot)}`}
+                        className={`flex h-16 w-full flex-col items-start justify-between rounded-xl border px-2.5 py-2 text-left transition-colors ${sounding ? "border-live bg-live/20" : "border-border bg-surface/50 hover:border-accent"}`}>
+                        <span className="flex w-full items-center justify-between gap-2">
+                          <kbd className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-[10px] text-muted">{padKey(slot)}</kbd>
+                          {sounding && <span aria-hidden className="h-2 w-2 rounded-full bg-live" />}
+                        </span>
+                        <span className="w-full truncate text-xs font-semibold">{track.title}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <p className="mt-2 text-sm text-muted">No sounds in this project yet.</p>)}
+          </section>
         )}
 
         {/* Above the tabs: the shows, and beside them the script. Both go away while a library item
@@ -1762,6 +1918,62 @@ function CueCountdown({ seconds, cueKey, onElapsed }: { seconds: number; cueKey:
   }, [seconds, cueKey]);
   if (left <= 0) return null;
   return <span className="shrink-0 rounded-xl border border-armed/40 bg-armed/10 px-2 py-1 font-mono text-xs text-armed">{formatTimer(left)}</span>;
+}
+
+/**
+ * The transport for whatever cue is out.
+ *
+ * An armed deck unmounts the Player, so the only way to pause a cue was a keybind -- and the keybind
+ * acted on the editor's element, not on the sound the audience could hear. Nothing on screen said
+ * pausing was possible at all. Reads the element directly for the same reason the Player does:
+ * `timeupdate` at four times a second must not re-render an armed Studio.
+ */
+function CueTransport({ element, label, onToggle, onStop, master, setMaster, commitMaster }: {
+  element: HTMLAudioElement | null; label: string;
+  onToggle: () => void; onStop: () => void;
+  master: number; setMaster: (v: number) => void; commitMaster: () => void;
+}) {
+  const [now, setNow] = useState(0);
+  const [span, setSpan] = useState(0);
+  const [running, setRunning] = useState(false);
+  useEffect(() => {
+    if (!element) { setNow(0); setSpan(0); setRunning(false); return; }
+    const read = () => {
+      setNow(element.currentTime);
+      setSpan(Number.isFinite(element.duration) ? element.duration : 0);
+      setRunning(!element.paused);
+    };
+    read();
+    const events = ["timeupdate", "durationchange", "loadedmetadata", "play", "pause", "ended", "seeked", "emptied"];
+    for (const name of events) element.addEventListener(name, read);
+    return () => { for (const name of events) element.removeEventListener(name, read); };
+  }, [element]);
+
+  return (
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
+      <Button isIconOnly size="sm" variant="flat" isDisabled={!element}
+        aria-label={running ? `Pause ${label}` : `Play ${label}`} title={running ? "Pause" : "Play"} onPress={onToggle}>
+        {running ? <Pause size={15} fill="currentColor" aria-hidden /> : <Play size={15} fill="currentColor" aria-hidden />}
+      </Button>
+      <Button isIconOnly size="sm" variant="flat" color="danger" aria-label="Stop all sound" title="Stop all sound" onPress={onStop}>
+        <Square size={14} fill="currentColor" aria-hidden />
+      </Button>
+      <span className="font-mono text-[11px] tabular-nums text-muted">{formatTimer(now)} / {span ? formatTimer(span) : "--:--"}</span>
+      <div className="min-w-32 flex-1">
+        <Slider aria-label={`Scrub ${label}`} minValue={0} maxValue={span || 1} step={0.05}
+          value={Math.min(now, span || 1)} isDisabled={!element || !span}
+          onChange={next => { if (element) element.currentTime = next; }} />
+      </div>
+      <span className="flex items-center gap-1.5 text-[11px] text-muted">
+        <Volume2 size={13} aria-hidden />
+        <span className="w-24">
+          <Slider aria-label="Master output level" minValue={0} maxValue={1} step={0.01} value={master}
+            onChange={setMaster} onChangeEnd={commitMaster} />
+        </span>
+        <span className="w-8 text-right font-mono tabular-nums">{Math.round(master * 100)}</span>
+      </span>
+    </div>
+  );
 }
 
 function ArmedEffectControls({ effects, update, commit }: { effects: Effects; update: (fx: Effects) => void; commit: () => void }) {

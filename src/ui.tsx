@@ -104,17 +104,27 @@ export function Switch({ isSelected, onValueChange, size, children, className }:
   );
 }
 
-export function Slider({ label, getValue, value, className, ...rest }: {
+/**
+ * The one slider. There used to be two -- this and a raw `metal-range` input -- which meant two
+ * sets of focus styles, two keyboard behaviours and two things to fix whenever either was wrong.
+ *
+ * `orientation="vertical"` gives the fader shape a sound desk has, which is what a level wants: the
+ * gesture matches the metaphor, and a column of them reads as a mixer rather than a settings form.
+ */
+export function Slider({ label, getValue, value, className, orientation = "horizontal", ...rest }: {
   label?: ReactNode; getValue?: (v: number) => string; value?: number; className?: string;
   minValue?: number; maxValue?: number; step?: number; isDisabled?: boolean; size?: "sm" | "md" | "lg";
+  orientation?: "horizontal" | "vertical";
   color?: string; onChange?: (v: number) => void; onChangeEnd?: (v: number) => void; "aria-label"?: string;
 }) {
   // v2's `size`/`color` are gone in v3, the theme drives both now.
   const { size: _size, color: _color, ...sliderProps } = rest as Record<string, unknown>;
+  const vertical = orientation === "vertical";
   return (
-    <S {...sliderProps} value={value} className={cn("control-slider w-full", className)}>
+    <S {...sliderProps} orientation={orientation} value={value}
+      className={cn("control-slider", vertical ? "flex h-full flex-col items-center gap-1" : "w-full", className)}>
       {(label || getValue) && (
-        <div className="mb-1 flex items-center justify-between text-xs text-muted">
+        <div className={cn("text-xs text-muted", vertical ? "order-last flex flex-col items-center gap-0.5 text-center" : "mb-1 flex items-center justify-between")}>
           <span>{label}</span>
           <span className="tabular-nums">{getValue && value !== undefined ? getValue(value) : value}</span>
         </div>

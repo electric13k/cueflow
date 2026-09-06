@@ -56,6 +56,74 @@ export class AudioEngine {
     await Promise.all([resume, playback]);
   }
 }
+/**
+ * Several sounds at once.
+ *
+ * There was one `HTMLAudioElement` in the whole Studio, so firing a cue swapped its `src` and the
+ * sound already playing stopped dead. For a cue board that is the wrong default in every direction:
+ * a linked pair -- slide up, sting under it -- lost the sting, an ambience bed died the moment
+ * anything else went out, and there was no way to run a loop under a sequence at all.
+ *
+ * A pool rather than an element per track, because each element carries a decoded stream and a
+ * browser will not give you an unbounded number of them. When every voice is busy the oldest one is
+ * taken, which is the same rule a hardware sampler uses and the same one an operator expects: the
+ * thing that has been going longest is the thing you were least likely to still want.
+ */
+export type Voice = {
+  readonly id: number;
+  readonly element: HTMLAudioElement;
+  readonly engine: AudioEngine;
+  /** What this voice is currently holding, or null when it is free. */
+  trackId: string | null;
+  /** `performance.now()` at the moment it was last claimed. Oldest is stolen first. */
+  startedAt: number;
+};
+
+export const DEFAULT_VOICES = 8;
+
+export class VoicePool {
+  private voices: Voice[] = [];
+  constructor(
+    private readonly size = DEFAULT_VOICES,
+    private readonly makeElement: () => HTMLAudioElement = () => Object.assign(new Audio(), { crossOrigin: "anonymous", preload: "auto" }),
+    private readonly now: () => number = () => performance.now(),
+  ) {}
+
+  all(): readonly Voice[] { return this.voices; }
+  find(trackId: string) { return this.voices.find(v => v.trackId === trackId); }
+
+  /**
+   * A voice for this track: the one already holding it if there is one, so re-firing a cue restarts
+   * it rather than stacking a second copy of the same sound on top of itself.
+   */
+  claim(trackId: string): Voice {
+    const held = this.find(trackId);
+    if (held) { held.startedAt = this.now(); return held; }
+    const free = this.voices.find(v => v.trackId === null);
+    if (free) { free.trackId = trackId; free.startedAt = this.now(); return free; }
+    if (this.voices.length < this.size) {
+      const made: Voice = { id: this.voices.length, element: this.makeElement(), engine: new AudioEngine(), trackId, startedAt: this.now() };
+      this.voices.push(made);
+      return made;
+    }
+    const oldest = this.voices.reduce((a, b) => (a.startedAt <= b.startedAt ? a : b));
+    oldest.element.pause();
+    oldest.trackId = trackId;
+    oldest.startedAt = this.now();
+    return oldest;
+  }
+
+  release(voice: Voice) { voice.element.pause(); voice.trackId = null; }
+
+  /** The panic button. Everything stops; nothing is torn down, so the next cue is still instant. */
+  stopAll() { for (const voice of this.voices) this.release(voice); }
+
+  /** Voices actually making sound right now, newest first -- the transport acts on the first. */
+  playing(): Voice[] {
+    return this.voices.filter(v => v.trackId && !v.element.paused).sort((a, b) => b.startedAt - a.startedAt);
+  }
+}
+
 export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return new File([encodeWav(reversed)], `${name}-reversed.wav`, { type: "audio/wav" }); }
 // --- Buffer editing (waveform region trim, stereo/mono, per-channel gain) ---
 /**
