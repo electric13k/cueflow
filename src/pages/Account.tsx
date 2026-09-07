@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Input } from "../ui";
 import { AtSign, Download, KeyRound, Link2, LogOut, UserRound } from "lucide-react";
 import Shell from "../components/Shell";
+import FriendsPanel from "../components/FriendsPanel";
 import GoogleMark from "../components/GoogleMark";
 import { toast } from "../lib/toast";
 import { linkGoogle, listIdentities, onAuth, signOut, unlinkIdentity, type Identity } from "../lib/store";
@@ -167,6 +168,8 @@ export default function Account() {
           </Button>
         )}
       </section>
+
+      <FriendsPanel />
 
       <section className="glass mt-6 space-y-4 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Download size={18} className="text-accent" />Your data</h2>

@@ -16,6 +16,7 @@ import {
 } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
 import { currentProject } from "../lib/projects";
+import { getProfile } from "../lib/account";
 import { supabase } from "../lib/store";
 
 const can = (t: Ticket | null, p: Perm) => !!t && (t.perms ?? []).includes(p);
@@ -128,6 +129,21 @@ export default function Show() {
   const [soundNote, setSoundNote] = useState("");
   const cuesRef = useRef<DeckCue[]>([]);
   const soundOnRef = useRef(false); soundOnRef.current = soundOn;
+  /**
+   * What the room should call this device.
+   *
+   * It used to be whatever was typed into the join box on this browser, once, and it stayed that
+   * way for ever -- so an operator who changed their username still appeared in every show under
+   * the old one. A signed-in account's own name wins, and changing it re-announces to the room.
+   */
+  const [myName, setMyName] = useState(() => localStorage.getItem("cueflow:showName") ?? "");
+  const myNameRef = useRef(myName); myNameRef.current = myName;
+  useEffect(() => {
+    void getProfile().then(profile => {
+      const named = profile?.displayName?.trim() || profile?.username?.trim();
+      if (named) setMyName(named);
+    }).catch(() => undefined);
+  }, []);
   const flashTimer = useRef(0);
 
   const playCueHere = (cue: DeckCue | undefined) => {
@@ -226,10 +242,17 @@ export default function Show() {
     msg => handlerRef.current(msg),
     () => {
       const held = ticketRef.current;
-      return held ? { type: "here", who: held.name, role: held.role, member: held.member } : null;
+      return held ? { type: "here", who: myNameRef.current || held.name, role: held.role, member: held.member } : null;
     },
   );
   const bus = { send: link.send };
+  // Re-announce when the name changes, so the host's roster follows a rename rather than keeping
+  // whatever was typed into the join box the first time this browser joined anything.
+  useEffect(() => {
+    const held = ticketRef.current;
+    if (!held || !link.ready || !myName) return;
+    link.send({ type: "here", who: myName, role: held.role, member: held.member });
+  }, [myName, link.ready]);
 
   useEffect(() => () => { if (curtainTimer.current) window.clearTimeout(curtainTimer.current); }, []);
 
