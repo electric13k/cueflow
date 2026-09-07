@@ -2,12 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import type { ShowMsg } from "./shows";
 import { openShowLink, type Router, type Transport } from "./transport";
 import { cloudTransport } from "./transports/cloud";
+import { bleTransport } from "./transports/ble";
 
 /**
- * The transports a show will try, in order of preference. Local wires get prepended here as they
- * land; cloud is last because it is the only one that needs the venue to have working internet.
+ * The transports a show will try, in order of preference.
+ *
+ * Cloud is last because it is the only one that needs the venue to have working internet, and a
+ * venue is exactly where that is not true. Bluetooth is ahead of it but is not tried on its own
+ * initiative: Web Bluetooth will not scan without the operator picking a device from the browser's
+ * chooser, so `bleTransport.available()` reports only that the radio exists. Putting it first means
+ * a room that has already been joined over Bluetooth stays on Bluetooth; a room that has not falls
+ * through to the cloud in the usual way.
  */
-export const showTransports: Transport[] = [cloudTransport];
+export const showTransports: Transport[] = [bleTransport, cloudTransport];
 
 /**
  * A message sent before the link is up is not dropped, it waits. This is the whole reason the crew
