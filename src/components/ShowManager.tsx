@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Clock, ExternalLink, FileText, GripVertical, Layers, ListMusic, MessageSquare, Monitor,
+  Clock, DoorOpen, ExternalLink, FileText, GripVertical, Layers, ListMusic, MessageSquare, Monitor,
   Play, Radio, Send, Square, Users, X,
 } from "lucide-react";
-import { Button, Select } from "../ui";
+import { Button, Select, Switch } from "../ui";
 import DarkToggle from "./DarkToggle";
 import ScriptReader from "./ScriptReader";
 import ShowChat from "./ShowChat";
@@ -16,7 +16,7 @@ import { clock, liveAt, planShow, showSequences } from "../lib/showPlan";
 import { local } from "../lib/store";
 import { themeClass, useStudioTheme } from "../lib/theme";
 import { linksOf, type LinkMap } from "../lib/showLinks";
-import { updateShow, type Show } from "../lib/shows";
+import { PERMS, updateShow, type Perm, type Role, type Show } from "../lib/shows";
 import { toast } from "../lib/toast";
 import type { ScriptDoc } from "../lib/script";
 import { isVisual, kindOf, type Sequence, type Stage as StageState, type Track } from "../types";
@@ -38,6 +38,13 @@ type Props = {
   cueIndex: number;
   onClose: () => void;
   onFlash: (text: string) => void;
+  /** Who the host can currently see in the room, learned from their own devices. */
+  members: { member: string; name: string; role: string | null; perms: Perm[]; state: "waiting" | "in" | "out" }[];
+  roles: Role[];
+  admission: boolean;
+  onAdmission: (on: boolean) => void;
+  onAnswerDoor: (member: string, allow: boolean) => void;
+  onSetJob: (member: string, roleId: string) => void;
   onResend: () => void;
   onAddSequence: (seqId: string) => void;
   onAddScript: () => void;
@@ -72,10 +79,12 @@ export default function ShowManager({
   show, setShow, projectId, sequences, tracks, script, links, stage, armedSequenceId, cueIndex,
   onClose, onFlash, onResend, onAddSequence, onAddScript, onRunSequence, onStage, onAddToSequence,
   onFire, onArmSequence, onOpenAudience,
+  members, roles, admission, onAdmission, onAnswerDoor, onSetJob,
 }: Props) {
+  const waitingCount = members.filter(m => m.state === "waiting").length;
   const [theme] = useStudioTheme();
   const [audience, setAudience] = useState(false);
-  const [panel, setPanel] = useState<"roles" | "chat">("roles");
+  const [panel, setPanel] = useState<"roles" | "room" | "chat">("roles");
   const [busy, setBusy] = useState(false);
   const [curtain, setCurtain] = useState(false);
   const curtainTimer = useRef<number | null>(null);
@@ -368,16 +377,120 @@ export default function ShowManager({
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 ${panel === "roles" ? "bg-accent/20 font-semibold text-accent" : "text-muted hover:text-foreground"}`}>
               <Users size={14} aria-hidden />Jobs and keys
             </button>
+            <button type="button" onClick={() => setPanel("room")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 ${panel === "room" ? "bg-accent/20 font-semibold text-accent" : "text-muted hover:text-foreground"}`}>
+              <DoorOpen size={14} aria-hidden />In the room
+              {waitingCount > 0 && <span className="rounded-full bg-armed px-1.5 text-[10px] font-bold text-black">{waitingCount}</span>}
+            </button>
             <button type="button" onClick={() => setPanel("chat")}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 ${panel === "chat" ? "bg-accent/20 font-semibold text-accent" : "text-muted hover:text-foreground"}`}>
               <MessageSquare size={14} aria-hidden />Messages
             </button>
           </div>
-          {panel === "roles"
-            ? <ShowHost projectId={projectId} sequenceId={show.sequenceId ?? ""} show={show} setShow={setShow} onFlash={flash} />
-            : <ShowChat className="min-h-0 flex-1" show={show.id} onSend={flash} />}
+          {panel === "roles" && <ShowHost projectId={projectId} sequenceId={show.sequenceId ?? ""} show={show} setShow={setShow} onFlash={flash} />}
+          {panel === "room" && (
+            <Room members={members} roles={roles} admission={admission}
+              onAdmission={onAdmission} onAnswerDoor={onAnswerDoor} onSetJob={onSetJob} />
+          )}
+          {panel === "chat" && <ShowChat className="min-h-0 flex-1" show={show.id} onSend={flash} />}
         </aside>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Who is in the room, and what they are holding.
+ *
+ * `show_members` exists in the database and no client code has ever read it: there was no roster
+ * anywhere in the app, and the only sign a stranger had arrived was a toast that accumulated
+ * nothing. This is built from the devices' own arrivals, so it works with no schema change and
+ * shows what is true right now rather than what was true when somebody last pressed refresh.
+ */
+function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }: {
+  members: Props["members"]; roles: Role[]; admission: boolean;
+  onAdmission: (on: boolean) => void;
+  onAnswerDoor: (member: string, allow: boolean) => void;
+  onSetJob: (member: string, roleId: string) => void;
+}) {
+  const waiting = members.filter(m => m.state === "waiting");
+  const inside = members.filter(m => m.state === "in");
+  const turnedAway = members.filter(m => m.state === "out");
+
+  const Person = ({ person, children }: { person: Props["members"][number]; children?: ReactNode }) => (
+    <li className="rounded-xl border border-border bg-surface/50 p-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{person.name || "Unnamed device"}</span>
+        <span className="text-xs text-muted">{person.role ?? "No job"}</span>
+      </div>
+      {person.perms.length > 0 && (
+        <p className="mt-1 text-[11px] text-muted">
+          {PERMS.filter(p => person.perms.includes(p.key)).map(p => p.label).join(" · ")}
+        </p>
+      )}
+      {children}
+    </li>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
+      <Switch isSelected={admission} onValueChange={onAdmission}>Hold new arrivals at the door</Switch>
+      <p className="text-xs text-muted">
+        Off, a key gets you straight in. On, whoever is running the show lets each person in, which is
+        what you want when the key has been passed around more than you would like.
+      </p>
+
+      {waiting.length > 0 && (
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-armed">Waiting</h3>
+          <ul className="mt-2 space-y-2">
+            {waiting.map(person => (
+              <Person key={person.member} person={person}>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" color="primary" onPress={() => onAnswerDoor(person.member, true)}>Let in</Button>
+                  <Button size="sm" variant="light" color="danger" onPress={() => onAnswerDoor(person.member, false)}>Turn away</Button>
+                </div>
+              </Person>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-muted">In the room</h3>
+        {inside.length === 0
+          ? <p className="mt-2 text-sm text-muted">Nobody has joined yet. Hand out a key and they appear here.</p>
+          : (
+            <ul className="mt-2 space-y-2">
+              {inside.map(person => (
+                <Person key={person.member} person={person}>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {/* The job can always be rewritten; before this the change only reached a device
+                        that happened to reload, so somebody could hold powers already taken away. */}
+                    <Select aria-label={`Job for ${person.name || "this device"}`} size="sm" className="min-w-36"
+                      value={roles.find(r => r.name === person.role)?.id ?? ""}
+                      onChange={value => { if (value) onSetJob(person.member, value); }}
+                      options={[{ value: "", label: "Change job…" }, ...roles.map(r => ({ value: r.id, label: r.name }))]} />
+                    <Button size="sm" variant="light" color="danger" onPress={() => onAnswerDoor(person.member, false)}>Remove</Button>
+                  </div>
+                </Person>
+              ))}
+            </ul>
+          )}
+      </section>
+
+      {turnedAway.length > 0 && (
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Turned away</h3>
+          <ul className="mt-2 space-y-2">
+            {turnedAway.map(person => (
+              <Person key={person.member} person={person}>
+                <Button className="mt-2" size="sm" variant="light" onPress={() => onAnswerDoor(person.member, true)}>Let in after all</Button>
+              </Person>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

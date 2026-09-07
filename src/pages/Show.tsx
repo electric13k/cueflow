@@ -107,6 +107,12 @@ export default function Show() {
    */
   const [hearStage, setHearStage] = useState(false);
   /**
+   * What the host has said about this device. `null` until it says anything, which is the same as
+   * being in -- a show with no admission never sends a `door` at all, and a key has always been
+   * enough on its own.
+   */
+  const [door, setDoor] = useState<{ state: "waiting" | "in" | "out"; note?: string } | null>(null);
+  /**
    * Cue sound, on this device.
    *
    * A crew screen mounted no audio at all: the sound only ever came out of whichever machine the
@@ -196,6 +202,16 @@ export default function Show() {
     if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
     if (msg.type === "end") { setStarted(null); setNote("Show ended"); voices.current.stopAll(); }
     if (msg.type === "flash") show(msg.text);
+    if (msg.type === "door") {
+      if (msg.member !== ticketRef.current?.member) return;
+      setDoor({ state: msg.state, note: msg.note });
+      if (msg.state === "out") { setCues([]); setDoc(emptyDoc()); setStage(null); voices.current.stopAll(); }
+      // A job can be rewritten while the show runs, and until now the change only reached a device
+      // that happened to reload -- so somebody could still be holding powers already taken away.
+      if (msg.perms) {
+        setTicket(held => (held ? { ...held, role: msg.role ?? held.role, perms: msg.perms ?? held.perms } : held));
+      }
+    }
   };
   const ticketRef = useRef(ticket); ticketRef.current = ticket;
   const handlerRef = useRef(onShowMsg); handlerRef.current = onShowMsg;
@@ -226,6 +242,27 @@ export default function Show() {
 
   const marked = useMemo(() => doc, [doc]);
   if (!ticket) return <Door initialKey={requestedKey} onClose={closeDoor} onIn={t => { setTicket(t); setStarted(t.started); }} />;
+
+  if (door && door.state !== "in") {
+    const refused = door.state === "out";
+    return (
+      <div className={`${themeClass(theme)} flex h-dvh flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground`}>
+        <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">{refused ? "Not in this show" : "Waiting room"}</p>
+        <h1 className="max-w-md text-3xl font-black tracking-tight">
+          {refused ? "You were not let in." : "Standing by to be let in."}
+        </h1>
+        <p className="max-w-md text-sm text-muted">
+          {door.note ?? (refused
+            ? "Ask whoever is running the show if you think that is wrong."
+            : "Whoever is running the show can see you at the door. This screen changes on its own.")}
+        </p>
+        <div className="flex gap-2">
+          {!refused && <span aria-live="polite" className="flex items-center gap-2 text-xs text-muted"><span className="armed-dot h-2 w-2 rounded-full bg-armed" />Still waiting</span>}
+          <Button size="sm" variant="light" onPress={() => { forgetTicket(); setTicket(null); setDoor(null); }}>Leave</Button>
+        </div>
+      </div>
+    );
+  }
 
   const sendFlash = () => {
     if (!outgoing.trim()) return;

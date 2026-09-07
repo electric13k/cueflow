@@ -19,7 +19,7 @@ import ShowManager from "../components/ShowManager";
 import DarkToggle, { WorkSurface } from "../components/DarkToggle";
 import { useSignedIn } from "../components/RequireAuth";
 import { currentProject, setCurrentProject } from "../lib/projects";
-import { createShow, deleteShow, listShows, memberPerms, playableUrl, SCRIPT_LIMIT, updateShow, type Perm, type Show, type ShowMsg } from "../lib/shows";
+import { createShow, deleteShow, forgetMemberPerms, listRoles, listShows, memberPerms, playableUrl, SCRIPT_LIMIT, updateShow, type Perm, type Role, type Show, type ShowMsg } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
 import { linksOf, loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
@@ -248,8 +248,14 @@ export default function Studio() {
    * host has to know who asked before it can answer. A resend with an empty roster carries no
    * script at all, which is the safe way round.
    */
-  const roster = useRef(new Map<string, { name: string; role: string | null; perms: Perm[]; at: number }>());
-  const [members, setMembers] = useState<{ member: string; name: string; role: string | null; perms: Perm[] }[]>([]);
+  /**
+   * Whether new arrivals wait to be let in. Off by default and held on the host's device: a show
+   * that worked yesterday works the same way today, and turning it on is the host deciding to.
+   */
+  const [admission, setAdmission] = useState(false);
+  const admitted = useRef(new Set<string>());
+  const roster = useRef(new Map<string, { name: string; role: string | null; perms: Perm[]; at: number; state: "waiting" | "in" | "out" }>());
+  const [members, setMembers] = useState<{ member: string; name: string; role: string | null; perms: Perm[]; state: "waiting" | "in" | "out" }[]>([]);
   // The shows section above the tabs. Shows are an account feature, so signed out there is none.
   const signedIn = useSignedIn();
   const [shows, setShows] = useState<Show[]>([]);
@@ -417,7 +423,20 @@ export default function Studio() {
   };
   const showLink = useShowLink(liveShow?.id ?? null, m => onShowMsg.current(m));
   const sendShow = showLink.send;
-  useEffect(() => { roster.current.clear(); setMembers([]); }, [liveShow?.id]);
+  useEffect(() => {
+    roster.current.clear();
+    admitted.current.clear();
+    setMembers([]);
+    setAdmission(!!liveShow && local.get<boolean>(`show:admission:${liveShow.id}`, false));
+  }, [liveShow?.id]);
+  const [showRoles, setShowRoles] = useState<Role[]>([]);
+  useEffect(() => {
+    if (!liveShow) { setShowRoles([]); return; }
+    let live = true;
+    void listRoles(liveShow.id).then(r => { if (live) setShowRoles(r); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [liveShow?.id]);
+  const showRoster = () => setMembers([...roster.current.entries()].map(([member, m]) => ({ member, name: m.name, role: m.role, perms: m.perms, state: m.state })));
   // Starting and ending are the two moments every device has to hear about, and the stage changing
   // is the only other thing a device might be mirroring. Both resend rather than diff: a deck is
   // small, and a device that missed one message would otherwise stay wrong all night.
@@ -851,6 +870,46 @@ export default function Studio() {
     for (const [member, who] of seen) sendShow(deck(member, who.perms));
   };
   const resendRef = useRef(resendDeck); resendRef.current = resendDeck;
+  const admissionRef = useRef(admission); admissionRef.current = admission;
+  /** Let somebody in, or turn them away. The refusal is a message, not a silence. */
+  const answerDoor = (member: string, allow: boolean) => {
+    const who = roster.current.get(member);
+    if (!who) return;
+    if (allow) {
+      admitted.current.add(member);
+      roster.current.set(member, { ...who, state: "in" });
+      sendShow({ type: "door", member, state: "in", role: who.role, perms: who.perms });
+      sendShow(deck(member, who.perms));
+    } else {
+      admitted.current.delete(member);
+      roster.current.set(member, { ...who, state: "out" });
+      sendShow({ type: "door", member, state: "out", note: "Whoever is running the show did not let you in." });
+    }
+    showRoster();
+  };
+  /**
+   * Change somebody's job while the show is running.
+   *
+   * Their device applies it immediately, which is the point: a role could always be rewritten
+   * mid-show, but the change only reached a device that happened to reload, so a crew member could
+   * be holding powers the host had already taken away.
+   */
+  const setMemberJob = (member: string, roleId: string) => {
+    const who = roster.current.get(member);
+    if (!who) return;
+    const role = showRoles.find(r => r.id === roleId);
+    const next = { ...who, role: role?.name ?? null, perms: role?.perms ?? [] };
+    roster.current.set(member, next);
+    forgetMemberPerms(member);
+    sendShow({ type: "door", member, state: next.state === "waiting" ? "waiting" : "in", role: next.role, perms: next.perms });
+    if (next.state !== "waiting") sendShow(deck(member, next.perms));
+    showRoster();
+    toast("Job changed", `${who.name || "That device"} is now ${next.role ?? "unassigned"}.`, "success");
+  };
+  const toggleAdmission = (on: boolean) => {
+    setAdmission(on);
+    if (liveShow) local.set(`show:admission:${liveShow.id}`, on);
+  };
   /**
    * The deck used to resend on `[stage.n, liveShow.id]` alone, so renaming a cue, reordering the
    * sequence or loading a script left every crew device quietly holding a stale list all night.
@@ -880,11 +939,19 @@ export default function Studio() {
     const perms = await memberPerms(msg.member, show.id);
     if (!perms.length) return;
     if (msg.type === "here") {
-      const who = { name: msg.who, role: msg.role, perms, at: Date.now() };
-      roster.current.set(msg.member, who);
-      setMembers([...roster.current.entries()].map(([member, m]) => ({ member, name: m.name, role: m.role, perms: m.perms })));
+      const known = roster.current.get(msg.member);
+      const waiting = admissionRef.current && !admitted.current.has(msg.member);
+      roster.current.set(msg.member, { name: msg.who, role: msg.role, perms, at: Date.now(), state: waiting ? "waiting" : "in" });
+      showRoster();
+      if (waiting) {
+        sendShow({ type: "door", member: msg.member, state: "waiting", note: "Waiting to be let in." });
+        if (!known) toast("Someone is at the door", `${msg.who || "A device"} is waiting to be let in.`, "warn");
+        return;
+      }
+      admitted.current.add(msg.member);
+      sendShow({ type: "door", member: msg.member, state: "in", role: msg.role, perms });
       sendShow(deck(msg.member, perms));
-      toast("Someone joined", `${msg.role ?? msg.who ?? "A device"} is in the show.`, "info");
+      if (!known) toast("Someone joined", `${msg.role ?? msg.who ?? "A device"} is in the show.`, "info");
       return;
     }
     if (msg.type === "fire") {
@@ -1473,6 +1540,8 @@ export default function Studio() {
           armedSequenceId={armed ? sequenceId : ""} cueIndex={cueIndex}
           onFlash={text => { sendShow({ type: "flash", text, from: "host", member: "host" }); showAlert("warn", text); }}
           onResend={resendDeck}
+          members={members} roles={showRoles} admission={admission} onAdmission={toggleAdmission}
+          onAnswerDoor={answerDoor} onSetJob={setMemberJob}
           onAddSequence={seqId => sequenceToShow(seqId, liveShow.id)} onAddScript={() => scriptToShow(liveShow.id)}
           onRunSequence={runSequence} onStage={t => show(t)}
           onAddToSequence={(seqId, trackId) => addTracksTo(seqId, [trackId])}

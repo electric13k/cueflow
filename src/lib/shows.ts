@@ -171,7 +171,18 @@ export type ShowMsg =
   | { type: "here"; who: string; role: string | null; member: string }
   | { type: "fire"; index: number; sequence: string; from: string; member: string }
   | { type: "relabel"; id: string; label: string; from: string; member: string }
-  | { type: "flash"; text: string; from: string; member: string };
+  | { type: "flash"; text: string; from: string; member: string }
+  /**
+   * The host answering the door, and re-answering it whenever the answer changes.
+   *
+   * One message rather than three, because admitting somebody, refusing them and changing their job
+   * are the same act from the crew device's point of view: this is who you are in this room now.
+   * `waiting` is the state that did not exist at all -- anyone with the key was simply in, and the
+   * host's only sign that a stranger had arrived was a toast that accumulated nothing.
+   *
+   * Addressed, like the deck. A device applies only the one naming it.
+   */
+  | { type: "door"; member: string; state: "waiting" | "in" | "out"; role?: string | null; perms?: Perm[]; note?: string };
 
 /**
  * Realtime refuses a payload much past 256 KB, and a long script is the only thing here that gets
