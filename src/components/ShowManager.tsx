@@ -8,6 +8,7 @@ import DarkToggle from "./DarkToggle";
 import ScriptReader from "./ScriptReader";
 import ShowChat from "./ShowChat";
 import ShowHost from "./ShowHost";
+import OfflineShow from "./OfflineShow";
 import Stage from "./Stage";
 import CurtainTransition from "./CurtainTransition";
 import { logChat } from "../lib/chat";
@@ -387,7 +388,12 @@ export default function ShowManager({
               <MessageSquare size={14} aria-hidden />Messages
             </button>
           </div>
-          {panel === "roles" && <ShowHost projectId={projectId} sequenceId={show.sequenceId ?? ""} show={show} setShow={setShow} onFlash={flash} />}
+          {panel === "roles" && (
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
+              <ShowHost projectId={projectId} sequenceId={show.sequenceId ?? ""} show={show} setShow={setShow} onFlash={flash} />
+              <OfflineShow sequences={seqs} tracks={tracks} />
+            </div>
+          )}
           {panel === "room" && (
             <Room members={members} roles={roles} admission={admission}
               onAdmission={onAdmission} onAnswerDoor={onAnswerDoor} onSetJob={onSetJob} />
