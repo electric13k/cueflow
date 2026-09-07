@@ -6,6 +6,21 @@ import {
 
 const body = (n: number) => new Uint8Array(Array.from({ length: n }, (_, i) => i % 251));
 
+/**
+ * The one test that matters for interop.
+ *
+ * These bytes are written out by hand and asserted identically in the Rust host,
+ * `native/cueflow-mesh/src/lib.rs::frame_layout_is_fixed`. Neither implementation is generated from
+ * the other, so a change to either that the other does not know about fails on one side rather than
+ * in a venue with the two halves quietly disagreeing about where a message ends.
+ */
+describe("the wire format", () => {
+  it("is these exact bytes", () => {
+    const [frame] = chunk(new Uint8Array([1, 2, 3]), 0x1234, 4);
+    expect([...frame]).toEqual([0xc0, 0x01, 0x12, 0x34, 0x00, 0x00, 0x00, 0x01, 0x04, 1, 2, 3]);
+  });
+});
+
 describe("chunk", () => {
   it("puts a short message in one frame", () => {
     const frames = chunk(body(10), 1);
