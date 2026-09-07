@@ -7,6 +7,7 @@ const Home = lazy(() => import("./pages/Home"));
 const Features = lazy(() => import("./pages/Features"));
 const Studio = lazy(() => import("./pages/Studio"));
 const Audience = lazy(() => import("./pages/Audience"));
+const Control = lazy(() => import("./pages/Control"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
@@ -63,6 +64,9 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/features" element={<Features />} />
         <Route path="/studio" element={<Studio />} />
         <Route path="/audience" element={<Audience />} />
+        {/* The operator's second window. Unlike /audience it is a control surface, so it keeps
+            the app chrome and the overlays that /audience deliberately refuses. */}
+        <Route path="/control" element={<Control />} />
         <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/credits" element={<Credits />} />

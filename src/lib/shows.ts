@@ -128,7 +128,29 @@ export async function refreshTicket(member: string): Promise<Ticket | null> {
  * no use to anyone, and writing it down would only slow the fire down. The show id is a uuid, so
  * knowing it is the same as being in the room.
  */
-export type DeckCue = { id: string; label: string; number: string; kind: string };
+/**
+ * `url` and `effects` are only sent to a member the server says holds `fire`.
+ *
+ * Withholding them from everybody was deliberate -- "a device that only reads cues has no business
+ * being able to download them" -- but it also meant the person actually calling the cue heard
+ * nothing, because the sound only ever played on the machine the file happened to be stored on. A
+ * device that is allowed to fire a cue has to be able to make the sound; a device that is only
+ * reading the list still gets a label and nothing else.
+ *
+ * Never a `blob:` URL. Those are scoped to the document that made them, so one on the wire is a
+ * cue that cannot possibly load anywhere else -- see `playableUrl`.
+ */
+export type DeckCue = { id: string; label: string; number: string; kind: string; url?: string; effects?: unknown };
+
+/**
+ * The URL to put on the wire, or nothing.
+ *
+ * A `blob:` URL belongs to one document and means the file is still uploading, or its upload
+ * failed. Broadcasting it produces a cue that silently never loads on any other device, which is
+ * worse than a cue that is honestly marked as not being available yet.
+ */
+export const playableUrl = (url: string | undefined) =>
+  url && !url.startsWith("blob:") && !url.startsWith("data:") ? url : undefined;
 export type ShowMsg =
   /**
    * The host, telling the room where it is. `deck` is the whole sequence, sent on request.

@@ -8,7 +8,8 @@ import CurtainTransition from "../components/CurtainTransition";
 import Stage from "../components/Stage";
 import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
 import { themeClass, useStudioTheme } from "../lib/theme";
-import { defaultVisual, type Kind, type Stage as StageState } from "../types";
+import { defaultEffects, defaultVisual, type Effects, type Kind, type Stage as StageState } from "../types";
+import { VoicePool } from "../lib/audio";
 import {
   forgetTicket, joinShow, listShows, refreshTicket, savedTicket,
   type DeckCue, type Perm, type ShowMsg, type Ticket,
@@ -105,7 +106,42 @@ export default function Show() {
    * Whether this device wants to hear it is this device's business, so the toggle is local.
    */
   const [hearStage, setHearStage] = useState(false);
+  /**
+   * Cue sound, on this device.
+   *
+   * A crew screen mounted no audio at all: the sound only ever came out of whichever machine the
+   * file happened to be stored on, so the person calling the cue from their phone heard nothing and
+   * had no way of telling whether it had gone out. The host sends the URL to anyone holding `fire`,
+   * and this plays it here.
+   *
+   * A browser will not start audio before the person has pressed something, and the press has to be
+   * the same gesture that builds the context -- so there is an explicit control rather than a guess.
+   */
+  const voices = useRef(new VoicePool(4));
+  const [soundOn, setSoundOn] = useState(false);
+  const [soundNote, setSoundNote] = useState("");
+  const cuesRef = useRef<DeckCue[]>([]);
+  const soundOnRef = useRef(false); soundOnRef.current = soundOn;
   const flashTimer = useRef(0);
+
+  const playCueHere = (cue: DeckCue | undefined) => {
+    if (!cue?.url || cue.kind !== "audio") return;
+    if (!soundOnRef.current) { setSoundNote("Turn sound on to hear cues on this device."); return; }
+    const voice = voices.current.claim(cue.id);
+    if (voice.element.src !== cue.url) { voice.element.src = cue.url; voice.element.load(); }
+    voice.element.currentTime = 0;
+    const effects = (cue.effects as Effects | undefined) ?? defaultEffects();
+    voice.engine.play(voice.element, effects).catch(() => {
+      voices.current.release(voice);
+      setSoundNote("This device would not play that cue.");
+    });
+  };
+  /** The gesture the browser needs. Playing the armed cue proves it worked, rather than claiming it. */
+  const enableSound = () => {
+    setSoundOn(true);
+    soundOnRef.current = true;
+    setSoundNote("");
+  };
 
   useEffect(() => {
     if (ticket || !requestedShow) return;
@@ -151,14 +187,14 @@ export default function Show() {
       // else is not ours to apply, and applying it would blank a list we can legitimately see.
       if (msg.to && msg.to !== ticketRef.current?.member) return;
       setDeckSequence(msg.sequence ?? "");
-      setCues(msg.cues); setIndex(msg.index);
+      setCues(msg.cues); cuesRef.current = msg.cues; setIndex(msg.index);
       setStage(msg.stage ? { ...msg.stage, kind: msg.stage.kind as Kind, visual: { ...defaultVisual(), muted: true }, n: Date.now() } : null);
       // Arrives from another device, so it is untrusted markup: sanitise before it can be rendered.
       if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
     }
-    if (msg.type === "cue") { setIndex(msg.index); setNote(`Cue ${msg.label}`); }
+    if (msg.type === "cue") { setIndex(msg.index); setNote(`Cue ${msg.label}`); playCueHere(cuesRef.current[msg.index]); }
     if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
-    if (msg.type === "end") { setStarted(null); setNote("Show ended"); }
+    if (msg.type === "end") { setStarted(null); setNote("Show ended"); voices.current.stopAll(); }
     if (msg.type === "flash") show(msg.text);
   };
   const ticketRef = useRef(ticket); ticketRef.current = ticket;
@@ -211,6 +247,7 @@ export default function Show() {
           <p className="text-xs text-muted">
             {ticket.role ?? "No job assigned"} · {started ? "live" : "standing by"}{note ? ` · ${note}` : ""}
           </p>
+          {soundNote && <p className="mt-1 text-xs text-armed" role="status">{soundNote}</p>}
         </div>
         <div className="flex items-center gap-2">
           {/* A collaborator holds the show password, which is the host's own key: they can call it on. */}
@@ -223,6 +260,11 @@ export default function Show() {
           <DarkToggle />
           <Button isIconOnly size="sm" variant="light" aria-label="Full screen"
             onPress={() => void document.documentElement.requestFullscreen?.().catch(() => {})}><Maximize size={15} /></Button>
+          {can(ticket, "fire") && (soundOn
+            ? <span className="flex items-center gap-1 text-xs text-ready"><Volume2 size={13} aria-hidden />Sound on</span>
+            : <Button size="sm" variant="flat" startContent={<VolumeX size={14} aria-hidden />} onPress={enableSound}>
+                Turn sound on
+              </Button>)}
           {!started && <Button size="sm" variant="light" onPress={() => { forgetTicket(); setTicket(null); }}>Leave</Button>}
         </div>
       </header>

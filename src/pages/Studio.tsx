@@ -2,7 +2,7 @@ import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Square, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Square, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal, PanelsTopLeft } from "lucide-react";
 import { useDeviceCapabilities, useIsPhone } from "../lib/layout";
 import LogoMark from "../components/LogoMark";
 import MediaEditor from "../components/MediaEditor";
@@ -19,7 +19,7 @@ import ShowManager from "../components/ShowManager";
 import DarkToggle, { WorkSurface } from "../components/DarkToggle";
 import { useSignedIn } from "../components/RequireAuth";
 import { currentProject, setCurrentProject } from "../lib/projects";
-import { createShow, deleteShow, listShows, memberPerms, SCRIPT_LIMIT, updateShow, type Perm, type Show, type ShowMsg } from "../lib/shows";
+import { createShow, deleteShow, listShows, memberPerms, playableUrl, SCRIPT_LIMIT, updateShow, type Perm, type Show, type ShowMsg } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
 import { linksOf, loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
@@ -588,7 +588,8 @@ export default function Studio() {
   const onBus = useRef<(msg: Msg) => void>(() => {});
   onBus.current = msg => {
     if (msg.type === "key") runKey(msg.key);
-    if (msg.type === "hello") send({ type: "stage", stage });
+    if (msg.type === "hello") { send({ type: "stage", stage }); sendDeck(); }
+    if (msg.type === "fire") playCue(msg.index);
     if (msg.type === "script") setScriptDoc(loadScript());
     // A cue word coming up in a reader in another window still has to reach the operator here.
     if (msg.type === "alert") showAlert(msg.level, msg.message);
@@ -596,6 +597,23 @@ export default function Studio() {
   useEffect(() => listen(msg => onBus.current(msg)), []);
   // Whatever the operator sees on the stage, the room sees too.
   useEffect(() => { send({ type: "stage", stage }); }, [stage]);
+  /** The running order, for a control panel in another window. */
+  const sendDeck = () => send({
+    type: "deck",
+    name: selectedSequence?.name ?? "Cue board",
+    armed,
+    index: cueIndex,
+    cues: (selectedSequence?.items ?? []).map((it, i) => ({
+      id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1),
+      kind: kindOf(trackById.get(it.trackId) ?? { kind: "audio" }),
+    })),
+  });
+  const deckToPanel = useRef(sendDeck); deckToPanel.current = sendDeck;
+  const openControlPanel = () => window.open(
+    `${location.origin}${import.meta.env.BASE_URL}control`,
+    "cueflow-control",
+    "popup,width=460,height=760",
+  );
 
   const updateEffects = (fx: Effects) => { if (!selected) return; setTracks(all => patch(all, selected.id, { effects: fx })); engine.current.apply(audio.current, fx); };
   /**
@@ -808,10 +826,18 @@ export default function Studio() {
       show: selectedSequence?.name ?? "Show",
       sequence: selectedSequence?.id ?? "",
       index: cueIndex,
-      cues: may("cues") ? (selectedSequence?.items ?? []).map((it, i) => ({
-        id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1),
-        kind: kindOf(trackById.get(it.trackId) ?? { kind: "audio" }),
-      })) : [],
+      cues: may("cues") ? (selectedSequence?.items ?? []).map((it, i) => {
+        const track = trackById.get(it.trackId);
+        const kind = kindOf(track ?? { kind: "audio" });
+        // Sound travels only to a device that is allowed to fire, and only when the file is
+        // somewhere that device can actually reach.
+        const sendable = may("fire") && kind === "audio" ? playableUrl(track?.url) : undefined;
+        return {
+          id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1), kind,
+          url: sendable,
+          effects: sendable ? (it.effects ?? track?.effects) : undefined,
+        };
+      }) : [],
       script: may("script") && scriptDoc.html.length <= SCRIPT_LIMIT ? scriptDoc.html : undefined,
       stage: may("stage") && stage ? { url: stage.url, kind: stage.kind, label: stage.label, slideIndex: stage.slideIndex } : null,
     };
@@ -840,6 +866,8 @@ export default function Studio() {
     const timer = setTimeout(() => resendRef.current(), 200);
     return () => clearTimeout(timer);
   }, [deckSignature, scriptDoc.html, stage?.n, liveShow?.id, showLink.ready]);
+  // …and the same change goes to a control panel popped out on the second screen.
+  useEffect(() => { deckToPanel.current(); }, [deckSignature, cueIndex, armed]);
 
   /**
    * Nothing the room says is acted on until the server confirms the sender may say it.
@@ -1184,7 +1212,9 @@ export default function Studio() {
             <CueTransport element={liveVoice()?.element ?? null} label={liveVoice()?.trackId ? (trackById.get(liveVoice()!.trackId!)?.title ?? "the cue") : "the cue"}
               onToggle={pauseOrResume} onStop={stopAllSound} master={master} setMaster={setMaster} commitMaster={commitMaster} />
             <span className="ml-auto flex items-center gap-1">
-              <Button data-coach="presenter" size="sm" variant="flat" startContent={<Monitor size={15} />} onPress={openAudience}>Audience display</Button>
+              <Button data-coach="presenter" size="sm" variant="flat" startContent={<Monitor size={15} aria-hidden />} onPress={openAudience}>Audience display</Button>
+              <Button size="sm" variant="flat" startContent={<PanelsTopLeft size={15} aria-hidden />} onPress={openControlPanel}
+                title="The cue list in its own window, for a second screen">Control panel</Button>
               <Button data-coach="script" size="sm" variant="flat" startContent={<FileText size={15} />} onPress={() => openScript("split")}>Open script</Button>
               <CoachHelp id="armed" />
             </span>
