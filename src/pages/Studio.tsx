@@ -36,7 +36,8 @@ import { addToCollection, buildProjectExport, formatTimer, loadFeatures, makeTem
 import { search as rank, type Facet, type SortKey } from "../lib/search";
 import { cuePoints } from "../lib/trim";
 import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, searchOpenverse, uniqueTitle, type Hit, type Source } from "../lib/media";
-import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack } from "../lib/store";
+import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack, watchCloud } from "../lib/store";
+import { autoSave, flushSave, onSyncResult } from "../lib/autosync";
 import { toast } from "../lib/toast";
 import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual, type DeckSlide } from "../types";
 import { loadAlertScope, type AlertScope } from "../lib/alerts";
@@ -478,19 +479,20 @@ export default function Studio() {
   const lastSyncNote = useRef("");
   // Sync is on and has no button: it runs on every change and only speaks up when it fails, once
   // per distinct reason, so a broken save is visible on the device it happens on rather than at the
-  // next show.
+  // next show. `autoSave` is the app's one save path -- this used to be a third inline copy of the
+  // same debounce, sitting beside the one in `autosync.ts` and the queue inside `persist`.
+  useEffect(() => onSyncResult(state => {
+    const note = state.ok ? "" : state.reason ?? "unknown error";
+    if (note && note !== lastSyncNote.current) toast("Couldn't save to your account", note, "warn");
+    lastSyncNote.current = note;
+  }), []);
+  useEffect(() => { autoSave(tracks, sequences, project); }, [tracks, sequences]);
+  // Leaving without waiting out the debounce must not lose the last edit.
   useEffect(() => {
-    // Wait for the typing to stop. Dragging a cue fires this on every frame, and a save per frame is
-    // both wasted work and the thing that used to make two of them overlap.
-    const timer = setTimeout(() => {
-      void persist(tracks, sequences, project).then(state => {
-        const note = state.ok ? "" : state.reason ?? "unknown error";
-        if (note && note !== lastSyncNote.current) toast("Couldn't save to your account", note, "warn");
-        lastSyncNote.current = note;
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [tracks, sequences]);
+    const leave = () => { void flushSave(data.current.tracks, data.current.sequences, project); };
+    window.addEventListener("pagehide", leave);
+    return () => { window.removeEventListener("pagehide", leave); leave(); };
+  }, []);
   useEffect(() => { local.set(key("session"), { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
   const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
   const mergeCloud = () => hydrateCloud(project).then(cloud => {
@@ -506,6 +508,11 @@ export default function Studio() {
     pulled ? "success" : "warn",
   ));
   useEffect(() => { void mergeCloud(); }, []);
+  /**
+   * Another device changed something. Pull and merge rather than reload: the merge is three-way and
+   * knows the difference between their edit and yours, so nothing being worked on is lost.
+   */
+  useEffect(() => watchCloud(project, () => { void mergeCloud(); }), []);
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
   useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences, project)); }), []);
   useEffect(() => {

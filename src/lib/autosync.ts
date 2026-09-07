@@ -15,6 +15,20 @@ export type SyncStatus = "idle" | "saving" | "saved" | "offline";
  */
 export const statusOf = (state: SyncState): SyncStatus => (state.ok ? "saved" : "offline");
 
+/**
+ * The last thing a save actually said, not merely whether it worked.
+ *
+ * `SyncStatus` is the word a page renders; a caller that wants to tell the operator *why* a save
+ * failed needs the reason too, and Studio was keeping its own debounce and its own `persist` call
+ * purely to get at it. One save path, and the reason still reaches whoever wants it.
+ */
+const results = new Set<(state: SyncState) => void>();
+export function onSyncResult(cb: (state: SyncState) => void) {
+  results.add(cb);
+  return () => { results.delete(cb); };
+}
+const report = (state: SyncState) => { for (const cb of [...results]) cb(state); };
+
 let status: SyncStatus = "idle";
 const watchers = new Set<(s: SyncStatus) => void>();
 export const syncStatus = () => status;
@@ -66,8 +80,8 @@ export function autoSave(tracks: Track[], sequences: Sequence[], projectId: stri
   debounce("store", wait, () => {
     setStatus("saving");
     persist(tracks, sequences, projectId).then(
-      state => setStatus(statusOf(state)),
-      () => setStatus("offline"),
+      state => { setStatus(statusOf(state)); report(state); },
+      () => { setStatus("offline"); report({ cloud: true, ok: false, reason: "The save did not go through." }); },
     );
   });
 }
@@ -78,7 +92,10 @@ export function flushSave(tracks: Track[], sequences: Sequence[], projectId: str
   timers.delete("store");
   setStatus("saving");
   return persist(tracks, sequences, projectId).then(
-    state => { setStatus(statusOf(state)); return state; },
-    () => { setStatus("offline"); return { cloud: true, ok: false } as SyncState; },
+    state => { setStatus(statusOf(state)); report(state); return state; },
+    () => {
+      const state = { cloud: true, ok: false, reason: "The save did not go through." } as SyncState;
+      setStatus("offline"); report(state); return state;
+    },
   );
 }

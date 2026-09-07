@@ -25,18 +25,24 @@ export type Visual = {
   deckSlides?: DeckSlide[];
 };
 
+/**
+ * `updatedAt` is written by the database, not by this app, and only exists on rows that have been
+ * saved to an account. It is what lets two devices editing the same library work out whose copy of a
+ * row is the newer one; without it a merge can only add, never update, which is how a rename made on
+ * one device used to be quietly destroyed by the other's next save.
+ */
 export type Track = {
   id: string; title: string; url: string; storagePath?: string; duration?: number;
   kind?: Kind; mime?: string; visual?: Visual; slides?: DeckSlide[];
-  effects: Effects; createdAt: string; pending?: boolean; error?: boolean;
+  effects: Effects; createdAt: string; updatedAt?: string; pending?: boolean; error?: boolean;
 };
 /**
  * `link` is another item's id in the same sequence, and both sides hold it. Firing either one fires
  * the other, which is how a slide and the sound under it stay together without becoming one cue --
  * they still have their own numbers, their own effects, and can still be called separately.
  */
-export type SequenceItem = { id: string; trackId: string; label: string; effects: Effects; visual?: Visual; slideIndex?: number; link?: string };
-export type Sequence = { id: string; name: string; items: SequenceItem[]; createdAt: string };
+export type SequenceItem = { id: string; trackId: string; label: string; effects: Effects; visual?: Visual; slideIndex?: number; link?: string; updatedAt?: string };
+export type Sequence = { id: string; name: string; items: SequenceItem[]; createdAt: string; updatedAt?: string };
 
 /** What the audience window is showing right now. `n` bumps per cue so a repeat still animates. */
 export type Stage = { url: string; kind: Kind; visual: Visual; label: string; n: number; slideIndex?: number } | null;

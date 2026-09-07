@@ -13,7 +13,7 @@ import { currentProject, listProjects, type Project } from "../lib/projects";
 import { listShows, type Show } from "../lib/shows";
 import { listSessions, type EditorSession } from "../lib/editorSessions";
 import { search, type Facets } from "../lib/search";
-import { local, onAuth } from "../lib/store";
+import { hydrateCloud, local, mergeInto, onAuth } from "../lib/store";
 import { loadScript } from "../lib/script";
 import { cueNumbers, kindOf, type Sequence, type Track } from "../types";
 
@@ -27,13 +27,32 @@ const tileKind = (track: Track): RecentKind => (kindOf(track) === "embed" ? "dec
 export default function Workspace() {
   const project = currentProject();
   const key = (k: string) => (project ? `${k}:${project}` : k);
-  const [tracks] = useState<Track[]>(() => local.get(key("tracks"), []));
-  const [sequences] = useState<Sequence[]>(() => local.get(key("sequences"), []));
+  const [tracks, setTracks] = useState<Track[]>(() => local.get(key("tracks"), []));
+  const [sequences, setSequences] = useState<Sequence[]>(() => local.get(key("sequences"), []));
   const [script] = useState(() => (typeof localStorage === "undefined" ? null : loadScript()));
   const [shows, setShows] = useState<Show[]>([]);
   const [sessions, setSessions] = useState<EditorSession[]>([]);
   const [name, setName] = useState<string>(project ? "…" : "Personal workspace");
   const [loading, setLoading] = useState(true);
+
+  /**
+   * Pull the account's library, not only whatever this device happens to have on disk.
+   *
+   * Workspace read localStorage and stopped there, so signing in on a second device showed an empty
+   * recents list next to a Studio that had everything -- the same account, the same project, two
+   * different answers. The merge is the same three-way one the Studio uses, so opening this page
+   * cannot clobber work the Studio has open in another tab.
+   */
+  useEffect(() => {
+    let live = true;
+    void hydrateCloud(project).then(cloud => {
+      if (!live || !cloud) return;
+      const merged = mergeInto(local.get(key("tracks"), []), local.get(key("sequences"), []), cloud);
+      setTracks(merged.tracks);
+      setSequences(merged.sequences);
+    });
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     let live = true;
