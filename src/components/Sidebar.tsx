@@ -81,7 +81,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <motion.div variants={sidebarItemVariants} className="space-y-1">
         <div className="flex items-center justify-between pb-1 pl-3 pr-1">
-          <p className="font-mono text-[10px] uppercase tracking-[.28em] text-muted">Workspaces</p>
+          <p className="font-mono eyebrow text-muted">Workspaces</p>
           <CoachHelp id="sidebar" />
         </div>
         <button type="button" onClick={() => { open(null); onNavigate?.(); }} className={`${row} ${here ? off : on}`}>

@@ -7,7 +7,7 @@ const UPDATED = "22 August 2026";
 export default function Privacy() {
   return (
     <Page width="max-w-3xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Legal</p>
+      <p className="eyebrow text-accent">Legal</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Privacy Policy</h1>
       <p className="mt-2 text-sm text-muted">
         Last updated {UPDATED}. See also the{" "}

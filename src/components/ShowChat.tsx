@@ -35,7 +35,7 @@ export default function ShowChat({ show, canSend = true, onSend, className = "" 
   return (
     <div className={`flex min-h-0 flex-col gap-2 ${className}`}>
       <div className="flex items-center gap-2">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-muted">Messages</h3>
+        <h3 className="label-cap text-muted">Messages</h3>
         <span className="text-xs text-muted">{lines.length ? `${lines.length} kept on this device` : "nothing yet"}</span>
         {lines.length > 0 && (
           <Button isIconOnly size="sm" variant="light" className="ml-auto" aria-label="Clear the history on this device"
@@ -55,7 +55,7 @@ export default function ShowChat({ show, canSend = true, onSend, className = "" 
           <li key={line.id} className={line.kind === "event"
             ? "text-xs italic text-muted"
             : "rounded-xl bg-surface/60 px-3 py-2 text-sm"}>
-            <span className="mr-2 font-mono text-[11px] uppercase tracking-widest text-muted">{time(line.at)}</span>
+            <span className="mr-2 font-mono label-cap text-muted">{time(line.at)}</span>
             {line.kind === "message" && <span className="mr-2 font-semibold text-accent">{line.from}</span>}
             <span className={line.kind === "message" ? "" : "text-muted"}>{line.text}</span>
           </li>

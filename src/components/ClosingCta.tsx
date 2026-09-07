@@ -26,7 +26,7 @@ export default function ClosingCta({ eyebrow, title, note, children, cta = "Open
       viewport={{ once: true, margin: "-70px" }} transition={{ duration: .55, ease: [.16, 1, .3, 1] }}
       className="glass mt-16 flex flex-wrap items-center justify-between gap-5 p-8 sm:p-10">
       <div>
-        {eyebrow && <p className="font-mono text-[11px] uppercase tracking-[.3em] text-brass">{eyebrow}</p>}
+        {eyebrow && <p className="font-mono eyebrow text-brass">{eyebrow}</p>}
         <h2 className={`text-3xl font-bold sm:text-4xl ${eyebrow ? "mt-3" : ""}`}>{title}</h2>
         {note && <p className="mt-2 text-muted">{note}</p>}
       </div>

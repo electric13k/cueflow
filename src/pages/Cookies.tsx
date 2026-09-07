@@ -7,7 +7,7 @@ const UPDATED = "22 August 2026";
 export default function Cookies() {
   return (
     <Page width="max-w-3xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Legal</p>
+      <p className="eyebrow text-accent">Legal</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Cookies and local storage</h1>
       <p className="mt-2 text-sm text-muted">
         Last updated {UPDATED}. See also the <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</Link> and <Link to="/terms" className="text-accent underline-offset-2 hover:underline">Terms of Service</Link>.

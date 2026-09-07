@@ -60,7 +60,7 @@ export default function Tutorial() {
   return (
     <Page>
       <div ref={root}>
-      <motion.p {...rise()} className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Tutorial</motion.p>
+      <motion.p {...rise()} className="font-mono eyebrow text-brass">Tutorial</motion.p>
       <motion.h1 {...rise(.05)} className="mt-3 max-w-3xl text-5xl font-bold leading-[1.02] sm:text-6xl">
         Library, deck, <span className="italic text-accent">go.</span>
       </motion.h1>
@@ -70,7 +70,7 @@ export default function Tutorial() {
       </motion.p>
 
       <section className="mt-14">
-        <motion.h2 {...rise()} className="font-mono text-xs uppercase tracking-[.3em] text-muted">The four screens</motion.h2>
+        <motion.h2 {...rise()} className="font-mono eyebrow text-muted">The four screens</motion.h2>
         <p className="mt-2 text-sm text-muted">Tap a card to turn it over.</p>
         <div className="mt-7 grid gap-4 sm:grid-cols-2">
           {screens.map((s, i) => <ScreenCard key={s.title} {...s} delay={i * .05} />)}
@@ -78,7 +78,7 @@ export default function Tutorial() {
       </section>
 
       <section className="mt-16">
-        <motion.h2 {...rise()} className="font-mono text-xs uppercase tracking-[.3em] text-muted">The keys</motion.h2>
+        <motion.h2 {...rise()} className="font-mono eyebrow text-muted">The keys</motion.h2>
         <ul className="mt-5 divide-y divide-white/10 border-y border-white/10">
           {keys.map(k => (
             <li key={k.k} data-reveal className="flex items-baseline gap-5 py-4">

@@ -96,7 +96,7 @@ export default function Features() {
           <motion.span className="feature-orbit feature-orbit--brass" animate={prefersReducedMotion ? undefined : { rotate: 360, y: [0, -16, 0] }} transition={{ rotate: { duration: 28, repeat: Infinity, ease: "linear" }, y: { duration: 9, repeat: Infinity, ease: "easeInOut" } }} />
           <motion.span className="feature-orbit feature-orbit--curtain" animate={prefersReducedMotion ? undefined : { rotate: -360, y: [0, 12, 0] }} transition={{ rotate: { duration: 34, repeat: Infinity, ease: "linear" }, y: { duration: 11, repeat: Infinity, ease: "easeInOut" } }} />
         </div>
-        <motion.p {...rise()} className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Features</motion.p>
+        <motion.p {...rise()} className="font-mono eyebrow text-brass">Features</motion.p>
         <motion.h1 {...rise(.05)} className="mt-3 max-w-4xl text-5xl font-bold leading-[1.02] sm:text-6xl">
           The controls that keep a live show moving.
         </motion.h1>
@@ -119,12 +119,12 @@ export default function Features() {
                     <span className="feature-icon flex h-11 w-11 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
                       <Icon size={20} aria-hidden />
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-[.28em] text-brass">{feature.eyebrow}</span>
+                    <span className="font-mono eyebrow text-brass">{feature.eyebrow}</span>
                   </div>
                   <h2 className="mt-7 max-w-md text-2xl font-bold leading-tight sm:text-3xl">{feature.title}</h2>
                   <p className="mt-3 max-w-xl leading-relaxed text-muted">{feature.body}</p>
                   <div className="mt-6 flex flex-wrap gap-2">
-                    {feature.tags.map(tag => <span key={tag} className="rounded-full border border-white/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[.15em] text-muted">{tag}</span>)}
+                    {feature.tags.map(tag => <span key={tag} className="rounded-full border border-white/10 px-3 py-1 font-mono label-cap text-muted">{tag}</span>)}
                   </div>
                 </div>
               </article>
@@ -135,7 +135,7 @@ export default function Features() {
         <section ref={workflowRef} className="relative mt-20 border-y border-white/10 py-14 sm:py-16">
           <motion.div aria-hidden className="workflow-rail" style={{ scaleX: workflowRail }} />
           <motion.div {...rise()}>
-            <p className="font-mono text-[11px] uppercase tracking-[.36em] text-brass">Also in the box</p>
+            <p className="font-mono eyebrow text-brass">Also in the box</p>
             <h2 className="mt-3 max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">The parts that only matter once you are running it.</h2>
           </motion.div>
           <div className="workflow-grid relative mt-10 grid gap-8 md:grid-cols-3">

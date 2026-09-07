@@ -72,7 +72,7 @@ export default function Projects() {
   return (
     <Shell width="max-w-3xl">
       <motion.div {...reveal()}>
-        <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Projects</p>
+        <p className="eyebrow text-accent">Projects</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">One production, one project</h1>
         <p className="mt-3 text-muted">
         Each project keeps its own sounds, its own sequences and its own shows. People you add

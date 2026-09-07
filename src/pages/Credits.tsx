@@ -71,7 +71,7 @@ export default function Credits() {
   useReveal(root);
   return (
     <Page width="max-w-3xl"><div ref={root}>
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Thanks</p>
+      <p className="eyebrow text-accent">Thanks</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Standing on open shoulders</h1>
       <p className="mt-2 text-sm text-muted">
         CueFlow's editors were built by studying tools that got these problems right first.

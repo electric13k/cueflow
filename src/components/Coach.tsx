@@ -79,7 +79,7 @@ export default function Coach() {
 
   return (
     <Spotlight spot={spot} label={lesson.title} onDismiss={() => close(true)}>
-      <p className="font-mono text-[10px] uppercase tracking-[.3em] text-brass">Tip</p>
+      <p className="font-mono eyebrow text-brass">Tip</p>
       <h3 className="mt-2 text-lg font-bold">{lesson.title}</h3>
       <p className="mt-1.5 text-sm leading-relaxed text-muted">{lesson.body}</p>
       <Button className="mt-4 w-full" size="sm" color="primary" onPress={() => close(true)}>Got it</Button>

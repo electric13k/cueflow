@@ -54,7 +54,7 @@ function Door({ onIn, onClose, initialKey = "" }: { onIn: (t: Ticket) => void; o
         <Button isIconOnly size="sm" variant="light" aria-label="Close join a show" title="Close" className="absolute right-3 top-3 z-10"
           onPress={onClose}><X size={17} /></Button>
         <div className="pr-10">
-          <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Join a show</p>
+          <p className="eyebrow text-accent">Join a show</p>
           <h1 id="join-show-title" className="mt-2 text-3xl font-black tracking-tight">Type your key</h1>
           <p id="join-show-description" className="mt-2 text-sm text-muted">
             No account needed. Whoever is running the show gives you a key, and the key is the job, type
@@ -270,7 +270,7 @@ export default function Show() {
     const refused = door.state === "out";
     return (
       <div className={`${themeClass(theme)} flex h-dvh flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground`}>
-        <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">{refused ? "Not in this show" : "Waiting room"}</p>
+        <p className="eyebrow text-accent">{refused ? "Not in this show" : "Waiting room"}</p>
         <h1 className="max-w-md text-3xl font-black tracking-tight">
           {refused ? "You were not let in." : "Standing by to be let in."}
         </h1>
@@ -335,7 +335,7 @@ export default function Show() {
              splits colour and a highlight that follows the pointer over a list that is changing
              under stage light is the one place refraction costs more than it gives. */
           <section className="glass-soft min-h-0 overflow-auto p-3">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-muted">Sequence</h2>
+            <h2 className="mb-2 label-cap text-muted">Sequence</h2>
             {cues.length === 0 && <p className="text-sm text-muted">Waiting for the host to send the deck…</p>}
             <ol className="space-y-1">
               {cues.map((cue, i) => (
@@ -364,7 +364,7 @@ export default function Show() {
 
         {can(ticket, "script") && (
           <section className="glass flex min-h-0 flex-col p-3">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-muted">Script</h2>
+            <h2 className="mb-2 label-cap text-muted">Script</h2>
             <div className="min-h-0 flex-1">
               <ScriptReader doc={marked} setDoc={setDoc} />
             </div>
@@ -374,7 +374,7 @@ export default function Show() {
         {can(ticket, "stage") && (
           <section className="glass flex min-h-0 flex-col p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-xs font-semibold uppercase tracking-[.2em] text-muted">On the screen</h2>
+              <h2 className="label-cap text-muted">On the screen</h2>
               {stage?.kind === "video" && (
                 <Button size="sm" variant="light" onPress={() => setHearStage(h => !h)}
                   aria-pressed={hearStage} title={hearStage ? "Mute the stage video on this device" : "Hear the stage video on this device"}>

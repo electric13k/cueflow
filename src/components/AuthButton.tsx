@@ -71,7 +71,7 @@ export default function AuthButton() {
               Already have a password account? Sign in with it, then add Google from your account page.
               Signing in with Google first makes a second, separate account.
             </p>
-            <p className="text-center font-mono text-[10px] uppercase tracking-[.3em] text-muted">or</p>
+            <p className="text-center font-mono eyebrow text-muted">or</p>
             <Input
               type={mode === "up" ? "email" : "text"}
               label={mode === "up" ? "Email" : "Email or username"}

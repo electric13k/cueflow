@@ -1343,7 +1343,7 @@ export default function Studio() {
         {!armed && !editingId && (!phone || pane === "deck") && (
           <section className="mt-4 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted">Sequences</p>
+              <p className="label-cap text-muted">Sequences</p>
               <Button data-tour="new-sequence" size="sm" variant="light" startContent={<Plus size={14} />} onPress={addSequence}>New sequence</Button>
               {selectedSequence && <Button size="sm" variant="light" startContent={<Copy size={14} />} onPress={duplicateSequence.bind(null, selectedSequence)}>Duplicate</Button>}
               {features.templates.length > 0 && <Select aria-label="Create from template" value="" size="sm" className="min-w-40"
@@ -1568,7 +1568,7 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
   return (
     <div className="mt-5 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Soundboard and slides</p><h2 className="flex items-center gap-1 text-xl font-bold">Click a card to fire it<CoachHelp id="library" /></h2></div>
+        <div><p className="label-cap text-accent">Soundboard and slides</p><h2 className="flex items-center gap-1 text-xl font-bold">Click a card to fire it<CoachHelp id="library" /></h2></div>
         <div className="flex flex-wrap gap-2">
           <Tooltip content="A blank 16:9 slide you can put a title on"><Button variant="bordered" isDisabled={busy} startContent={<Presentation size={16} />} onPress={onAddSlide}>New slide</Button></Tooltip>
           <Tooltip content="Audio, images and video from this device"><Button data-coach="add" as="label" color="primary" startContent={<Upload size={17} aria-hidden />}>Upload<input className="sr-only" type="file" accept={UPLOAD_ACCEPT} multiple aria-label="Upload audio, images and video from this device" onChange={onAdd} /></Button></Tooltip>
@@ -1837,7 +1837,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
   if (!track) return <div className="mt-5 rounded-2xl border border-dashed border-border py-16 text-center text-muted">Select something in the Library to edit it.</div>;
   const kind = kindOf(track);
   const heading = (
-    <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Non-destructive editor</p>
+    <div><p className="label-cap text-accent">Non-destructive editor</p>
       <h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button><CoachHelp id="editor" /></h2></div>
   );
   if (kind !== "audio") return (
@@ -1890,7 +1890,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* The list of sequences is the rail above the tabs, because a library card has to be able to
             land on one without changing tab. This panel is only ever the one that is open. */}
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-accent">Manual cue deck</p><h2 className="flex items-center gap-1 text-xl font-bold">{seq ? seq.name : "Sequences"}<CoachHelp id="sequence" /></h2></div>
+        <div><p className="label-cap text-accent">Manual cue deck</p><h2 className="flex items-center gap-1 text-xl font-bold">{seq ? seq.name : "Sequences"}<CoachHelp id="sequence" /></h2></div>
       </div>
       {!seq ? (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center text-muted">Pick a sequence in the rail above, or make one. Then add sounds and slides from the Library. Audio responds to ← →, visual media responds to A / D, and every cue can still be clicked.</div>
@@ -2004,7 +2004,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
             </div>
             <div className="order-1 space-y-2 lg:order-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted">Stage</p>
+                <p className="label-cap text-muted">Stage</p>
                 {stage && <Button size="sm" variant="light" onPress={clearStage}>Blackout</Button>}
               </div>
               <Stage stage={stage} className="aspect-video w-full rounded-xl border border-border" />
@@ -2166,7 +2166,7 @@ function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setL
         <div className="min-w-0 flex-1">
           <p aria-live="polite" data-player-track-id={track.id} className="flex items-center gap-2 truncate text-sm font-bold capitalize">
             {track.title}
-            {unsaved && <span className="shrink-0 rounded-full border border-secondary/40 bg-secondary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-secondary">Unsaved edit</span>}
+            {unsaved && <span className="shrink-0 rounded-full border border-secondary/40 bg-secondary/15 px-2 py-0.5 label-cap text-secondary">Unsaved edit</span>}
           </p>
           {/* playbackRate never touches element.duration, so at 2x a 30s file still reports 30s.
               Divide by speed to show how long it will actually take. */}

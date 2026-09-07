@@ -8,7 +8,7 @@ const UPDATED = "22 August 2026";
 export default function Terms() {
   return (
     <Page width="max-w-3xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Legal</p>
+      <p className="eyebrow text-accent">Legal</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Terms of Service</h1>
       <p className="mt-2 text-sm text-muted">
         Last updated {UPDATED}. CueFlow is a hobby project offered free of charge. See also the{" "}

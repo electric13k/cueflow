@@ -89,7 +89,7 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
           </span>
         )}
 
-        <span className="mt-auto pt-2 font-mono text-[10px] uppercase tracking-[.14em] text-muted">
+        <span className="mt-auto pt-2 font-mono label-cap text-muted">
           {entry.kind === "session" ? "Resume" : entry.note}
         </span>
 

@@ -108,7 +108,7 @@ export default function Account() {
 
   return (
     <Shell width="max-w-2xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Account</p>
+      <p className="eyebrow text-accent">Account</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{profile.username ? `@${profile.username}` : "Your account"}</h1>
       <p className="mt-2 text-sm text-muted">{profile.email}</p>
 

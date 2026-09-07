@@ -33,7 +33,7 @@ export default function Settings() {
 
   return (
     <Shell width="max-w-3xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[.3em] text-accent">Settings</p>
+      <p className="eyebrow text-accent">Settings</p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">How it behaves</h1>
       <p className="mt-2 text-sm text-muted">These stay on this device. They are not tied to your account, so a borrowed laptop keeps its own.</p>
 

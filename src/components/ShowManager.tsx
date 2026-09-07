@@ -202,7 +202,7 @@ export default function ShowManager({
         <Radio size={17} className={show.startedAt ? "text-live" : "text-accent"} aria-hidden />
         <div className="min-w-0">
           <h1 className="truncate text-lg font-black tracking-tight">{show.name}</h1>
-          <p className="font-mono text-[11px] uppercase tracking-widest text-muted">
+          <p className="font-mono label-cap text-muted">
             {show.startedAt ? `live · ${clock(elapsed)}` : show.password ?? "no key"}
           </p>
         </div>
@@ -238,14 +238,14 @@ export default function ShowManager({
 
           {/* What is coming, and when. */}
           <section className="glass-soft p-3">
-            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted">
+            <h2 className="flex items-center gap-2 label-cap text-muted">
               <Clock size={14} aria-hidden />Coming up
             </h2>
             {plan.length === 0 ? (
               <p className="mt-2 text-sm text-muted">This show carries no sequences yet. Drag one onto the header, or add it below.</p>
             ) : (<>
               <div className={`mt-2 flex flex-wrap items-center gap-3 rounded-xl border p-3 ${next ? "border-armed/50 bg-armed/10" : "border-border bg-surface/60"}`}>
-                <span className="text-[11px] font-semibold uppercase tracking-[.2em] text-muted">Next</span>
+                <span className="label-cap text-muted">Next</span>
                 {next ? (<>
                   <span className={`font-mono text-lg font-black ${next.kind === "audio" ? "text-audio" : "text-visual"}`}>{next.number}</span>
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold">{next.label}</span>
@@ -287,7 +287,7 @@ export default function ShowManager({
 
           {/* The script, on the manager's own screen rather than in a window somebody has to find. */}
           <section className="glass-soft flex min-h-0 flex-col p-3">
-            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted">
+            <h2 className="flex items-center gap-2 label-cap text-muted">
               <FileText size={14} aria-hidden />Script
               {script?.html && !link.script && <Button className="ml-auto" size="sm" variant="flat" onPress={onAddScript}>Add to the show</Button>}
               {link.script && <span className="ml-auto text-[11px] normal-case tracking-normal text-muted">Goes out with the show</span>}
@@ -299,7 +299,7 @@ export default function ShowManager({
 
           {/* Sequences: drag one onto the header to put it in the show, or press the card. */}
           <section className="glass-soft p-3">
-            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted">
+            <h2 className="flex items-center gap-2 label-cap text-muted">
               <ListMusic size={14} aria-hidden />Sequences
             </h2>
             {sequences.length === 0 ? (
@@ -334,7 +334,7 @@ export default function ShowManager({
 
           {/* The library, and the drag it was missing: a card goes straight onto a sequence card. */}
           <section className="glass-soft p-3">
-            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted">
+            <h2 className="flex items-center gap-2 label-cap text-muted">
               <Layers size={14} aria-hidden />Library
             </h2>
             {tracks.length === 0 ? (
@@ -442,7 +442,7 @@ function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }
 
       {waiting.length > 0 && (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-armed">Waiting</h3>
+          <h3 className="label-cap text-armed">Waiting</h3>
           <ul className="mt-2 space-y-2">
             {waiting.map(person => (
               <Person key={person.member} person={person}>
@@ -457,7 +457,7 @@ function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }
       )}
 
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-muted">In the room</h3>
+        <h3 className="label-cap text-muted">In the room</h3>
         {inside.length === 0
           ? <p className="mt-2 text-sm text-muted">Nobody has joined yet. Hand out a key and they appear here.</p>
           : (
@@ -481,7 +481,7 @@ function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }
 
       {turnedAway.length > 0 && (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Turned away</h3>
+          <h3 className="label-cap text-muted">Turned away</h3>
           <ul className="mt-2 space-y-2">
             {turnedAway.map(person => (
               <Person key={person.member} person={person}>

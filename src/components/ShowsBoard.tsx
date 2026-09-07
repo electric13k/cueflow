@@ -81,7 +81,7 @@ export default function ShowsBoard({
                   className={`flex min-h-24 flex-col rounded-xl border p-3 transition-colors ${hot === `show:${s.id}` ? "border-accent bg-accent/20" : s.startedAt ? "border-live/50 bg-live/10" : "border-border bg-surface/60"}`}>
                   <button type="button" className="flex-1 text-left" onClick={() => onOpenShow(s)}>
                     <span className="block truncate font-bold">{s.name}</span>
-                    <span className="mt-1 block font-mono text-[11px] uppercase tracking-widest text-muted">
+                    <span className="mt-1 block font-mono label-cap text-muted">
                       {s.startedAt ? "live" : "open manager"}
                     </span>
                     <span className="mt-1 block text-xs text-muted">

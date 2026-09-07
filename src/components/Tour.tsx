@@ -181,7 +181,7 @@ export default function Tour() {
 
   return (
     <Spotlight spot={spot} label={current.say} onDismiss={() => finish(false)}>
-      <p className="font-mono text-[10px] uppercase tracking-[.3em] text-brass">
+      <p className="font-mono eyebrow text-brass">
         Step {step + 1} of {steps.length}
       </p>
       <p className="mt-2 text-base font-semibold leading-snug">{current.say}</p>

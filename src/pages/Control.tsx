@@ -55,7 +55,7 @@ export default function Control() {
     <div className={`${themeClass(theme)} flex h-dvh flex-col gap-3 bg-background p-3 text-foreground`}>
       <header className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[.3em] text-accent">Control panel</p>
+          <p className="eyebrow text-accent">Control panel</p>
           <h1 className="truncate text-lg font-black tracking-tight">{deck?.name ?? "Waiting for the desk"}</h1>
         </div>
         <span className={`shrink-0 text-xs ${deck?.armed ? "text-armed" : "text-muted"}`}>

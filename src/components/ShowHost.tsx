@@ -78,7 +78,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       </div>
       {shows.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Or reopen one</p>
+          <p className="label-cap text-muted">Or reopen one</p>
           {shows.map(s => (
             <button key={s.id} type="button" onClick={() => void enterAsOwner(s).then(() => setShow(s)).catch(e => toast("Could not reopen the show", (e as Error).message, "warn"))}
               className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10">
@@ -95,7 +95,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Collaborator password</p>
+          <p className="label-cap text-muted">Collaborator password</p>
           <p className="font-mono text-3xl font-black tracking-[.3em] text-accent">{show.password ?? "-"}</p>
         </div>
         <div className="flex flex-wrap gap-2">

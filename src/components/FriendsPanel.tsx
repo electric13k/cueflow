@@ -69,7 +69,7 @@ export default function FriendsPanel() {
 
       {incoming.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-armed">Asked you</h3>
+          <h3 className="label-cap text-armed">Asked you</h3>
           <ul className="mt-2 space-y-2">
             {incoming.map(friend => (
               <li key={friend.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface/50 px-3 py-2">
@@ -85,7 +85,7 @@ export default function FriendsPanel() {
       )}
 
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-[.2em] text-muted">Your list</h3>
+        <h3 className="label-cap text-muted">Your list</h3>
         {settled.length === 0 && waiting.length === 0
           ? <p className="mt-2 text-sm text-muted">Nobody yet. Ask by username above.</p>
           : (
