@@ -19,14 +19,14 @@ import ShowManager from "../components/ShowManager";
 import DarkToggle, { WorkSurface } from "../components/DarkToggle";
 import { useSignedIn } from "../components/RequireAuth";
 import { currentProject, setCurrentProject } from "../lib/projects";
-import { createShow, deleteShow, forgetMemberPerms, listRoles, listShows, memberPerms, playableUrl, SCRIPT_LIMIT, updateShow, type Perm, type Role, type Show, type ShowMsg } from "../lib/shows";
+import { createShow, deleteShow, forgetMemberPerms, listRoles, listShows, memberPerms, PERMS, playableUrl, SCRIPT_LIMIT, updateShow, type Perm, type Role, type Show, type ShowMsg } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
 import { linksOf, loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
 import ShareButton from "../components/ShareButton";
 import WaveformEditor from "../components/WaveformEditor";
 import { fetchMedia } from "../lib/api";
-import { AudioEngine, decodeAudioUrl, makeReversedFile, peaks, VoicePool } from "../lib/audio";
+import { AudioEngine, decodeAudioUrl, liveVoiceOf, makeReversedFile, masterLevel, peaks, VoicePool, type HeldVoice } from "../lib/audio";
 import { listen, send, type Msg } from "../lib/bus";
 import { linkSequenceItems, unlinkSequenceItem } from "../lib/sequenceLinks";
 import { moved, useDragList } from "../lib/dragList";
@@ -88,6 +88,12 @@ const PANES = [
   { id: "script", label: "Script", icon: FileText },
 ] as const;
 type PaneId = (typeof PANES)[number]["id"];
+
+/**
+ * Holding a key repeats it about fifteen times a second. Riding a level up is exactly what that is
+ * for; firing cues and toggling pads at that rate is a stutter of sound rather than a control.
+ */
+const REPEATS_SAFELY: Action[] = ["volUp", "volDown", "speedUp", "speedDown", "reverbUp", "reverbDown", "zoomIn", "zoomOut"];
 
 export default function Studio() {
   // crossOrigin must be set before src/load so MediaElementAudioSourceNode is not silenced by CORS.
@@ -177,20 +183,28 @@ export default function Studio() {
    * "the whole show is too loud in this room" meant editing every cue. Scales what each voice plays
    * at rather than touching the stored effects, so it is a monitor control and never edits the show.
    */
-  const [master, setMaster] = useState(() => {
-    const held = Number(localStorage.getItem("cueflow:master"));
-    return Number.isFinite(held) && held >= 0 && held <= 1 ? held : 1;
-  });
+  const [master, setMaster] = useState(() => masterLevel(localStorage.getItem("cueflow:master")));
   const masterRef = useRef(master); masterRef.current = master;
   const commitMaster = () => { try { localStorage.setItem("cueflow:master", String(masterRef.current)); } catch { /* storage is off; the level still holds for this session */ } };
   /** What each voice would play at with the master wide open, so moving the master is not cumulative. */
   const voiceLevel = useRef(new Map<number, number>());
+  // Through the engine, not the element: a fade in flight ramps towards the engine's ceiling, so
+  // setting element.volume alone would be ramped straight back over.
   useEffect(() => {
     for (const voice of voices.current.all()) {
-      if (voice.trackId) voice.element.volume = (voiceLevel.current.get(voice.id) ?? 1) * master;
+      if (voice.trackId) voice.engine.level(voice.element, (voiceLevel.current.get(voice.id) ?? 1) * master);
     }
-    audio.current.volume = (selectedRef.current?.effects.volume ?? 1) * master;
+    engine.current.level(audio.current, (selectedRef.current?.effects.volume ?? 1) * master);
   }, [master]);
+  /**
+   * The pool outlives a render but not the page. Without this, two cues fired and then a walk to
+   * Settings left both still playing with the new pool unable to reach them.
+   */
+  useEffect(() => {
+    const pool = voices.current, editorElement = audio.current;
+    pool.onIdle = () => setVoiceTick(n => n + 1);
+    return () => { pool.onIdle = undefined; pool.stopAll(); editorElement.pause(); };
+  }, []);
   // `time` and `duration` used to live here. Only the Player reads them, and `timeupdate` fires
   // about four times a second, so holding them here re-rendered all of Studio -- the whole library
   // grid and cue list, each wrapped in `motion.div layout` -- four times a second during playback.
@@ -492,7 +506,7 @@ export default function Studio() {
     const src = editUrl && selected.id === selectedId ? editUrl : selected.url;
     const absolute = new URL(src, location.href).href;
     if (a.src !== absolute) { a.src = src; a.load(); }
-    engine.current.apply(a, selected.effects);
+    engine.current.apply(a, selected.effects, selected.effects.volume * masterRef.current);
   }, [selected?.id, selected?.url, selectedId, editUrl]);
 
   const lastSyncNote = useRef("");
@@ -539,7 +553,7 @@ export default function Studio() {
     const tick = () => {
       const fx = selectedRef.current?.effects;
       const fade = fx?.fadeOut ?? 0;
-      if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, fx!.volume * (a.duration - a.currentTime) / fade);
+      if (fade && Number.isFinite(a.duration) && a.duration - a.currentTime <= fade) a.volume = Math.max(0, fx!.volume * masterRef.current * (a.duration - a.currentTime) / fade);
     };
     const ended = () => setPlaying(false);
     a.addEventListener("timeupdate", tick); a.addEventListener("ended", ended);
@@ -548,8 +562,10 @@ export default function Studio() {
 
   // One place to run a bound key, whether it was pressed in this window or forwarded from the
   // audience one. Returns true if it matched something, so the caller can preventDefault.
-  const runKey = (key: string) => {
+  const runKey = (key: string, repeat = false) => {
     const action = (Object.keys(binds) as Action[]).find(a => binds[a] === key); if (!action) return false;
+    // Matched, and deliberately not run: the key still belongs to the desk, so it is still swallowed.
+    if (repeat && !REPEATS_SAFELY.includes(action)) return true;
     if ((action === "nextCue" || action === "prevCue" || action === "nextVisual" || action === "prevVisual") && !selectedSequence) return false;
     if ((action === "zoomIn" || action === "zoomOut") && !stage) return false;
     if (["volUp", "volDown", "speedUp", "speedDown", "reverbUp", "reverbDown"].includes(action) && !selected) return false;
@@ -589,11 +605,13 @@ export default function Studio() {
     if (el.tagName === "BUTTON" && (e.key === " " || e.key === "Enter")) return;
     // Number keys are the pads, and only while a deck is armed -- outside a show they are still
     // free for anything else, and inside one they are the fastest control on the desk.
-    if (armedRef.current && !e.metaKey && !e.ctrlKey && !e.altKey && /^[0-9]$/.test(e.key)) {
+    // `firePad` toggles, so a leaned-on number key started and stopped the sound fifteen times a
+    // second. The repeats are swallowed rather than passed on.
+    if (armedRef.current && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && /^[0-9]$/.test(e.key)) {
       if (firePadRef.current(e.key === "0" ? 9 : Number(e.key) - 1)) { e.preventDefault(); return; }
     }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
-    if (runKey(e.key)) e.preventDefault();
+    if (runKey(e.key, e.repeat)) e.preventDefault();
   };
   useEffect(() => {
     const keys = (e: KeyboardEvent) => onKeyDown.current(e);
@@ -634,7 +652,7 @@ export default function Studio() {
     "popup,width=460,height=760",
   );
 
-  const updateEffects = (fx: Effects) => { if (!selected) return; setTracks(all => patch(all, selected.id, { effects: fx })); engine.current.apply(audio.current, fx); };
+  const updateEffects = (fx: Effects) => { if (!selected) return; setTracks(all => patch(all, selected.id, { effects: fx })); engine.current.apply(audio.current, fx, fx.volume * masterRef.current); };
   /**
    * A slider drag is one edit, not sixty. Recording history per frame meant two
    * `JSON.stringify(all sequences)` plus a `structuredClone` of them plus a synchronous
@@ -652,15 +670,24 @@ export default function Studio() {
       sequenceRef.current = next;
       setSequences(next);
     } else updateEffects(fx);
-    engine.current.apply(audio.current, fx);
-    const sounding = voices.current.playing()[0];
-    if (sounding) sounding.engine.apply(sounding.element, fx);
+    engine.current.apply(audio.current, fx, fx.volume * masterRef.current);
+    // The armed cue's own voice, not whatever is newest: with a soundboard pad sounding over it,
+    // `playing()[0]` wrote cue 4's stored effects while changing the pad's live level.
+    const sounding = armedAudioItem ? voices.current.find(armedAudioItem.trackId) : voices.current.playing()[0];
+    if (sounding) { voiceLevel.current.set(sounding.id, fx.volume); sounding.engine.apply(sounding.element, fx, fx.volume * masterRef.current); }
   };
   const commitArmedEffects = () => {
     const before = armedDragFrom.current;
     armedDragFrom.current = null;
-    if (before) updateFeatures(state => recordHistory(state, before, sequenceRef.current, "Update armed cue effects"));
+    if (!before) return;
+    // The deck signature stands still during a drag, so anything the room needed to hear about that
+    // arrived while the slider was down goes out now.
+    resendRef.current();
+    updateFeatures(state => recordHistory(state, before, sequenceRef.current, "Update armed cue effects"));
   };
+  // A baseline belongs to one cue. Left standing across a cue change, the next drag's undo reverted
+  // every keyboard nudge made in between as well.
+  useEffect(() => { armedDragFrom.current = null; }, [armedAudioItem?.id]);
   const updateVisual = (visual: Visual) => { if (!selected) return; setTracks(all => patch(all, selected.id, { visual })); setStage(s => s && s.url === selected.url ? { ...s, visual } : s); };
   // A fresh edit invalidates whatever the element has loaded: swap the source and rewind rather than
   // let the transport keep playing the pre-edit audio.
@@ -713,7 +740,9 @@ export default function Studio() {
     if (range && lastPick.current >= 0 && index >= 0) {
       const [a, b] = [Math.min(lastPick.current, index), Math.max(lastPick.current, index)];
       lastPick.current = index;
-      return [...ids, ...tracks.slice(a, b + 1).map(t => t.id).filter(x => !ids.includes(x))];
+      // The rows on screen, not the whole library: the index came from the filtered list, so a range
+      // taken from `tracks` selected whatever happened to sit at those positions unfiltered.
+      return [...ids, ...shownTracks.slice(a, b + 1).map(t => t.id).filter(x => !ids.includes(x))];
     }
     lastPick.current = index;
     return ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
@@ -736,8 +765,7 @@ export default function Studio() {
     voiceLevel.current.set(voice.id, fx.volume);
     setVoiceTick(n => n + 1);
     try {
-      await voice.engine.play(voice.element, fx);
-      voice.element.volume = fx.volume * masterRef.current;
+      await voice.engine.play(voice.element, fx, fx.volume * masterRef.current);
     } catch { voices.current.release(voice); }
     setVoiceTick(n => n + 1);
   };
@@ -792,13 +820,15 @@ export default function Studio() {
     [voiceTick, playing, selected?.id],
   );
 
+  /** What the last press paused, so the next press can reach it however much has gone out since. */
+  const heldVoice = useRef<HeldVoice | null>(null);
   /** The voice a transport control acts on: whatever went out most recently and is still sounding. */
-  const liveVoice = () => voices.current.playing()[0] ?? voices.current.all().find(v => v.trackId) ?? null;
+  const liveVoice = () => liveVoiceOf(voices.current, heldVoice.current);
   const pauseOrResume = () => {
     const voice = liveVoice();
     if (!voice) { toggle(); return; }
-    if (voice.element.paused) void voice.element.play().catch(() => undefined);
-    else voice.element.pause();
+    if (voice.element.paused) { heldVoice.current = null; void voice.element.play().catch(() => undefined); }
+    else { voice.element.pause(); heldVoice.current = voice.trackId ? { voice, trackId: voice.trackId } : null; }
     setVoiceTick(n => n + 1);
   };
   const playCue = (i: number) => {
@@ -916,10 +946,14 @@ export default function Studio() {
    * Signature over what the room can actually see, so a resend happens when their copy is wrong and
    * not on every keystroke in the studio.
    */
-  const deckSignature = useMemo(
-    () => JSON.stringify([selectedSequence?.id, selectedSequence?.name, (selectedSequence?.items ?? []).map(it => [it.id, it.label, it.trackId]), cueLabels]),
-    [selectedSequence, cueLabels],
-  );
+  const deckSignatureHeld = useRef("");
+  const deckSignature = useMemo(() => {
+    // An armed effects drag replaces the sequences array every pointermove and changes nothing in
+    // here, so the last signature stands rather than being rebuilt sixty times a second. Whatever
+    // did change while the slider was down is resent by `commitArmedEffects`.
+    if (armedDragFrom.current) return deckSignatureHeld.current;
+    return (deckSignatureHeld.current = JSON.stringify([selectedSequence?.id, selectedSequence?.name, (selectedSequence?.items ?? []).map(it => [it.id, it.label, it.trackId]), cueLabels]));
+  }, [selectedSequence, cueLabels]);
   useEffect(() => {
     if (!liveShow || !showLink.ready) return;
     const timer = setTimeout(() => resendRef.current(), 200);
@@ -938,6 +972,9 @@ export default function Studio() {
   const onCrewMsg = async (msg: Extract<ShowMsg, { member: string }>, show: Show) => {
     const perms = await memberPerms(msg.member, show.id);
     if (!perms.length) return;
+    // Being held at the door has to restrict something. A device showing "Waiting to be let in"
+    // could still send a `fire` and the host played the cue.
+    if (msg.type !== "here" && roster.current.get(msg.member)?.state !== "in") return;
     if (msg.type === "here") {
       const known = roster.current.get(msg.member);
       const waiting = admissionRef.current && !admitted.current.has(msg.member);
@@ -973,11 +1010,28 @@ export default function Studio() {
       })));
     }
   };
+  /**
+   * A collaborator holds the show password, so calling the show on is theirs to do as well. The
+   * host's copy is still the one that gets written down -- and only for a device the server says
+   * holds the whole show, which is what the crew screen already requires of the button that sends
+   * this. An unchecked `end` stopped the performance and wrote `started_at = null` for anyone who
+   * knew the show id.
+   */
+  const onRunMsg = async (msg: Extract<ShowMsg, { type: "start" | "end" }>, member: string, show: Show) => {
+    const perms = await memberPerms(member, show.id);
+    if (perms.length !== PERMS.length) return;
+    const at = msg.type === "start" ? msg.at : null;
+    setLiveShow(held => (held && held.id === show.id ? { ...held, startedAt: at } : held));
+    void updateShow(show.id, { started_at: at });
+  };
   onShowMsg.current = msg => {
-    // A collaborator holds the show password, so calling the show on is theirs to do as well. The
-    // host's copy is still the one that gets written down.
-    if (msg.type === "start" && liveShow) { setLiveShow({ ...liveShow, startedAt: msg.at }); void updateShow(liveShow.id, { started_at: msg.at }); return; }
-    if (msg.type === "end" && liveShow) { setLiveShow({ ...liveShow, startedAt: null }); void updateShow(liveShow.id, { started_at: null }); return; }
+    // Every message from the room carries the member id the server handed out at the door, and one
+    // without it never came through the door. These two were acted on before that check was reached.
+    if (msg.type === "start" || msg.type === "end") {
+      const from = (msg as { member?: string }).member;
+      if (liveShow && from) void onRunMsg(msg, from, liveShow);
+      return;
+    }
     if (liveShow && "member" in msg) void onCrewMsg(msg, liveShow);
   };
   /** Both sides hold the link, and each cue has at most one partner, so an old pairing is dropped. */
@@ -1049,7 +1103,9 @@ export default function Studio() {
     if (!selected) return;
     const base = armed ? armedEffects : selected.effects;
     const next = { ...base, [key]: clamp(Number(base[key]) + delta, min, max) };
-    if (armed) updateArmedEffects(next); else updateEffects(next);
+    // Committed on the spot. A nudge opened an undo baseline that only a later slider release ever
+    // closed, so one Ctrl+Z reverted every press made in between along with that drag.
+    if (armed) { updateArmedEffects(next); commitArmedEffects(); } else updateEffects(next);
   };
   // Arms the deck without firing anything: cue 1 waits for the first arrow press, so nothing ever
   // hits the room the moment a window opens.
@@ -1434,7 +1490,7 @@ export default function Studio() {
               <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingIds={soundingIds} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
-              <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
+              <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} effectsDrag={armedDragFrom} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
             </Tab>
           </Tabs>
           )}
@@ -1866,7 +1922,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
   );
 }
 
-function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage, cueTimers = {}, setCueTimer, rehearsal = { active: false, completed: [], notes: {} }, onToggleRehearsal, onSaveRehearsalNote }: any) {
+function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage, effectsDrag, cueTimers = {}, setCueTimer, rehearsal = { active: false, completed: [], notes: {} }, onToggleRehearsal, onSaveRehearsalNote }: any) {
   // Which cue is waiting to be paired. Linking is two clicks, so the second one has to know.
   const [linking, setLinking] = useState("");
   const [cueMenuFor, setCueMenuFor] = useState<string | null>(null);
@@ -1925,8 +1981,9 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                     const held = cueDrag.drag?.to === i;
                     return (
                     // Layout animation is off mid-drag: an animating row reports a moving rectangle,
-                    // and the drop target is computed from those rectangles.
-                    <motion.li key={item.id} layout={!cueDrag.dragging} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setCueMenuFor(item.id); }}>
+                    // and the drop target is computed from those rectangles. Off during an armed
+                    // effects drag too, where every frame re-measures rows that are not moving.
+                    <motion.li key={item.id} layout={!cueDrag.dragging && !effectsDrag?.current} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setCueMenuFor(item.id); }}>
 
                       <div className={`relative flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5 ${cueMenuFor === item.id ? "z-30" : "z-0"} ${held ? "border-accent bg-accent/15 shadow-lg" : i === cueIndex ? "border-accent bg-accent/10" : "border-border bg-surface/50"}`}>
                         {/* A 15px icon is a 15px target. The grip fills the row's height and is wide

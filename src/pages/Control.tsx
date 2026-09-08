@@ -41,6 +41,10 @@ export default function Control() {
     const onKey = (event: KeyboardEvent) => {
       const el = event.target as HTMLElement;
       if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName) || el.isContentEditable) return;
+      // Only a bound key belongs to the desk. Swallowing every key ate the first Tab, and since the
+      // focus target on load is <body>, focus never reached a button and the exemption above could
+      // never fire: the panel was unusable by keyboard and by screen reader.
+      if (!Object.values(binds.current).includes(event.key)) return;
       send({ type: "key", key: event.key });
       event.preventDefault();
     };

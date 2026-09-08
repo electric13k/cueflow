@@ -16,45 +16,79 @@ const audioContextCtor = () => {
   return scope.AudioContext ?? scope.webkitAudioContext;
 };
 
+/**
+ * One realtime context for the whole desk.
+ *
+ * A context per engine meant eight voices plus the editor's, and browsers cap concurrent contexts
+ * around six (the decode cache below hit the same wall), so the last voices of a busy stack got no
+ * graph at all and silently lost gain, reverb, EQ and distortion. One context carries a source node
+ * per element quite happily, which is what a mixer is.
+ */
+let realtime: AudioContext | undefined;
+const realtimeContext = () => {
+  const Ctor = audioContextCtor();
+  if (!Ctor) return undefined;
+  try { return (realtime ??= new Ctor()); } catch { return undefined; }
+};
+
 export class AudioEngine {
   private context?: AudioContext; private source?: MediaElementAudioSourceNode; private output?: GainNode; private wet?: GainNode; private distortion?: WaveShaperNode; private reverb?: ConvolverNode; private element?: HTMLAudioElement; private eq: BiquadFilterNode[] = [];
+  /** The loudest this element may get: the cue's own volume, already scaled by the master fader. */
+  private ceiling = 1;
+  /** Which fade owns the ramp, so a re-fire supersedes the one before it rather than racing it. */
+  private fadeRun = 0;
   /** Build the graph lazily: constructing/resuming AudioContext during preload loses mobile activation. */
   private connect(element: HTMLAudioElement) {
     if (this.element === element) return;
-    this.element = element;
-    const Ctor = audioContextCtor();
-    if (!Ctor) return;
+    const context = realtimeContext();
+    if (!context) return;
     try {
-      this.context = new Ctor();
-      this.source = this.context.createMediaElementSource(element);
-      this.output = this.context.createGain(); this.wet = this.context.createGain();
-      this.distortion = this.context.createWaveShaper(); this.reverb = this.context.createConvolver();
+      this.source = context.createMediaElementSource(element);
+      this.output = context.createGain(); this.wet = context.createGain();
+      this.distortion = context.createWaveShaper(); this.reverb = context.createConvolver();
       // source -> distortion -> bass -> mid -> treble -> output, with a reverb send off the tone stack.
-      this.eq = BANDS.map(band => { const node = this.context!.createBiquadFilter(); node.type = band.type; node.frequency.value = band.freq; node.Q.value = 1; return node; });
+      this.eq = BANDS.map(band => { const node = context.createBiquadFilter(); node.type = band.type; node.frequency.value = band.freq; node.Q.value = 1; return node; });
       const toned = this.eq.reduce<AudioNode>((prev, node) => { prev.connect(node); return node; }, this.distortion);
       this.source.connect(this.distortion);
       toned.connect(this.output);
       toned.connect(this.reverb); this.reverb.connect(this.wet); this.wet.connect(this.output);
-      this.output.connect(this.context.destination);
+      this.output.connect(context.destination);
+      // Claimed only once the graph is really up. Claiming it first latched a failure for the whole
+      // session: the catch nulled the graph and this method then returned early forever.
+      this.context = context; this.element = element;
     } catch {
       // A CORS-tainted source or an older browser may reject the graph. Native media still works.
-      this.context = undefined; this.source = undefined; this.output = undefined; this.wet = undefined; this.distortion = undefined; this.reverb = undefined; this.eq = [];
+      this.context = undefined; this.source = undefined; this.output = undefined; this.wet = undefined; this.distortion = undefined; this.reverb = undefined; this.eq = []; this.element = undefined;
     }
   }
-  apply(element: HTMLAudioElement, fx: Effects) {
-    element.playbackRate = fx.speed; element.volume = fx.volume;
+  /** `ceiling` is what this element may actually reach; `fx.volume` is only what the cue asked for. */
+  apply(element: HTMLAudioElement, fx: Effects, ceiling = fx.volume) {
+    this.ceiling = ceiling; element.playbackRate = fx.speed; element.volume = ceiling;
     if (!this.context || !this.output || !this.wet || !this.distortion || !this.reverb || this.element !== element) return;
     const now = this.context.currentTime;
     this.output.gain.setTargetAtTime(fx.gain, now, .02); this.wet.gain.setTargetAtTime(fx.reverb, now, .02); this.distortion.curve = curve(fx.distortion); this.eq.forEach((node, i) => node.gain.setTargetAtTime(fx[BANDS[i].key] ?? 0, now, .02)); if (fx.reverb) this.reverb.buffer = impulse(this.context);
   }
-  async play(element: HTMLAudioElement, fx: Effects) {
-    this.connect(element); this.apply(element, fx);
-    if (fx.fadeIn) { element.volume = 0; const started = performance.now(); const fade = () => { element.volume = Math.min(fx.volume, fx.volume * (performance.now() - started) / (fx.fadeIn * 1000)); if (element.volume < fx.volume) requestAnimationFrame(fade); }; fade(); }
+  /** The master fader moving: a new ceiling, and none of the cue's stored effects touched. */
+  level(element: HTMLAudioElement, ceiling: number) { this.ceiling = ceiling; element.volume = ceiling; }
+  async play(element: HTMLAudioElement, fx: Effects, ceiling = fx.volume) {
+    this.connect(element); this.apply(element, fx, ceiling);
+    const run = ++this.fadeRun;
+    if (fx.fadeIn) { element.volume = 0; const started = performance.now(); const fade = () => { if (run !== this.fadeRun || (this.element && this.element !== element)) return; element.volume = Math.min(this.ceiling, this.ceiling * (performance.now() - started) / (fx.fadeIn * 1000)); if (element.volume < this.ceiling) requestAnimationFrame(fade); }; fade(); }
     // Call both operations synchronously while the click/tap activation is still live.
     const resume = this.context?.state === "suspended" ? this.context.resume().catch(() => undefined) : Promise.resolve();
     const playback = element.play();
     await Promise.all([resume, playback]);
   }
+}
+
+/**
+ * The stored master fader, read as text. `Number(null)` is 0 and 0 passes every range check, so an
+ * absent key came back as a shut master and a fresh install played every cue silent.
+ */
+export function masterLevel(raw: string | null) {
+  if (!raw?.trim()) return 1;
+  const held = Number(raw);
+  return Number.isFinite(held) && held >= 0 && held <= 1 ? held : 1;
 }
 /**
  * Several sounds at once.
@@ -83,6 +117,8 @@ export const DEFAULT_VOICES = 8;
 
 export class VoicePool {
   private voices: Voice[] = [];
+  /** Told whenever a voice frees itself, so the desk can redraw what is still sounding. */
+  onIdle?: (voice: Voice) => void;
   constructor(
     private readonly size = DEFAULT_VOICES,
     private readonly makeElement: () => HTMLAudioElement = () => Object.assign(new Audio(), { crossOrigin: "anonymous", preload: "auto" }),
@@ -103,6 +139,9 @@ export class VoicePool {
     if (free) { free.trackId = trackId; free.startedAt = this.now(); return free; }
     if (this.voices.length < this.size) {
       const made: Voice = { id: this.voices.length, element: this.makeElement(), engine: new AudioEngine(), trackId, startedAt: this.now() };
+      // Nothing else lets a voice go. Without this a finished sound keeps its trackId, so the
+      // transport re-binds to a cue that is already over and its pad stays lit.
+      made.element.addEventListener("ended", () => { if (made.trackId === null) return; made.trackId = null; this.onIdle?.(made); });
       this.voices.push(made);
       return made;
     }
@@ -122,6 +161,21 @@ export class VoicePool {
   playing(): Voice[] {
     return this.voices.filter(v => v.trackId && !v.element.paused).sort((a, b) => b.startedAt - a.startedAt);
   }
+}
+
+/** A voice a transport press paused, pinned to the sound it was holding at the time. */
+export type HeldVoice = { voice: Voice; trackId: string };
+
+/**
+ * The voice a transport control acts on.
+ *
+ * Re-deriving it on every press stranded sounds: pause a bed, pause a sting over it, and the next
+ * press resumed whichever was newest while the other was left mid-file with nothing pointing at it.
+ * A press that paused something is remembered, so the press after it reaches that same sound.
+ */
+export function liveVoiceOf(pool: VoicePool, held: HeldVoice | null): Voice | null {
+  if (held && held.voice.trackId === held.trackId && held.voice.element.paused) return held.voice;
+  return pool.playing()[0] ?? pool.all().find(v => v.trackId) ?? null;
 }
 
 export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return new File([encodeWav(reversed)], `${name}-reversed.wav`, { type: "audio/wav" }); }
