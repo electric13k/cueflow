@@ -32,20 +32,31 @@ describe("pick", () => {
     expect(pick(here, remote, rowShape(here))).toBe("remote");
   });
 
-  it("falls back to the newer timestamp when both sides changed", () => {
+  it("keeps the copy in front of the operator when both sides changed", () => {
+    // Deliberately not the newer timestamp. `updatedAt` is set by the database trigger and
+    // refreshed only by a pull, so a local row carries the time the *server* last wrote it, never
+    // the time anybody typed. Comparing it against a server-set remote value made the other device
+    // win every real conflict, and the unsaved edit disappeared off the screen with nothing said.
     const here = track("a", { title: "Mine", updatedAt: "2026-05-01T10:00:00Z" });
     const remote = track("a", { title: "Theirs", updatedAt: "2026-05-01T11:00:00Z" });
-    expect(pick(here, remote, "something-else-entirely")).toBe("remote");
+    expect(pick(here, remote, "something-else-entirely")).toBe("here");
   });
 
-  it("keeps this device's copy on a tie, rather than taking work off the screen", () => {
-    const at = "2026-05-01T10:00:00Z";
-    expect(pick(track("a", { title: "Mine", updatedAt: at }), track("a", { title: "Theirs", updatedAt: at }), "base")).toBe("here");
+  it("still keeps this device's copy when the remote one looks older", () => {
+    const here = track("a", { title: "Mine", updatedAt: "2026-05-01T11:00:00Z" });
+    const remote = track("a", { title: "Theirs", updatedAt: "2026-05-01T10:00:00Z" });
+    expect(pick(here, remote, "diverged")).toBe("here");
   });
 
   it("keeps this device's copy when neither side has a timestamp yet", () => {
     // Before the migration lands there is nothing to compare, so the visible copy stands.
     expect(pick(track("a", { title: "Mine" }), track("a", { title: "Theirs" }), "base")).toBe("here");
+  });
+
+  it("does not mistake an unsaved local row for one the other device deleted", () => {
+    // No baseline entry means this device made the row and has not saved it yet. Treating that as a
+    // remote delete is what silently swallowed a track on its second merge.
+    expect(pick(track("a", { title: "Mine" }), track("a", { title: "Theirs" }), undefined)).toBe("here");
   });
 });
 

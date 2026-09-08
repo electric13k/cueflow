@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { toast } from "./toast";
 import type { Sequence, SequenceItem, Track } from "../types";
 // Supabase publishable credentials are safe to ship in a browser build. The fallback keeps the
 // static Pages deployment functional when its build environment is not injected by Cloudflare.
@@ -115,26 +116,57 @@ function tombstone(id: string) { const t = tombstones(); t.add(id); local.set("d
 
 /** Storage path out of a public object URL: …/object/public/audio/public/<file> -> public/<file> */
 const storagePath = (publicUrl: string) => publicUrl.split("/object/public/audio/")[1] ?? null;
+/** The same path as the storage API itself names it: decoded, and without any download query. */
+const objectPath = (publicUrl: string) => {
+  const path = storagePath(publicUrl);
+  return path ? decodeURIComponent(path.split("?")[0]) : null;
+};
 
-export async function deleteTrackEverywhere(id: string, url: string) {
-  tombstone(id);
-  if (!supabase || !isUuid(id)) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from("sequence_items").delete().eq("track_id", id);
-  await supabase.from("tracks").delete().eq("id", id).eq("user_id", user.id);
-  // The audio itself lives in a public bucket, leaving it behind would keep it playable by URL.
-  const path = storagePath(url);
-  if (path) await supabase.storage.from("audio").remove([decodeURIComponent(path)]);
+export type DeleteResult = { ok: boolean; reason?: string };
+
+/**
+ * supabase-js resolves with an `{ error }` rather than throwing, so a call whose error is never read
+ * is a no-op that reads exactly like a success. Both helpers below are called fire-and-forget, so
+ * the only place a refused delete can be reported from is here: without it the row stays in the
+ * cloud, the audio stays playable by its public URL, and the only thing hiding either is a local
+ * tombstone list that is capped and eventually evicts.
+ */
+function deleteFailed(what: string, failures: string[]): DeleteResult {
+  if (!failures.length) return { ok: true };
+  toast(`${what} is still in your account`, `${failures[0]} It is hidden on this device; removing it again once the connection is back will finish the job.`, "warn");
+  return { ok: false, reason: failures[0] };
 }
 
-export async function deleteSequenceEverywhere(id: string) {
+export async function deleteTrackEverywhere(id: string, url: string): Promise<DeleteResult> {
   tombstone(id);
-  if (!supabase || !isUuid(id)) return;
+  if (!supabase || !isUuid(id)) return { ok: true };
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from("sequence_items").delete().eq("sequence_id", id);
-  await supabase.from("sequences").delete().eq("id", id).eq("user_id", user.id);
+  if (!user) return { ok: true };
+  const failures: string[] = [];
+  const { error: cues } = await supabase.from("sequence_items").delete().eq("track_id", id);
+  if (cues) failures.push(cues.message);
+  const { error: row } = await supabase.from("tracks").delete().eq("id", id).eq("user_id", user.id);
+  if (row) failures.push(row.message);
+  // The audio itself lives in a public bucket, leaving it behind would keep it playable by URL.
+  const path = objectPath(url);
+  if (path) {
+    const { error: blob } = await supabase.storage.from("audio").remove([path]);
+    if (blob) failures.push(blob.message);
+  }
+  return deleteFailed("That sound", failures);
+}
+
+export async function deleteSequenceEverywhere(id: string): Promise<DeleteResult> {
+  tombstone(id);
+  if (!supabase || !isUuid(id)) return { ok: true };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: true };
+  const failures: string[] = [];
+  const { error: cues } = await supabase.from("sequence_items").delete().eq("sequence_id", id);
+  if (cues) failures.push(cues.message);
+  const { error: row } = await supabase.from("sequences").delete().eq("id", id).eq("user_id", user.id);
+  if (row) failures.push(row.message);
+  return deleteFailed("That sequence", failures);
 }
 /**
  * What the last save actually did. Every call used to discard its error, so a rejected write looked
@@ -161,7 +193,10 @@ const writeSignature = (tracks: Track[], sequences: Sequence[], projectId: strin
 export function persist(tracks: Track[], sequences: Sequence[], projectId: string | null = null): Promise<SyncState> {
   const signature = writeSignature(tracks, sequences, projectId);
   if (signature === lastWriteSignature && !queued) return Promise.resolve({ cloud: !!supabase, ok: true });
-  const job = () => write(tracks, sequences, projectId).then(result => { if (result.ok) lastWriteSignature = signature; return result; });
+  // Only a write that actually reached the cloud counts as written. A signed-out save also returns
+  // `ok`, and remembering its signature meant the first save after signing in matched it, returned
+  // without writing and rendered "saved" -- so nothing left the device until the next edit.
+  const job = () => write(tracks, sequences, projectId).then(result => { if (result.ok && result.cloud) lastWriteSignature = signature; return result; });
   queued = job;
   const run = inFlight.then(async () => {
     if (queued !== job) return { cloud: true, ok: true } as SyncState; // a newer save superseded this one
@@ -182,6 +217,9 @@ async function write(tracks: Track[], sequences: Sequence[], projectId: string |
   const cloudTracks = tracks.filter(track => isUuid(track.id));
   const { error: trackError } = await supabase.from("tracks").upsert(cloudTracks.map(track => ({
     id: track.id, user_id: user.id, title: track.title, source_url: track.url,
+    // Nothing wrote `storage_path`, so the retention sweep could not tell a member's upload from an
+    // ownerless guest one and put every file under `public/` on the 30-day guest clock.
+    storage_path: track.storagePath ?? objectPath(track.url),
     effects: track.effects, kind: track.kind ?? "audio", visual: track.visual ? { ...track.visual, ...(track.slides ? { deckSlides: track.slides } : {}) } : null,
     project_id: projectId,
   })));
@@ -196,7 +234,12 @@ async function write(tracks: Track[], sequences: Sequence[], projectId: string |
   // A cue can only be stored once its sound is, so drop the ones whose track never made it rather
   // than losing the whole sequence to a foreign-key error.
   const saved = new Set(cloudTracks.map(track => track.id));
+  // Two different things were both counted as "skipped" and both reported as saved. A cue whose
+  // sound is demo material or some other non-UUID id was never cloud material and is nobody's
+  // problem; a cue dropped because its id was already taken, or because the sound it points at is
+  // not in the library, is work that silently did not leave the device and has to be said out loud.
   let skipped = 0;
+  let lost = 0;
   // Upsert, then remove what is no longer there. Deleting first left a window in which the rows were
   // gone, and anything that read or wrote during it saw a sequence with no cues.
   const seen = new Set<string>();
@@ -204,11 +247,11 @@ async function write(tracks: Track[], sequences: Sequence[], projectId: string |
     const items = sequence.items.filter(item => {
       // The same cue id landing in two sequences -- which a bad merge can produce -- is a primary
       // key collision waiting to happen. Keep the first one and drop the copy.
-      if (!saved.has(item.trackId) || seen.has(item.id)) return false;
+      if (seen.has(item.id)) { lost += 1; return false; }
+      if (!saved.has(item.trackId)) { if (isUuid(item.trackId)) lost += 1; else skipped += 1; return false; }
       seen.add(item.id);
       return true;
     });
-    skipped += sequence.items.length - items.length;
     if (items.length) {
       const { error } = await supabase.from("sequence_items").upsert(items.map((item, position) => ({
         id: item.id, sequence_id: sequence.id, track_id: item.trackId, position,
@@ -222,6 +265,10 @@ async function write(tracks: Track[], sequences: Sequence[], projectId: string |
     const { error: gone } = items.length ? await stale.not("id", "in", `(${items.map(i => i.id).join(",")})`) : await stale;
     if (gone) return { cloud: true, ok: false, reason: gone.message };
   }
+  if (lost) return {
+    cloud: true, ok: false, skipped: skipped + lost,
+    reason: `${lost} ${lost === 1 ? "cue is" : "cues are"} not in your account: the sound behind ${lost === 1 ? "it is" : "them are"} no longer in this library.`,
+  };
   return { cloud: true, ok: true, skipped };
 }
 /**
@@ -237,6 +284,9 @@ const BASELINE = "syncBase";
 type Baseline = Record<string, string>;
 const baseline = () => local.get<Baseline>(BASELINE, {});
 const saveBaseline = (next: Baseline) => local.set(BASELINE, next);
+/** Which deck a cue sat in, and what order a sequence's cues came back in, at the last sync. */
+const deckKey = (id: string) => `deck:${id}`;
+const orderKey = (id: string) => `order:${id}`;
 
 /** Row identity for comparison: everything the user can change, and nothing the server sets. */
 export const rowShape = (row: unknown) => {
@@ -250,23 +300,23 @@ export const rowShape = (row: unknown) => {
 };
 const shapeOf = rowShape;
 
-const when = (value?: string) => (value ? Date.parse(value) || 0 : 0);
-
 /**
  * Which copy of a row to keep.
  *
- * The first two branches are the ones that matter and neither needs a clock: if this device has not
- * touched the row since the last sync, the other device's copy is simply newer, and vice versa. Only
- * when both changed is there a real conflict, and then the newer `updatedAt` wins with a tie going
- * to what is already on screen -- taking someone's work away in front of them is the worse failure.
+ * The branch that matters needs no clock: if this device has not touched the row since the last
+ * sync, the other device's copy is simply newer.
+ *
+ * When both sides changed there is no honest tie-break to reach for, so the copy in front of the
+ * operator stands. `updatedAt` is written by the database trigger and refreshed only by a pull, so
+ * the local value is the time the *server* last wrote the row and never the time anybody typed:
+ * comparing it against a server-set remote one made the other device win by construction, and an
+ * unsaved edit vanished off the screen with nothing said. Losing the visible copy is the worse of
+ * the two failures, and the one the operator cannot see coming.
  */
-export function pick<T extends { updatedAt?: string }>(here: T, remote: T, base?: string): "here" | "remote" {
+export function pick<T>(here: T, remote: T, base?: string): "here" | "remote" {
   const mine = shapeOf(here);
-  const theirs = shapeOf(remote);
-  if (mine === theirs) return "here";
-  if (base !== undefined && base === mine) return "remote";
-  if (base !== undefined && base === theirs) return "here";
-  return when(remote.updatedAt) > when(here.updatedAt) ? "remote" : "here";
+  if (mine === shapeOf(remote)) return "here";
+  return base !== undefined && base === mine ? "remote" : "here";
 }
 
 /**
@@ -282,97 +332,156 @@ export function pick<T extends { updatedAt?: string }>(here: T, remote: T, base?
  */
 export function mergeInto(tracks: Track[], sequences: Sequence[], cloud: { tracks: Track[]; sequences: Sequence[] }) {
   const base = baseline();
-  const next: Baseline = {};
-  const keep = (id: string, row: unknown) => { next[id] = shapeOf(row); };
+  const remoteTracks = new Map(cloud.tracks.map(track => [track.id, track]));
+  const remoteSequences = new Map(cloud.sequences.map(sequence => [sequence.id, sequence]));
+  const owner = deckOwners(sequences, cloud.sequences, base);
 
   const mergedTracks: Track[] = [];
-  const remoteTracks = new Map(cloud.tracks.map(track => [track.id, track]));
+  const haveTrack = new Set<string>();
   for (const here of tracks) {
+    haveTrack.add(here.id);
     if (isDeleted(here.id)) continue;
     const remote = remoteTracks.get(here.id);
-    if (!remote) {
-      // In the baseline but gone from the cloud means another device deleted it. Not in the
-      // baseline means this device made it and it has not been saved yet.
-      if (base[here.id] !== undefined) continue;
-      mergedTracks.push(here);
-      keep(here.id, here);
-      continue;
-    }
-    remoteTracks.delete(here.id);
-    const winner = pick(here, remote, base[here.id]) === "remote" ? { ...here, ...remote } : here;
-    mergedTracks.push(winner);
-    keep(here.id, winner);
+    // In the baseline but gone from the cloud means another device deleted it. Not in the
+    // baseline means this device made it and it has not been saved yet.
+    if (!remote) { if (base[here.id] === undefined) mergedTracks.push(here); continue; }
+    mergedTracks.push(pick(here, remote, base[here.id]) === "remote" ? { ...here, ...remote } : here);
   }
-  for (const remote of remoteTracks.values()) {
-    if (isDeleted(remote.id)) continue;
+  for (const remote of cloud.tracks) {
+    if (isDeleted(remote.id) || haveTrack.has(remote.id)) continue;
     mergedTracks.push(remote);
-    keep(remote.id, remote);
   }
 
   const mergedSequences: Sequence[] = [];
-  const remoteSequences = new Map(cloud.sequences.map(sequence => [sequence.id, sequence]));
+  const haveSequence = new Set<string>();
   for (const here of sequences) {
+    haveSequence.add(here.id);
     if (isDeleted(here.id)) continue;
     const remote = remoteSequences.get(here.id);
     if (!remote) {
       if (base[here.id] !== undefined) continue;
-      mergedSequences.push(here);
-      keep(here.id, here);
-      here.items.forEach(item => keep(item.id, item));
+      mergedSequences.push({ ...here, items: mergeItems(here.id, here.items, [], base, owner) });
       continue;
     }
-    remoteSequences.delete(here.id);
     const fields = pick(here, remote, base[here.id]) === "remote" ? { ...here, ...remote } : here;
-    const items = mergeItems(here.items, remote.items, base, keep);
-    const merged = { ...fields, items };
-    mergedSequences.push(merged);
-    keep(merged.id, merged);
+    mergedSequences.push({ ...fields, items: mergeItems(here.id, here.items, remote.items, base, owner) });
   }
-  for (const remote of remoteSequences.values()) {
-    if (isDeleted(remote.id)) continue;
-    const items = remote.items.filter(item => !isDeleted(item.id));
-    mergedSequences.push({ ...remote, items });
-    keep(remote.id, remote);
-    items.forEach(item => keep(item.id, item));
+  for (const remote of cloud.sequences) {
+    if (isDeleted(remote.id) || haveSequence.has(remote.id)) continue;
+    mergedSequences.push({ ...remote, items: mergeItems(remote.id, [], remote.items, base, owner) });
   }
 
-  // One cue id can only live in one deck. Held across the whole merge, not per sequence: a cue that
-  // moved decks on another device arrives in both copies, and saving both is a key collision.
-  const held = new Set<string>();
-  for (const sequence of mergedSequences) {
-    sequence.items = sequence.items.filter(item => !held.has(item.id) && (held.add(item.id), true));
-  }
-
-  saveBaseline(next);
+  saveBaseline(confirmed(base, tracks, sequences, cloud));
   return { tracks: mergedTracks, sequences: mergedSequences };
+}
+
+/**
+ * Which deck each cue belongs in, decided once for the whole merge.
+ *
+ * A cue dragged from one sequence to another arrives in both copies, and a sequence looked at on its
+ * own cannot tell that move from a duplicate: it saw a cue it did not have and took it, so a move
+ * made here came back undone with the cue in both decks. Comparing both decks against the deck the
+ * cloud last reported answers it properly, and it also answers the question a per-sequence merge
+ * cannot: the side that moved the cue is the side that owns it.
+ */
+function deckOwners(here: Sequence[], remote: Sequence[], base: Baseline) {
+  const hereDecks = new Map<string, string>();
+  const cloudDecks = new Map<string, string>();
+  for (const sequence of here) for (const item of sequence.items) hereDecks.set(item.id, sequence.id);
+  for (const sequence of remote) for (const item of sequence.items) cloudDecks.set(item.id, sequence.id);
+
+  const owner = new Map<string, string>();
+  for (const id of new Set([...hereDecks.keys(), ...cloudDecks.keys()])) {
+    const hereDeck = hereDecks.get(id);
+    const cloudDeck = cloudDecks.get(id);
+    const was = base[deckKey(id)];
+    // Gone from one side. If the side that still has it has not moved it either, the other side
+    // deleted it and the delete stands. A move is an edit, not an absence, so it survives.
+    if (hereDeck === undefined) { if (cloudDeck !== undefined && was !== cloudDeck) owner.set(id, cloudDeck); continue; }
+    if (cloudDeck === undefined) { if (was !== hereDeck) owner.set(id, hereDeck); continue; }
+    // In both, and in different decks: whoever moved it away from the deck the cloud last reported
+    // owns it, and when that is nobody or both, the deck in front of the operator wins.
+    owner.set(id, was === hereDeck && cloudDeck !== hereDeck ? cloudDeck : hereDeck);
+  }
+  return owner;
 }
 
 /**
  * The cues of one sequence, from both sides.
  *
- * Order comes from the remote copy for anything both sides know about, because `position` is what
- * the database stores and what every other device will agree on. A cue this device added and has not
- * saved yet has no agreed position, so it is appended rather than dropped.
+ * Which cues belong here is already settled; what is left is their content and their order. Order is
+ * three-way like everything else: the cloud's order is taken only when this device has not moved
+ * anything since the last sync, so an unsaved rearrangement is not reverted on the next ping. It
+ * used to be taken unconditionally, on the grounds that `position` is what the database stores.
  */
-function mergeItems(here: SequenceItem[], remote: SequenceItem[], base: Baseline, keep: (id: string, row: unknown) => void) {
-  const mine = new Map(here.map(item => [item.id, item]));
+function mergeItems(sequenceId: string, here: SequenceItem[], remote: SequenceItem[], base: Baseline, owner: Map<string, string>) {
+  const belongs = (id: string) => owner.get(id) === sequenceId && !isDeleted(id);
+  const mine = new Map(here.filter(item => belongs(item.id)).map(item => [item.id, item]));
+  const theirs = new Map(remote.filter(item => belongs(item.id)).map(item => [item.id, item]));
+  const hereOrder = [...mine.keys()];
+  const cloudOrder = [...theirs.keys()];
+
+  // Compared over the cues that are still in this deck, so one cue added or deleted elsewhere does
+  // not read as though the whole thing had been rearranged.
+  const live = new Set([...hereOrder, ...cloudOrder]);
+  const stored = base[orderKey(sequenceId)];
+  const was = stored === undefined ? null : stored.split(",").filter(id => live.has(id)).join(",");
+  const takeCloud = was !== null && hereOrder.join(",") === was && cloudOrder.join(",") !== was;
+
   const out: SequenceItem[] = [];
-  for (const theirs of remote) {
-    if (isDeleted(theirs.id)) continue;
-    const ours = mine.get(theirs.id);
-    mine.delete(theirs.id);
-    const winner = !ours ? theirs : (pick(ours, theirs, base[theirs.id]) === "remote" ? { ...ours, ...theirs } : ours);
-    out.push(winner);
-    keep(winner.id, winner);
-  }
-  for (const ours of mine.values()) {
-    if (isDeleted(ours.id)) continue;
-    // Known at the last sync and absent from the cloud now: deleted on another device.
-    if (base[ours.id] !== undefined) continue;
-    out.push(ours);
-    keep(ours.id, ours);
-  }
+  const added = new Set<string>();
+  const push = (id: string) => {
+    if (added.has(id)) return;
+    const ours = mine.get(id);
+    const other = theirs.get(id);
+    const row = ours && other ? (pick(ours, other, base[id]) === "remote" ? { ...ours, ...other } : ours) : ours ?? other;
+    if (!row) return;
+    added.add(id);
+    out.push(row);
+  };
+  for (const id of takeCloud ? cloudOrder : hereOrder) push(id);
+  for (const id of takeCloud ? hereOrder : cloudOrder) push(id);
   return out;
+}
+
+/**
+ * The baseline this merge earns: exactly what the cloud just said about every row it mentioned, and
+ * nothing at all for a row it did not have.
+ *
+ * It used to record the merge winner, which meant a row whose write had not landed -- an unsaved
+ * edit, a failed save, a cue the write deliberately skipped -- was written down as confirmed by a
+ * cloud that had never seen it. The next merge then read "in the baseline, absent from the cloud" as
+ * deleted on another device and dropped it, and the save after that removed it from the cloud too.
+ * Two merge cycles is nothing: a realtime ping, a remount, a manual sync, a double-invoked effect.
+ *
+ * Rows this merge never looked at are left where they are rather than wiped. The baseline is one map
+ * for every project, and replacing it wholesale erased the entries for the project just left, so
+ * going back made every row there look brand new and re-uploaded ones another device had deleted.
+ */
+function confirmed(base: Baseline, tracks: Track[], sequences: Sequence[], cloud: { tracks: Track[]; sequences: Sequence[] }) {
+  const next: Baseline = { ...base };
+  const forget = (id: string) => { delete next[id]; delete next[deckKey(id)]; };
+
+  const cloudTracks = new Set(cloud.tracks.map(track => track.id));
+  for (const track of cloud.tracks) next[track.id] = shapeOf(track);
+  for (const track of tracks) if (!cloudTracks.has(track.id)) forget(track.id);
+
+  const cloudSequences = new Set(cloud.sequences.map(sequence => sequence.id));
+  const cloudItems = new Set<string>();
+  for (const sequence of cloud.sequences) {
+    next[sequence.id] = shapeOf(sequence);
+    next[orderKey(sequence.id)] = sequence.items.map(item => item.id).join(",");
+    for (const item of sequence.items) {
+      cloudItems.add(item.id);
+      next[item.id] = shapeOf(item);
+      next[deckKey(item.id)] = sequence.id;
+    }
+  }
+  for (const sequence of sequences) {
+    if (!cloudSequences.has(sequence.id)) { forget(sequence.id); delete next[orderKey(sequence.id)]; }
+    for (const item of sequence.items) if (!cloudItems.has(item.id)) forget(item.id);
+  }
+  return next;
 }
 
 /**
@@ -385,10 +494,14 @@ function mergeItems(here: SequenceItem[], remote: SequenceItem[], base: Baseline
  * Coalesced, because one drag of a cue produces a burst of row changes and re-merging per row would
  * be both wasteful and visibly jumpy.
  */
-export function watchCloud(projectId: string | null, onChange: () => void, wait = 400) {
+export function watchCloud(projectId: string | null, onChange: () => void, wait = 400, onLive?: (live: boolean) => void) {
   const client = supabase;
   if (!client) return () => {};
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  let channel: ReturnType<typeof client.channel> | null = null;
+  let attempt = 0;
+  let stopped = false;
   const ping = () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(onChange, wait);
@@ -396,14 +509,33 @@ export function watchCloud(projectId: string | null, onChange: () => void, wait 
   // The topic includes the project so switching projects cannot leave a channel listening for the
   // one you left. Realtime rejects a second channel on the same topic in a tab, so this must differ
   // from the `show:<id>` topic the running show uses.
-  const channel = client.channel(`cueflow:data:${projectId ?? "personal"}`);
-  for (const table of ["tracks", "sequences", "sequence_items"]) {
-    channel.on("postgres_changes", { event: "*", schema: "public", table }, ping);
-  }
-  channel.subscribe();
+  const topic = `cueflow:data:${projectId ?? "personal"}`;
+  const open = () => {
+    const live = client.channel(topic);
+    channel = live;
+    for (const table of ["tracks", "sequences", "sequence_items"]) {
+      live.on("postgres_changes", { event: "*", schema: "public", table }, ping);
+    }
+    // The status was thrown away, so a subscription that never came up -- realtime switched off, an
+    // expired token, a timeout -- left the app silently back where it started, two people in one
+    // project neither of them seeing the other. Say so, and keep trying.
+    live.subscribe(status => {
+      if (status === "SUBSCRIBED") { attempt = 0; onLive?.(true); return; }
+      if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") return;
+      console.warn(`cueflow: realtime ${status} on ${topic}`);
+      onLive?.(false);
+      if (stopped) return;
+      void client.removeChannel(live);
+      channel = null;
+      retry = setTimeout(open, Math.min(30_000, 1_000 * 2 ** attempt++));
+    });
+  };
+  open();
   return () => {
+    stopped = true;
     if (timer) clearTimeout(timer);
-    void client.removeChannel(channel);
+    if (retry) clearTimeout(retry);
+    if (channel) void client.removeChannel(channel);
   };
 }
 
@@ -424,24 +556,52 @@ type SequenceRow = Stamped & { id: string; name: string; created_at: string };
 type ItemRow = Stamped & { id: string; sequence_id: string; track_id: string; label: string; effects: SequenceItem["effects"]; visual?: (NonNullable<SequenceItem["visual"]> & { deckSlideIndex?: number }) | null; link?: string | null; position: number };
 
 let updatedAtProbe: Promise<boolean> | null = null;
+/** Postgres says 42703 when a column is not there. Anything else is a failed request, not an answer. */
+const columnMissing = (error: { code?: string } | null) => error?.code === "42703";
+/**
+ * Only a "yes" is remembered. Treating every error as "the column is missing" and caching it for the
+ * tab meant one offline blip on the probe turned the merge timestamp-blind for the rest of the
+ * session, and a "no" cached the same way meant applying the migration changed nothing until reload.
+ * An inconclusive probe throws, so a caller can decline to merge rather than merge against a guess.
+ */
 export function hasUpdatedAt(): Promise<boolean> {
   return (updatedAtProbe ??= (async () => {
     if (!supabase) return false;
     const { error } = await supabase.from("tracks").select("updated_at").limit(1);
-    return !error;
-  })());
+    if (!error) return true;
+    if (columnMissing(error)) return false;
+    throw new Error(error.message);
+  })().then(
+    yes => { if (!yes) updatedAtProbe = null; return yes; },
+    error => { updatedAtProbe = null; throw error; },
+  ));
 }
 
+export type CloudCopy = { tracks: Track[]; sequences: Sequence[] };
+
+/**
+ * What the cloud holds, or why it could not be read.
+ *
+ * `null` is "there is nothing to pull": no cloud in this build, or nobody signed in. `false` is "the
+ * pull failed", which is a different thing entirely and used to be reported as the same `null`.
+ *
+ * The distinction is not cosmetic. Every query's error went unread and a missing sub-query result
+ * was coerced to an empty array, so one transient PostgREST failure arrived as a sequence with no
+ * cues: the merge read that as every cue having been deleted on another device, dropped them, and
+ * the next save deleted them from the cloud as well, all of it reported as a successful sync. A pull
+ * that cannot be trusted must stop the merge, not feed it.
+ */
 // A project scopes every read: its own library, its own sequences. No project means the
 // personal one, which is every row that was here before projects existed.
-export async function hydrateCloud(projectId: string | null = null) { if (!supabase) return null; const { data: { user } } = await supabase.auth.getUser(); if (!user) return null;
+export async function hydrateCloud(projectId: string | null = null): Promise<CloudCopy | null | false> { if (!supabase) return null; const { data: { user } } = await supabase.auth.getUser(); if (!user) return null;
   // Row-level security already limits this to rows you own or projects you belong to, so the only
   // question left is which of the two: a project's shared library, or the personal one. Filtering
   // by user_id as well would hide a collaborator's work, which is the whole point of a project.
   const where = projectId ? `eq.${projectId}` : "is.null";
   // Two spellings of each select rather than one built by hand: postgrest-js reads the column list
   // as a literal type, and a string it cannot see at compile time gives back no row type at all.
-  const stamped = await hasUpdatedAt();
+  let stamped: boolean;
+  try { stamped = await hasUpdatedAt(); } catch { return false; }
   const [trackResult, sequenceResult] = await Promise.all([
     stamped
       ? supabase.from("tracks").select("id,title,source_url,effects,kind,visual,created_at,updated_at").or(`project_id.${where}`)
@@ -450,16 +610,20 @@ export async function hydrateCloud(projectId: string | null = null) { if (!supab
       ? supabase.from("sequences").select("id,name,created_at,updated_at").or(`project_id.${where}`)
       : supabase.from("sequences").select("id,name,created_at").or(`project_id.${where}`),
   ]);
+  if (trackResult.error || sequenceResult.error) return false;
   const tracks = trackResult.data as (TrackRow[] | null);
   const sequences = sequenceResult.data as (SequenceRow[] | null);
-  if (!tracks || !sequences) return null;
+  if (!tracks || !sequences) return false;
   const ids = sequences.map(sequence => sequence.id);
   const itemColumns = "id,sequence_id,track_id,label,effects,visual,link,position";
   const itemQuery = ids.length
     ? (stamped
       ? await supabase.from("sequence_items").select(`${itemColumns},updated_at`).in("sequence_id", ids).order("position")
       : await supabase.from("sequence_items").select(itemColumns).in("sequence_id", ids).order("position"))
-    : { data: [] };
-  const items = itemQuery.data as (ItemRow[] | null);
-  return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, kind: row.kind ?? "audio", visual: row.visual ?? undefined, slides: row.visual?.deckSlides ?? undefined, createdAt: row.created_at, updatedAt: row.updated_at ?? undefined } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, updatedAt: sequence.updated_at ?? undefined, items: (items ?? []).filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects, visual: item.visual ?? undefined, slideIndex: item.visual?.deckSlideIndex ?? undefined, link: item.link ?? undefined, updatedAt: item.updated_at ?? undefined } as SequenceItem)) } as Sequence)) };
+    : { data: [] as unknown[], error: null };
+  // A failed cue query used to become `(items ?? [])`, one line of coercion that emptied every
+  // sequence in the show and then wrote the emptying back to the cloud.
+  if (itemQuery.error || !itemQuery.data) return false;
+  const items = itemQuery.data as ItemRow[];
+  return { tracks: tracks.map(row => ({ id: row.id, title: row.title, url: row.source_url, effects: row.effects, kind: row.kind ?? "audio", visual: row.visual ?? undefined, slides: row.visual?.deckSlides ?? undefined, createdAt: row.created_at, updatedAt: row.updated_at ?? undefined } as Track)), sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, createdAt: sequence.created_at, updatedAt: sequence.updated_at ?? undefined, items: items.filter(item => item.sequence_id === sequence.id).map(item => ({ id: item.id, trackId: item.track_id, label: item.label, effects: item.effects, visual: item.visual ?? undefined, slideIndex: item.visual?.deckSlideIndex ?? undefined, link: item.link ?? undefined, updatedAt: item.updated_at ?? undefined } as SequenceItem)) } as Sequence)) };
 }
