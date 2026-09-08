@@ -70,6 +70,14 @@ export async function listFriends(): Promise<Friend[]> {
 }
 
 /**
+ * `%` and `_` are wildcards to `ilike`, and `\` escapes them. Passing a name through unescaped turns
+ * "look up one person" into "match a pattern": `a%` with `maybeSingle()` answers whether exactly one
+ * account starts with an `a`, and walking the alphabet that way reads out the whole directory, uid
+ * included. Escaping makes the pattern mean the literal name the user typed.
+ */
+export const likeLiteral = (name: string) => name.replace(/[\\%_]/g, match => `\\${match}`);
+
+/**
  * Ask somebody, by username.
  *
  * Username only, deliberately. `profiles` has no email column on purpose -- being findable by name
@@ -81,16 +89,24 @@ export async function askFriend(username: string): Promise<void> {
   const { data: { user } } = await client.auth.getUser();
   if (!user) throw new Error("Sign in first.");
   const name = username.trim();
-  const { data: found } = await client.from("profiles").select("id").ilike("username", name).maybeSingle();
+  if (!name) throw new Error("Type a username first.");
+  const { data: found } = await client.from("profiles").select("id").ilike("username", likeLiteral(name)).maybeSingle();
   if (!found) throw new Error("No one here goes by that name.");
   if (found.id === user.id) throw new Error("That is you.");
-  const { error } = await client.from("friendships").insert({ requester: user.id, addressee: found.id });
+  const { error } = await client.from("friendships").insert({ requester: user.id, addressee: found.id, accepted: false });
   // 23505 is the unique index: the pair already exists, in one direction or the other.
   if (error) throw new Error(error.code === "23505" ? "You have already asked them." : error.message);
 }
 
+/**
+ * Accepting goes through a function rather than an update.
+ *
+ * Row-level security is exactly that: a policy letting the addressee set `accepted` on their row also
+ * lets them rewrite `requester`, which would let anyone hand a stranger a friendship they never
+ * asked for. `accept_friendship` can touch one column and checks who is calling.
+ */
 export async function acceptFriend(id: string): Promise<void> {
-  const { error } = await need().from("friendships").update({ accepted: true }).eq("id", id);
+  const { error } = await need().rpc("accept_friendship", { p_request: id });
   if (error) throw new Error(error.message);
 }
 
