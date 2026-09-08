@@ -30,12 +30,19 @@ export type Msg =
 
 export type ControlCue = { id: string; label: string; number: string; kind: string };
 
-const channel = () => ("BroadcastChannel" in globalThis ? new BroadcastChannel("cueflow") : null);
+// `typeof` rather than `in`: a runtime can carry the name without a usable constructor (an older
+// webview, a page under a strict policy), and `new undefined()` throws where the whole point of the
+// guard is that a missing second window costs the operator nothing.
+const channel = () => {
+  try { return typeof BroadcastChannel === "function" ? new BroadcastChannel("cueflow") : null; }
+  catch { return null; }
+};
 let out: BroadcastChannel | null = null;
 
 export function send(msg: Msg) {
   out ??= channel();
-  out?.postMessage(msg);
+  try { out?.postMessage(msg); }
+  catch { out = null; }   // the channel was closed under us; the next send opens a fresh one
 }
 
 export function listen(on: (msg: Msg) => void) {
