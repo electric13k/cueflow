@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ShowMsg } from "./shows";
 import { backoffFor, createShowLink, QUEUE_LIMIT } from "./showLink";
+import { PayloadTooLarge } from "./transport";
 import type { Capability, Router, Transport } from "./transport";
 
 const cue = (index: number): ShowMsg => ({ type: "cue", index, label: String(index + 1) });
@@ -14,6 +15,7 @@ const capability: Capability = { maxPayload: 100_000, latency: "low", reach: "lo
  */
 function fakeOpener(script: (attempt: number) => "up" | "down" | "throw") {
   const sent: ShowMsg[] = [];
+  const refuses = new Set<ShowMsg>();
   let attempts = 0;
   let live = false;
   let announce: ((id: string | null) => void) | null = null;
@@ -32,7 +34,12 @@ function fakeOpener(script: (attempt: number) => "up" | "down" | "throw") {
     return {
       get transport() { return live ? "fake" : null; },
       get capability() { return live ? capability : null; },
-      send(msg) { if (!live) throw new Error("No link to the room, so nothing was sent."); sent.push(msg); },
+      send(msg) {
+        if (!live) throw new Error("No link to the room, so nothing was sent.");
+        // A link that physically cannot carry it, which is what a BLE MTU does to a long script.
+        if (refuses.has(msg)) throw new PayloadTooLarge("fake", 20_000, 8_192);
+        sent.push(msg);
+      },
       close() { live = false; },
     };
   };
@@ -41,6 +48,10 @@ function fakeOpener(script: (attempt: number) => "up" | "down" | "throw") {
     opener,
     sent,
     get attempts() { return attempts; },
+    /** Mark one message as more than this link can carry. */
+    refuse: (msg: ShowMsg) => refuses.add(msg),
+    /** The wire goes down without the link being closed, which is what arms the retry. */
+    drop: () => { live = false; announce?.(null); },
     /** The wire comes back without a fresh `openShowLink`, the way the router's own failover does. */
     revive: () => { live = true; announce?.("fake"); },
   };
@@ -108,6 +119,15 @@ describe("createShowLink", () => {
     await settle();
     for (let i = 0; i < QUEUE_LIMIT + 10; i++) link.send(cue(i));
     expect(link.queued).toBe(QUEUE_LIMIT);
+
+    // Which ones survived is the whole point, and a count alone passes just as happily if the
+    // newest were the ones thrown away. The last cue pressed is the one that still matters.
+    wire.revive();
+    await settle();
+    const kept = wire.sent.map(m => (m as { index: number }).index);
+    expect(kept).toHaveLength(QUEUE_LIMIT);
+    expect(kept[kept.length - 1]).toBe(QUEUE_LIMIT + 9);
+    expect(kept[0]).toBe(10);
   });
 
   it("greets again on a reconnect, because the deck it holds may be stale", async () => {
@@ -192,5 +212,47 @@ describe("createShowLink", () => {
     await settle();
     expect(link.transport).toBe("fake");
     expect(changes).toContain("fake");
+  });
+
+  it("does not tear down a link that recovered on its own", async () => {
+    // The retry armed when the transport dropped used to survive the recovery and fire a second
+    // later against a router that was by then working: the show went off the wire for as long as a
+    // join takes, the deck was re-sent, and the peer saw a fresh sequence range.
+    const wire = fakeOpener(() => "up");
+    const clock = manualClock();
+    const link = createShowLink({ show: "s1", transports: [], onMessage: () => {}, open: wire.opener, delay: clock.delay });
+    await settle();
+
+    wire.drop();
+    await settle();
+    expect(clock.scheduled).toBe(1);
+
+    wire.revive();
+    await settle();
+    expect(clock.scheduled).toBe(0);
+
+    // Run whatever is left. Nothing should reopen, so the original attempt still stands alone.
+    await clock.tick();
+    await settle();
+    expect(wire.attempts).toBe(1);
+    expect(link.transport).toBe("fake");
+  });
+
+  it("tells the caller when a message is too big, instead of retrying it for ever", async () => {
+    // Requeueing one is worse than dropping it: it is re-sent on every flush, and because the queue
+    // evicts from the front, a deck too large for the link shifts the real cues out behind it.
+    const refused: ShowMsg[] = [];
+    const wire = fakeOpener(() => "up");
+    const big = { ...cue(1), label: "x" };
+    const link = createShowLink({
+      show: "s1", transports: [], onMessage: () => {}, open: wire.opener,
+      onRefused: msg => refused.push(msg),
+    });
+    await settle();
+    wire.refuse(big);
+    link.send(big);
+    await settle();
+    expect(refused).toEqual([big]);
+    expect(link.queued).toBe(0);
   });
 });

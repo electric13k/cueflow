@@ -99,15 +99,33 @@ export function createShowLink(options: ShowLinkOptions): ShowLinkHandle {
     if (queue.length > QUEUE_LIMIT) queue.shift();
   };
 
-  const flush = (open: Router) => {
-    const greeting = options.hello?.();
-    if (greeting) { try { open.send(greeting); } catch { push(greeting); } }
-    const waiting = queue;
-    queue = [];
-    for (const msg of waiting) {
-      try { open.send(msg); } catch { push(msg); }
+  /**
+   * Send it, or decide whether it is worth keeping.
+   *
+   * A message no link can carry must not go back on the queue. Retrying it forever is worse than
+   * dropping it: it is re-sent on every flush, and since `push` appends while the queue evicts from
+   * the front, a deck too big for a Bluetooth link quietly shifts the real cues out behind it. The
+   * caller is told instead, because "the script is too long to send over Bluetooth" is something the
+   * operator can act on and a silently missing cue is not.
+   */
+  const deliver = (open: Router, msg: ShowMsg) => {
+    try { open.send(msg); }
+    catch (error) {
+      if (error instanceof PayloadTooLarge) { options.onRefused?.(msg, error); return; }
+      push(msg);
     }
   };
+
+  const flush = (open: Router) => {
+    const greeting = options.hello?.();
+    if (greeting) deliver(open, greeting);
+    const waiting = queue;
+    queue = [];
+    for (const msg of waiting) deliver(open, msg);
+  };
+
+  /** Drop a retry that is no longer wanted, so it cannot fire against a link that has recovered. */
+  const unschedule = () => { cancelRetry?.(); cancelRetry = null; };
 
   const schedule = () => {
     if (closed || cancelRetry) return;
@@ -126,6 +144,10 @@ export function createShowLink(options: ShowLinkOptions): ShowLinkHandle {
         if (closed) return;
         options.onTransport?.(id);
         if (!id) { schedule(); return; }
+        // The link failed over and recovered on its own. Without this the retry armed a moment ago
+        // still fires, closes a working router and reconnects from scratch, which takes the show off
+        // the wire for as long as a join takes and hands the peer a fresh sequence range.
+        unschedule();
         attempt = 0;
         // On the first connect this fires before `router` is assigned; the block below flushes.
         if (router) flush(router);
@@ -149,14 +171,13 @@ export function createShowLink(options: ShowLinkOptions): ShowLinkHandle {
       if (closed) return;
       const open = router;
       if (!open?.transport) { push(msg); return; }
-      try { open.send(msg); } catch { push(msg); }
+      deliver(open, msg);
     },
     reopen() {
       if (closed) return;
       // Drop any pending retry first, or it fires later against the router this call replaces and
       // tears down a link that is by then working.
-      cancelRetry?.();
-      cancelRetry = null;
+      unschedule();
       attempt = 0;
       router?.close();
       router = null;
@@ -165,8 +186,7 @@ export function createShowLink(options: ShowLinkOptions): ShowLinkHandle {
     },
     close() {
       closed = true;
-      cancelRetry?.();
-      cancelRetry = null;
+      unschedule();
       router?.close();
       router = null;
       queue = [];

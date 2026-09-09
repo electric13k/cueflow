@@ -121,6 +121,10 @@ describe("openShowLink", () => {
     lan.drop();
     await vi.waitFor(() => expect(router.transport).toBe("cloud"));
     expect(changed).toHaveBeenLastCalledWith("cloud");
+    // And the dead one is actually closed. Dropping the reference is not enough: a channel left
+    // registered keeps auto-rejoining with its handler still bound, so five blips across an evening
+    // leave six of them parsing every envelope that arrives.
+    expect(lan.closes).toBe(1);
   });
 
   it("hands a received message up, unwrapped", async () => {

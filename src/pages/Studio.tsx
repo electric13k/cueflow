@@ -842,7 +842,10 @@ export default function Studio() {
     if (linked) fire(linked);
     if (featureRef.current.rehearsal.active) markRehearsed(item.id);
     updateFeatures(state => ({ ...state, runHistory: [...state.runHistory, { id: crypto.randomUUID(), at: new Date().toISOString(), type: "cue" as const, sequenceId: selectedSequence.id, sequenceName: selectedSequence.name, cueIndex: i, label: cueLabels[i] ?? String(i + 1) }].slice(-500) }));
-    sendShow({ type: "cue", index: i, label: cueLabels[i] ?? String(i + 1) });
+    // Which list the index counts in. The deck resend is debounced behind a sequence switch, so a
+    // Go pressed inside that window used to reach the crew before the new deck did and highlight,
+    // and play, position i of the sequence that had just stopped running.
+    sendShow({ type: "cue", index: i, label: cueLabels[i] ?? String(i + 1), sequence: selectedSequence.id });
     if (armed && !loopSeq && i === selectedSequence.items.length - 1) {
       const ids = showSequenceIds();
       const next = sequences.find(sequence => sequence.id === ids[ids.indexOf(selectedSequence.id) + 1]);
@@ -977,6 +980,13 @@ export default function Studio() {
     if (msg.type !== "here" && roster.current.get(msg.member)?.state !== "in") return;
     if (msg.type === "here") {
       const known = roster.current.get(msg.member);
+      // Removal has to survive a reconnect. A removed device keeps its link and re-announces on
+      // every blip, and this is the one branch that does not consult the roster, so it used to put
+      // that device straight back in and hand it a fresh deck with nobody touching anything.
+      if (known?.state === "out") {
+        sendShow({ type: "door", member: msg.member, state: "out", note: "Removed from this show." });
+        return;
+      }
       const waiting = admissionRef.current && !admitted.current.has(msg.member);
       roster.current.set(msg.member, { name: msg.who, role: msg.role, perms, at: Date.now(), state: waiting ? "waiting" : "in" });
       showRoster();

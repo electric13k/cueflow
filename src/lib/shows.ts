@@ -160,7 +160,9 @@ export type ShowMsg =
    * sequences mid-show turned a crew "Go" on cue 4 into whatever now sat at position 4.
    */
   | { type: "deck"; to?: string; show: string; sequence: string; cues: DeckCue[]; index: number; script?: string; stage?: { url: string; kind: string; label: string; slideIndex?: number } | null }
-  | { type: "cue"; index: number; label: string }
+  /** `sequence` is which list the index counts in. Without it a Go that overtakes a deck resend
+   *  lands on whatever now sits at that position in the sequence the operator just left. */
+  | { type: "cue"; index: number; label: string; sequence?: string }
   | { type: "start"; at: string }
   | { type: "end" }
   /**
@@ -212,9 +214,13 @@ export function forgetMemberPerms(member?: string) {
 export async function memberPerms(member: string, showId: string): Promise<Perm[]> {
   if (!member || !supabase) return [];
   const held = ticketCache.get(member);
-  const fresh = held && Date.now() - held.at < TICKET_TTL
+  const usable = held && Date.now() - held.at < TICKET_TTL;
+  // An answer is worth caching; a failure is not. Caching one meant a single dropped request denied
+  // a member who genuinely holds `fire` for the next fifteen seconds, silently, while the wire and
+  // the ticket were both fine. Forget it instead, so the next cue asks again.
+  const fresh = usable
     ? held.ticket
-    : refreshTicket(member).catch(() => null);
+    : refreshTicket(member).catch(() => { ticketCache.delete(member); return null; });
   if (fresh !== held?.ticket) ticketCache.set(member, { at: Date.now(), ticket: fresh });
   const ticket = await fresh;
   // A real member of some other show is still a stranger to this one.

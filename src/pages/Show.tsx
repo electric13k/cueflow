@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input } from "../ui";
-import { Lock, Maximize, MessageSquare, Send, Unlock, Volume2, VolumeX, X } from "lucide-react";
+import { Bluetooth, Lock, Maximize, MessageSquare, Send, Unlock, Volume2, VolumeX, X } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import DarkToggle from "../components/DarkToggle";
 import CurtainTransition from "../components/CurtainTransition";
@@ -15,6 +15,7 @@ import {
   type DeckCue, type Perm, type ShowMsg, type Ticket,
 } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
+import { bluetoothPossible, bluetoothWanted, enableBluetooth } from "../lib/transports/ble";
 import { currentProject } from "../lib/projects";
 import { getProfile } from "../lib/account";
 import { supabase } from "../lib/store";
@@ -126,6 +127,8 @@ export default function Show() {
    */
   const voices = useRef(new VoicePool(4));
   const [soundOn, setSoundOn] = useState(false);
+  /** Whether this device has been told it may use Bluetooth. Survives a remount within the session. */
+  const [btOn, setBtOn] = useState(() => bluetoothWanted());
   const [soundNote, setSoundNote] = useState("");
   const cuesRef = useRef<DeckCue[]>([]);
   const soundOnRef = useRef(false); soundOnRef.current = soundOn;
@@ -203,34 +206,74 @@ export default function Show() {
     });
   }, [ticket?.member]);
 
-  const onShowMsg = (msg: ShowMsg) => {
-    if (msg.type === "deck") {
-      // A deck can be addressed: the host tailors it to one member's perms. One meant for somebody
-      // else is not ours to apply, and applying it would blank a list we can legitimately see.
-      if (msg.to && msg.to !== ticketRef.current?.member) return;
-      setDeckSequence(msg.sequence ?? "");
-      setCues(msg.cues); cuesRef.current = msg.cues; setIndex(msg.index);
-      setStage(msg.stage ? { ...msg.stage, kind: msg.stage.kind as Kind, visual: { ...defaultVisual(), muted: true }, n: Date.now() } : null);
-      // Arrives from another device, so it is untrusted markup: sanitise before it can be rendered.
-      if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
-    }
-    if (msg.type === "cue") { setIndex(msg.index); setNote(`Cue ${msg.label}`); playCueHere(cuesRef.current[msg.index]); }
-    if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
-    if (msg.type === "end") { setStarted(null); setNote("Show ended"); voices.current.stopAll(); }
-    if (msg.type === "flash") show(msg.text);
+  /**
+   * Which device we are taking the show from.
+   *
+   * `deck`, `cue`, `start`, `end` and `flash` are the host talking, and none of them carries a
+   * member id, so until this existed the page acted on them from whoever sent them. The show topic
+   * is joinable by anyone holding the show id, which meant a stranger could blank a crew screen with
+   * a forged `door`, or advance the index and fire audio on every phone in the building with a
+   * forged `cue`. We pin the sender the first deck came from and ignore the rest.
+   *
+   * This narrows the hole rather than closing it: a device that wins the race to send the first deck
+   * still gets believed. Closing it properly needs an authenticated topic, which is a server change.
+   */
+  const hostRef = useRef<string | null>(null);
+  /** Set once the host removes us, so the re-announce below cannot quietly undo the removal. */
+  const removedRef = useRef(false);
+
+  const onShowMsg = (msg: ShowMsg, from: string) => {
+    // The door is the one host message addressed to a member, so it can be checked without the pin.
     if (msg.type === "door") {
       if (msg.member !== ticketRef.current?.member) return;
+      if (hostRef.current && from !== hostRef.current) return;
       setDoor({ state: msg.state, note: msg.note });
-      if (msg.state === "out") { setCues([]); setDoc(emptyDoc()); setStage(null); voices.current.stopAll(); }
+      if (msg.state === "out") {
+        removedRef.current = true;
+        setCues([]); setDoc(emptyDoc()); setStage(null); voices.current.stopAll();
+      } else if (msg.state === "in") {
+        removedRef.current = false;
+      }
       // A job can be rewritten while the show runs, and until now the change only reached a device
       // that happened to reload -- so somebody could still be holding powers already taken away.
       if (msg.perms) {
         setTicket(held => (held ? { ...held, role: msg.role ?? held.role, perms: msg.perms ?? held.perms } : held));
       }
+      return;
     }
+
+    if (msg.type === "deck") {
+      // A deck can be addressed: the host tailors it to one member's perms. One meant for somebody
+      // else is not ours to apply, and applying it would blank a list we can legitimately see.
+      if (msg.to && msg.to !== ticketRef.current?.member) return;
+      if (hostRef.current && from !== hostRef.current) return;
+      hostRef.current = from;
+      setDeckSequence(msg.sequence ?? "");
+      setCues(msg.cues); cuesRef.current = msg.cues; setIndex(msg.index);
+      setStage(msg.stage ? { ...msg.stage, kind: msg.stage.kind as Kind, visual: { ...defaultVisual(), muted: true }, n: Date.now() } : null);
+      // Arrives from another device, so it is untrusted markup: sanitise before it can be rendered.
+      if (msg.script !== undefined) setDoc(d => ({ ...d, html: clean(msg.script ?? ""), name: d.name || "Script" }));
+      return;
+    }
+
+    // Everything below is the host running the show. No pinned host means no deck has arrived, so
+    // there is nothing these could correctly act on anyway.
+    if (!hostRef.current || from !== hostRef.current) return;
+
+    if (msg.type === "cue") {
+      // The deck resend is debounced behind a sequence switch, so a Go pressed inside that window
+      // used to arrive before the new list and fire position 4 of the sequence that just stopped
+      // running. An index only means something against the list it was counted in.
+      if (msg.sequence && msg.sequence !== deckSequenceRef.current) return;
+      setIndex(msg.index); setNote(`Cue ${msg.label}`); playCueHere(cuesRef.current[msg.index]);
+    }
+    if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
+    if (msg.type === "end") { setStarted(null); setNote("Show ended"); voices.current.stopAll(); }
+    if (msg.type === "flash") show(msg.text);
   };
   const ticketRef = useRef(ticket); ticketRef.current = ticket;
   const handlerRef = useRef(onShowMsg); handlerRef.current = onShowMsg;
+  const deckSequenceRef = useRef(deckSequence); deckSequenceRef.current = deckSequence;
   /**
    * `here` is what asks the host for the deck, and it used to be sent the instant the channel object
    * existed -- before the socket had joined -- so it was routinely dropped and the device sat on
@@ -239,9 +282,13 @@ export default function Show() {
    */
   const link = useShowLink(
     ticket?.show ?? null,
-    msg => handlerRef.current(msg),
+    (msg, from) => handlerRef.current(msg, from),
     () => {
       const held = ticketRef.current;
+      // A removed device kept greeting on every reconnect, and the host's `here` branch is the one
+      // path that does not consult the roster, so it let itself straight back in and was handed a
+      // fresh deck. Removal has to survive a dropped connection to mean anything.
+      if (removedRef.current) return null;
       return held ? { type: "here", who: myNameRef.current || held.name, role: held.role, member: held.member } : null;
     },
   );
@@ -250,11 +297,19 @@ export default function Show() {
   // whatever was typed into the join box the first time this browser joined anything.
   useEffect(() => {
     const held = ticketRef.current;
-    if (!held || !link.ready || !myName) return;
+    if (!held || !link.ready || !myName || removedRef.current) return;
     link.send({ type: "here", who: myName, role: held.role, member: held.member });
   }, [myName, link.ready]);
 
-  useEffect(() => () => { if (curtainTimer.current) window.clearTimeout(curtainTimer.current); }, []);
+  // Leaving the page has to stop the sound. A VoicePool holds real Audio elements, so without this
+  // a crew member who navigated away mid-cue kept hearing it to the end of the file with no UI left
+  // anywhere to stop it.
+  const voicesRef = voices;
+  useEffect(() => () => {
+    if (curtainTimer.current) window.clearTimeout(curtainTimer.current);
+    window.clearTimeout(flashTimer.current);
+    voicesRef.current.stopAll();
+  }, []);
 
   // Locked in: once the show starts, the screen is the show and nothing else. Fullscreen is a
   // request, not a command -- a browser can refuse it, so the layout does the work either way.
@@ -324,6 +379,21 @@ export default function Show() {
             ? <span className="flex items-center gap-1 text-xs text-ready"><Volume2 size={13} aria-hidden />Sound on</span>
             : <Button size="sm" variant="flat" startContent={<VolumeX size={14} aria-hidden />} onPress={enableSound}>
                 Turn sound on
+              </Button>)}
+          {/*
+            * The only way the Bluetooth transport is ever reachable.
+            *
+            * `bleTransport.available()` answers false until this is pressed, because `requestDevice`
+            * puts the browser's own chooser on screen and refuses to run from a background probe. So
+            * without a control the transport sat first in the list and was never once considered,
+            * and a venue with no internet got no link at all rather than a fallback. The press has
+            * to be the same gesture that opens the chooser, which is why `reopen` exists.
+            */}
+          {bluetoothPossible() && (btOn
+            ? <span className="flex items-center gap-1 text-xs text-ready"><Bluetooth size={13} aria-hidden />Bluetooth on</span>
+            : <Button size="sm" variant="flat" startContent={<Bluetooth size={14} aria-hidden />}
+                onPress={() => { enableBluetooth(); setBtOn(true); link.reopen(); }}>
+                Use Bluetooth
               </Button>)}
           {!started && <Button size="sm" variant="light" onPress={() => { forgetTicket(); setTicket(null); }}>Leave</Button>}
         </div>

@@ -71,7 +71,10 @@ type GattCharacteristicLike = {
   writeValueWithoutResponse?: (value: BufferSource) => Promise<void>;
   writeValue?: (value: BufferSource) => Promise<void>;
   startNotifications: () => Promise<GattCharacteristicLike>;
+  /** Optional because a stub in a test, or an older implementation, may not have it. */
+  stopNotifications?: () => Promise<GattCharacteristicLike>;
   addEventListener: (type: string, listener: (event: Event) => void) => void;
+  removeEventListener: (type: string, listener: (event: Event) => void) => void;
   value?: DataView;
 };
 
@@ -143,7 +146,7 @@ export const bleTransport: Transport = {
     device.addEventListener("gattserverdisconnected", drop);
 
     await outbox.startNotifications();
-    outbox.addEventListener("characteristicvaluechanged", event => {
+    const onValue = (event: Event) => {
       const value = (event.target as unknown as GattCharacteristicLike).value;
       if (!value) return;
       const done = join.accept(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
@@ -154,7 +157,8 @@ export const bleTransport: Transport = {
       if (!envelope || envelope.v !== 1 || envelope.show !== show) return;
       if (relayTtl(done.ttl) === null && done.ttl <= 0) return;
       onEnvelope(envelope);
-    });
+    };
+    outbox.addEventListener("characteristicvaluechanged", onValue);
 
     /**
      * `writeValueWithoutResponse` is what makes this usable: with a response, every frame costs a
@@ -189,6 +193,11 @@ export const bleTransport: Transport = {
       close() {
         status = "closed";
         device.removeEventListener("gattserverdisconnected", drop);
+        // Both halves of the notification, not just the disconnect handler. Leaving them attached
+        // meant every transport switch stacked another live listener feeding envelopes into the
+        // reassembler of a link that had already been closed.
+        outbox.removeEventListener("characteristicvaluechanged", onValue);
+        void outbox.stopNotifications?.().catch(() => undefined);
         join.forget();
         try { device.gatt?.disconnect(); } catch { /* already gone */ }
       },
