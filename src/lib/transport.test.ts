@@ -168,12 +168,12 @@ describe("openShowLink", () => {
     const lan = fake("lan");
     const first = await openShowLink("show-1", [lan.transport], () => {});
     first.send(cue(0));
-    const before = lan.sent.at(-1)!.seq;
+    const before = lan.sent[lan.sent.length - 1].seq;
     // A second router stands in for the same device after a reload: same persisted id, so its
     // numbers have to carry on from where the last run stopped rather than collide with it.
     const again = await openShowLink("show-1", [lan.transport], () => {});
     again.send(cue(1));
-    expect(lan.sent.at(-1)!.seq).toBeGreaterThan(before);
+    expect(lan.sent[lan.sent.length - 1].seq).toBeGreaterThan(before);
   });
 
   it("does not act on its own message coming back off the wire", async () => {

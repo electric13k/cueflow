@@ -289,9 +289,9 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
                 </>
               )}
           <div className="flex flex-wrap items-center gap-2">
-            <Tooltip content="Smaller text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.max(12, s - 2))}><Minus size={14} /></Button></Tooltip>
+            <Tooltip content="Smaller text"><Button aria-label="Smaller text" size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.max(12, s - 2))}><Minus size={14} /></Button></Tooltip>
             <span className="w-10 text-center text-xs tabular-nums text-muted">{size}px</span>
-            <Tooltip content="Bigger text"><Button size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.min(48, s + 2))}><Plus size={14} /></Button></Tooltip>
+            <Tooltip content="Bigger text"><Button aria-label="Bigger text" size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.min(48, s + 2))}><Plus size={14} /></Button></Tooltip>
             <label className="inline-flex items-center gap-1 text-xs text-muted">
               Colour
               <input type="color" aria-label="Text colour" value={colour || "#d8cfc4"} onChange={e => setColour(e.target.value)}
@@ -349,7 +349,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
               <Input className="min-w-40 flex-1" size="sm" placeholder="Words, comma separated" value={c.words} onValueChange={v => editCue(c.id, { words: v })} />
               <Input className="min-w-40 flex-1" size="sm" placeholder="Message to flash (optional)" value={c.message} onValueChange={v => editCue(c.id, { message: v })} />
               <Switch size="sm" isSelected={c.warn !== false} onValueChange={enabled => editCue(c.id, { warn: enabled })}>Yellow</Switch>
-              <Button size="sm" variant="light" isIconOnly onPress={() => setCues(doc.cues.filter(x => x.id !== c.id))}><Trash2 size={14} /></Button>
+              <Button aria-label={`Remove the cue for ${c.words || "no word yet"}`} size="sm" variant="light" isIconOnly onPress={() => setCues(doc.cues.filter(x => x.id !== c.id))}><Trash2 size={14} /></Button>
             </div>
           ))}
           <div className="mt-4 max-w-xl rounded-2xl border border-border/70 bg-surface/35 px-4 py-3">

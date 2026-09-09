@@ -1,4 +1,9 @@
 # Single-page app: every route is served by index.html and matched client-side. Cloudflare Pages
 # reads this file; Netlify reads the same rule from netlify.toml. Functions under /api are matched
 # before redirects on both, so this does not shadow them.
+#
+# A missing file under /assets/ would be answered by this rule too, which is wrong: `_headers` marks
+# that prefix immutable for a year, so the browser would cache index.html under a JavaScript URL and
+# never ask again. `functions/assets/[[path]].ts` turns that case back into a 404. It cannot be
+# expressed here, because Pages only honours redirect codes and the 200 rewrite in this file.
 /*    /index.html   200

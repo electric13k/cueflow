@@ -40,7 +40,7 @@ function ModulePanel({ m, v, off, onVisual, onToggle, children }: {
         <span className="hidden text-xs text-muted sm:inline">{m.hint}</span>
         <Tooltip content={`Reset ${m.label.toLowerCase()}`}>
           <span className="ml-auto">
-            <Button size="sm" variant="light" isIconOnly isDisabled={!on || !moduleTouched(v, m)}
+            <Button aria-label={`Reset ${m.label.toLowerCase()}`} size="sm" variant="light" isIconOnly isDisabled={!on || !moduleTouched(v, m)}
               onPress={() => onVisual(resetModule(v, m))}><RotateCcw size={14} /></Button>
           </span>
         </Tooltip>

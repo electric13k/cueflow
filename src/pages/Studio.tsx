@@ -1669,7 +1669,7 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
                         <GripVertical size={14} aria-hidden />
                       </span>
                       <Tooltip content={isChecked ? `Cue ${pick + 1} of the selection, click to drop it` : "Select (shift-click to take a run)"}>
-                        <Button isIconOnly size="sm" variant={isChecked ? "solid" : "light"} color={isChecked ? "primary" : "default"} onPress={(e: any) => onToggleSelect(t.id, i, !!e?.shiftKey)}>
+                        <Button aria-label={isChecked ? `Drop ${t.title} from the selection` : `Select ${t.title}`} aria-pressed={isChecked} isIconOnly size="sm" variant={isChecked ? "solid" : "light"} color={isChecked ? "primary" : "default"} onPress={(e: any) => onToggleSelect(t.id, i, !!e?.shiftKey)}>
                           {isChecked ? <span className="text-xs font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
                         </Button>
                       </Tooltip>
@@ -1894,7 +1894,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
   const kind = kindOf(track);
   const heading = (
     <div><p className="label-cap text-accent">Non-destructive editor</p>
-      <h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button><CoachHelp id="editor" /></h2></div>
+      <h2 className="flex items-center gap-2 text-xl font-bold capitalize">{track.title}<Button aria-label={`Rename ${track.title}`} isIconOnly size="sm" variant="light" onPress={onRename}><Pencil size={15} /></Button><CoachHelp id="editor" /></h2></div>
   );
   if (kind !== "audio") return (
     <div className="mt-5 space-y-6">
@@ -2039,10 +2039,10 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                           {/* The chevrons are the mouse's answer to reordering; a thumb has the grip
                               and they are the two controls a 375px row can least afford. */}
                           <span className="hidden sm:contents">
-                            <Tooltip content="Move up"><Button isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button></Tooltip>
-                            <Tooltip content="Move down"><Button isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
+                            <Tooltip content="Move up"><Button aria-label={`Move ${item.label} up`} isIconOnly size="sm" variant="light" isDisabled={i === 0} onPress={() => moveItem(i, -1)}><ChevronUp size={15} /></Button></Tooltip>
+                            <Tooltip content="Move down"><Button aria-label={`Move ${item.label} down`} isIconOnly size="sm" variant="light" isDisabled={i === seq.items.length - 1} onPress={() => moveItem(i, 1)}><ChevronDown size={15} /></Button></Tooltip>
                           </span>
-                          <Tooltip content="Remove cue"><Button isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteItem(item.id)}><Trash2 size={14} /></Button></Tooltip>
+                          <Tooltip content="Remove cue"><Button aria-label={`Remove ${item.label}`} isIconOnly size="sm" variant="light" color="danger" onPress={() => deleteItem(item.id)}><Trash2 size={14} /></Button></Tooltip>
                           <div className="relative">
                             <Button isIconOnly size="sm" variant="light" aria-label={`More actions for ${item.label}`} title="More actions" onPress={() => setCueMenuFor(cueMenuFor === item.id ? null : item.id)}><MoreHorizontal size={14} /></Button>
                             {cueMenuFor === item.id && <div className="absolute right-0 top-full z-40 mt-1 flex w-44 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass">
@@ -2233,11 +2233,15 @@ function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setL
           </p>
         </div>
         <div className="flex items-center justify-center gap-2 sm:gap-4">
-          <Tooltip content="Back 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
-          <Button isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-accent/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
-          <Tooltip content="Forward 5s"><Button isIconOnly variant="flat" radius="full" onPress={() => jump(5)}><FastForward size={18} /></Button></Tooltip>
-          <Tooltip content={loop ? "Looping" : "Loop"}><Button isIconOnly variant={loop ? "solid" : "flat"} color={loop ? "primary" : "default"} radius="full" onPress={() => setLoop((l: boolean) => !l)}><Repeat size={18} /></Button></Tooltip>
-          <Tooltip content="Live effects"><Button isIconOnly variant={open ? "solid" : "flat"} color={open ? "primary" : "default"} radius="full" onPress={() => setOpen(o => !o)}><SlidersHorizontal size={18} /></Button></Tooltip>
+          {/* A tooltip is not a name. It is announced as a description, only on hover or focus, so
+              an icon-only button wrapped in one still reaches a screen reader as "button". Every
+              control here carries its own aria-label, and the pressed ones say which state they are
+              in rather than leaving that to the fill colour. */}
+          <Tooltip content="Back 5s"><Button aria-label="Back 5 seconds" isIconOnly variant="flat" radius="full" onPress={() => jump(-5)}><Rewind size={18} /></Button></Tooltip>
+          <Button aria-label={playing ? "Pause" : "Play"} isIconOnly color="primary" radius="full" size="lg" onPress={toggle} className="shadow-lg shadow-accent/30">{playing ? <Pause fill="currentColor" size={22} /> : <Play fill="currentColor" size={22} />}</Button>
+          <Tooltip content="Forward 5s"><Button aria-label="Forward 5 seconds" isIconOnly variant="flat" radius="full" onPress={() => jump(5)}><FastForward size={18} /></Button></Tooltip>
+          <Tooltip content={loop ? "Looping" : "Loop"}><Button aria-label="Loop this cue" aria-pressed={loop} isIconOnly variant={loop ? "solid" : "flat"} color={loop ? "primary" : "default"} radius="full" onPress={() => setLoop((l: boolean) => !l)}><Repeat size={18} /></Button></Tooltip>
+          <Tooltip content="Live effects"><Button aria-label="Live effects" aria-pressed={open} isIconOnly variant={open ? "solid" : "flat"} color={open ? "primary" : "default"} radius="full" onPress={() => setOpen(o => !o)}><SlidersHorizontal size={18} /></Button></Tooltip>
         </div>
       </div>
       <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => { const next = Array.isArray(v) ? v[0] : v; setTime(next); seek(next); }} />

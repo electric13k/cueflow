@@ -29,7 +29,7 @@ export default function SearchBar({ query, setQuery, sort, setSort, kinds = [], 
       <div className="relative min-w-48 flex-1">
         <Search size={14} className="pointer-events-none absolute bottom-3 left-3 text-muted" aria-hidden />
         {/* The compat Input takes no startContent, so the icon is positioned over it. */}
-        <Input className="[&_input]:pl-8" value={query} onValueChange={setQuery} placeholder={placeholder} />
+        <Input aria-label={placeholder} className="[&_input]:pl-8" value={query} onValueChange={setQuery} placeholder={placeholder} />
       </div>
       <Select aria-label="Sort by" value={sort} onChange={v => setSort(v as SortKey)}
         options={SORTS.map(s => ({ value: s.id, label: s.label }))} size="sm" className="min-w-36" />
