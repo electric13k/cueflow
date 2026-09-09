@@ -103,7 +103,7 @@ function BeatRow({ beat, theme }: { beat: Beat; theme: Theme }) {
         transition={{ duration: .48, ease: [.16, 1, .3, 1] }}
         className="margin-rule">
         <span className="cue-mark text-brass">{beat.n}</span>
-        <h2 className="text-3xl font-bold leading-tight sm:text-4xl">{beat.head}</h2>
+        <h2 className="text-title font-bold leading-tight sm:text-banner">{beat.head}</h2>
         <p className="mt-3 text-muted">{beat.line}</p>
       </motion.div>
       <motion.figure
@@ -151,7 +151,7 @@ export default function Home() {
             <LogoMark size={40} />
           </motion.div>
           <motion.h1 initial={prefersReducedMotion ? false : { opacity: 0, y: 28 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .8, delay: .1, ease: [.16, 1, .3, 1] }}
-            className="mt-6 max-w-4xl text-[2.75rem] font-bold leading-[.95] sm:text-7xl">
+            className="mt-6 max-w-4xl text-display font-bold leading-[.95] sm:text-7xl">
             Run the whole show off one key.
           </motion.h1>
           <motion.p initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }} animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: .7, delay: .24 }}
@@ -187,7 +187,7 @@ export default function Home() {
         {/* Held for half a screen, the way a house light fade is held. Nothing moves but opacity. */}
         <section data-pin className="py-24">
           <blockquote data-pin-inner className="max-w-3xl">
-              <p className="editorial-quote text-3xl font-bold italic leading-snug sm:text-5xl">
+              <p className="editorial-quote text-title font-bold italic leading-snug sm:text-display">
               A desk decides what goes out and when.
               <span className="text-accent"> You should decide the when.</span>
             </p>
@@ -196,7 +196,7 @@ export default function Home() {
 
         <section className="pb-24">
           <div data-reveal className="glass flex flex-wrap items-center justify-between gap-6 px-8 py-14">
-            <h2 className="text-4xl font-bold sm:text-5xl">Curtain up.</h2>
+            <h2 className="text-banner font-bold sm:text-display">Curtain up.</h2>
             <Button href="/studio" color="primary" size="lg" startContent={<Radio size={18} />} className="cue-leather font-semibold">
               Open the Studio
             </Button>

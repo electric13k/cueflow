@@ -83,7 +83,7 @@ export default function Stage({ stage, className = "", blank = "black" }: { stag
         {stage.kind === "embed" && <iframe src={presentationUrl} title={stage.label} allowFullScreen className="h-full w-full border-0" />}
         {stage.kind !== "embed" && <Grade v={stage.visual} />}
         {stage.visual.caption && (
-          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-8 text-center text-2xl font-bold text-white sm:text-4xl">
+          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-8 text-center text-2xl font-bold text-white sm:text-banner">
             {stage.visual.caption}
           </p>
         )}

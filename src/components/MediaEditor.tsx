@@ -33,7 +33,7 @@ function ModulePanel({ m, v, off, onVisual, onToggle, children }: {
   return (
     <div className="glass-soft space-y-3 rounded-2xl p-3">
       <div className="flex items-center gap-2">
-        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-border text-[10px] tabular-nums text-muted">
+        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-border text-micro tabular-nums text-muted">
           {MODULES.indexOf(m) + 1}
         </span>
         <Switch size="sm" isSelected={on} onValueChange={onToggle}>{m.label}</Switch>

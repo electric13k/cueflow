@@ -100,7 +100,7 @@ export default function Account() {
 
   if (!profile) return (
     <Shell width="max-w-2xl">
-      <h1 className="text-3xl font-black tracking-tight">Your account</h1>
+      <h1 className="text-title font-semibold tracking-tight">Your account</h1>
       <p className="mt-3 text-muted">You are not signed in. Open the Studio and sign in there, an account is optional, and CueFlow works without one.</p>
       <Button className="mt-6" href="/studio" color="primary">Open the Studio</Button>
     </Shell>
@@ -109,13 +109,13 @@ export default function Account() {
   return (
     <Shell width="max-w-2xl">
       <p className="eyebrow text-accent">Account</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{profile.username ? `@${profile.username}` : "Your account"}</h1>
+      <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">{profile.username ? `@${profile.username}` : "Your account"}</h1>
       <p className="mt-2 text-sm text-muted">{profile.email}</p>
 
       {note && <p className="mt-4 rounded-xl border border-live/40 bg-live/10 px-4 py-2 text-sm">{note}</p>}
 
       <section className="glass mt-8 space-y-4 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><UserRound size={18} className="text-accent" />Profile</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><UserRound size={18} className="text-accent" />Profile</h2>
         <p className="text-sm text-muted">
           Your username is how people add you to a project. It is the only part of your account anyone
           else can look up, your email address is never shown to them.
@@ -126,7 +126,7 @@ export default function Account() {
       </section>
 
       <section className="glass mt-6 space-y-4 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><KeyRound size={18} className="text-accent" />Password</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><KeyRound size={18} className="text-accent" />Password</h2>
         <Input type="password" label="New password" value={pw} onValueChange={setPw} autoComplete="new-password" />
         <Input type="password" label="New password again" value={pw2} onValueChange={setPw2} autoComplete="new-password" />
         <div className="flex flex-wrap gap-2">
@@ -138,7 +138,7 @@ export default function Account() {
       </section>
 
       <section className="glass mt-6 space-y-4 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Link2 size={18} className="text-accent" />Ways in</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Link2 size={18} className="text-accent" />Ways in</h2>
         <p className="text-sm text-muted">
           Every method below opens this same account and the same library. Adding one does not make a
           second account, and removing one leaves everything where it is.
@@ -172,7 +172,7 @@ export default function Account() {
       <FriendsPanel />
 
       <section className="glass mt-6 space-y-4 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Download size={18} className="text-accent" />Your data</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Download size={18} className="text-accent" />Your data</h2>
         {notice ? (
           <p className="rounded-xl border border-live/40 bg-live/10 px-4 py-3 text-sm">
             This account has been idle, so it is scheduled for deletion on{" "}
@@ -195,7 +195,7 @@ export default function Account() {
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
-        <h2 className="text-xl font-black tracking-tight">Signing out</h2>
+        <h2 className="text-xl font-semibold tracking-tight">Signing out</h2>
         <p className="mt-2 text-sm text-muted">Your library stays on this device. Sign back in to pull down anything saved from another one.</p>
         <Button className="mt-4" variant="bordered" startContent={<LogOut size={16} />} onPress={() => void signOut().then(load)}>Sign out</Button>
       </section>

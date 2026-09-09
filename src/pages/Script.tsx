@@ -42,7 +42,7 @@ export default function Script() {
     <div className={bare ? "relative flex h-screen flex-col gap-3 bg-background p-4 text-foreground" : "relative flex h-[78vh] flex-col gap-3"}>
       {alertScope === "script" && <AlertFlash level={flash} scope="script" />}
       <div className="flex items-baseline gap-3">
-        <h1 className="text-lg font-black tracking-tight">{doc.name || "Script"}</h1>
+        <h1 className="text-lg font-semibold tracking-tight">{doc.name || "Script"}</h1>
         <span className="text-xs text-muted">{note}</span>
         {!bare && <ShareButton className="ml-auto" url="/script" title={`${doc.name || "Script"} · CueFlow`} text={`Open ${doc.name || "Script"} in CueFlow`} />}
       </div>

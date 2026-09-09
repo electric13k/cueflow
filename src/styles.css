@@ -13,6 +13,46 @@
   --font-control: "Source Serif 4", Georgia, serif;
   --font-display: "Bodoni Moda", "Source Serif 4", Georgia, serif;
   --font-mono: "Courier Prime", ui-monospace, "Courier New", monospace;
+  /**
+   * A type scale, named for the job each step does.
+   *
+   * Size and weight had stopped carrying any hierarchy. Sixteen distinct sizes were in use, six of
+   * them one-off arbitrary values, and 243 of 265 size declarations were `text-sm` or `text-xs`, so
+   * a heading and a hint were within a hair of each other while five weights fought over which was
+   * emphatic. Naming the steps is what stops the next one being invented inline.
+   *
+   * `micro` is the floor and it is 12px. The old scale went to 9px, which is below what anybody
+   * should be asked to read and was being used for cue counts an operator reads in a dark room.
+   *
+   * Line heights ride with the step, because a display size at body leading is what made the
+   * headings feel loose and the panels feel cramped.
+   */
+  --text-micro: 0.75rem;          /* 12px: counts, timecodes, the smallest label that is allowed */
+  --text-micro--line-height: 1.35;
+  --text-label: 0.8125rem;        /* 13px: control labels, table headers */
+  --text-label--line-height: 1.4;
+  --text-body: 0.9375rem;         /* 15px: reading size in the app */
+  --text-body--line-height: 1.55;
+  --text-lead: 1.0625rem;         /* 17px: the sentence under a heading */
+  --text-lead--line-height: 1.5;
+  --text-heading: 1.375rem;       /* 22px: a panel's own title */
+  --text-heading--line-height: 1.25;
+  /**
+   * The three heading steps carry the values Tailwind's `text-3xl`, `text-4xl` and `text-5xl`
+   * already had, line heights included. They are a rename, not a resize: the point is that a page
+   * title is called `text-title` rather than picked off a numeric ladder, so the next person reaches
+   * for a role instead of inventing a size. Changing what a step measures is a separate decision
+   * from naming it, and doing both at once would have moved every heading in the app at the same
+   * time as it explained itself.
+   */
+  --text-title: 1.875rem;         /* 30px: the page */
+  --text-title--line-height: 2.25rem;
+  --text-banner: 2.25rem;         /* 36px: a page that carries a picture */
+  --text-banner--line-height: 2.5rem;
+  --text-display: 3rem;           /* 48px: the marketing headline */
+  --text-display--line-height: 1;
+  --text-marquee: 5rem;           /* 80px: one per page at most */
+  --text-marquee--line-height: 1;
   --shadow-glass: 0 10px 34px -14px rgba(36, 31, 28, .5), inset 0 1px 0 rgba(255, 255, 255, .05);
   --color-secondary: var(--cue-visual);
   /* The house palette, named for where each colour comes from. */

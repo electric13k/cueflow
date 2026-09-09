@@ -150,7 +150,7 @@ export default function Workspace() {
     <Shell>
       <motion.div {...rise()}>
         <p className="font-mono eyebrow text-brass">{project ? "Project" : "Everything not in a project"}</p>
-        <h1 className="mt-2 text-4xl font-bold sm:text-5xl">{name}</h1>
+        <h1 className="mt-2 text-banner font-bold sm:text-display">{name}</h1>
         <p className="mt-3 text-sm text-muted">
           The last {MONTH_DAYS} days, by category, most important first. Everything older is still in the Studio.
         </p>
@@ -171,7 +171,7 @@ export default function Workspace() {
                   <motion.section key={group.id} {...rise(.06 + g * .05)}>
                     <div className="flex items-baseline justify-between gap-3">
                       <h2 className="font-mono eyebrow text-brass">{group.title}</h2>
-                      <span className="font-mono text-[10px] text-muted">{group.items.length}</span>
+                      <span className="font-mono text-micro text-muted">{group.items.length}</span>
                     </div>
                     <p className="mt-1 text-xs text-muted">{group.blurb}</p>
                     <ul className={`mt-3 ${GRID_CLASS}`} style={GRID_STYLE}>

@@ -97,7 +97,7 @@ export default function Features() {
           <motion.span className="feature-orbit feature-orbit--curtain" animate={prefersReducedMotion ? undefined : { rotate: -360, y: [0, 12, 0] }} transition={{ rotate: { duration: 34, repeat: Infinity, ease: "linear" }, y: { duration: 11, repeat: Infinity, ease: "easeInOut" } }} />
         </div>
         <motion.p {...rise()} className="font-mono eyebrow text-brass">Features</motion.p>
-        <motion.h1 {...rise(.05)} className="mt-3 max-w-4xl text-5xl font-bold leading-[1.02] sm:text-6xl">
+        <motion.h1 {...rise(.05)} className="mt-3 max-w-4xl text-display font-bold leading-[1.02] sm:text-6xl">
           The controls that keep a live show moving.
         </motion.h1>
         <motion.p {...rise(.1)} className="mt-5 max-w-2xl text-xl leading-snug text-muted sm:text-2xl">
@@ -113,7 +113,7 @@ export default function Features() {
             return (
               <article key={feature.number} data-reveal
                 className="glass feature-card group relative overflow-hidden p-6 sm:p-8">
-                <span className="pointer-events-none absolute -right-3 -top-8 font-display text-[8rem] font-bold leading-none text-accent/10">{feature.number}</span>
+                <span className="pointer-events-none absolute -right-3 -top-8 font-display text-marquee font-bold leading-none text-accent/10">{feature.number}</span>
                 <div className="relative">
                   <div className="flex items-center justify-between gap-4">
                     <span className="feature-icon flex h-11 w-11 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
@@ -121,7 +121,7 @@ export default function Features() {
                     </span>
                     <span className="font-mono eyebrow text-brass">{feature.eyebrow}</span>
                   </div>
-                  <h2 className="mt-7 max-w-md text-2xl font-bold leading-tight sm:text-3xl">{feature.title}</h2>
+                  <h2 className="mt-7 max-w-md text-2xl font-bold leading-tight sm:text-title">{feature.title}</h2>
                   <p className="mt-3 max-w-xl leading-relaxed text-muted">{feature.body}</p>
                   <div className="mt-6 flex flex-wrap gap-2">
                     {feature.tags.map(tag => <span key={tag} className="rounded-full border border-white/10 px-3 py-1 font-mono label-cap text-muted">{tag}</span>)}
@@ -136,7 +136,7 @@ export default function Features() {
           <motion.div aria-hidden className="workflow-rail" style={{ scaleX: workflowRail }} />
           <motion.div {...rise()}>
             <p className="font-mono eyebrow text-brass">Also in the box</p>
-            <h2 className="mt-3 max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">The parts that only matter once you are running it.</h2>
+            <h2 className="mt-3 max-w-2xl text-banner font-bold leading-tight sm:text-display">The parts that only matter once you are running it.</h2>
           </motion.div>
           <div className="workflow-grid relative mt-10 grid gap-8 md:grid-cols-3">
             {alsoIncluded.map((item, index) => {

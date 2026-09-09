@@ -96,7 +96,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="label-cap text-muted">Collaborator password</p>
-          <p className="font-mono text-3xl font-black tracking-[.3em] text-accent">{show.password ?? "-"}</p>
+          <p className="font-mono text-title font-semibold tracking-[.3em] text-accent">{show.password ?? "-"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <ShareButton variant="bordered" label="Share show" url={`/show?show=${encodeURIComponent(show.id)}${show.password ? `&key=${encodeURIComponent(show.password)}` : ""}`} title={`${show.name} · CueFlow show`} text={`Join the ${show.name} show in CueFlow. Your name will be requested before you enter.`} />

@@ -1321,8 +1321,8 @@ export default function Studio() {
       <div className="pb-56 sm:pb-36">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className={`text-[11px] font-semibold uppercase tracking-[.3em] ${armed ? "text-armed" : "text-accent"}`}>{armed ? (cueIndex < 0 ? "Armed" : "Running") : "Studio"}</p>
-            <h1 className="flex items-center gap-1 text-2xl font-black tracking-tight sm:text-3xl">
+            <p className={`text-micro font-semibold uppercase tracking-[.3em] ${armed ? "text-armed" : "text-accent"}`}>{armed ? (cueIndex < 0 ? "Armed" : "Running") : "Studio"}</p>
+            <h1 className="flex items-center gap-1 text-2xl font-semibold tracking-tight sm:text-title">
               {armed ? (selectedSequence?.name ?? "Cue board") : "Cue board"}
               <CoachHelp id="studio" />
             </h1>
@@ -1393,7 +1393,7 @@ export default function Studio() {
                         title={`${track.title} — press ${padKey(slot)}`}
                         className={`flex h-16 w-full flex-col items-start justify-between rounded-xl border px-2.5 py-2 text-left transition-colors ${sounding ? "border-live bg-live/20" : "border-border bg-surface/50 hover:border-accent"}`}>
                         <span className="flex w-full items-center justify-between gap-2">
-                          <kbd className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-[10px] text-muted">{padKey(slot)}</kbd>
+                          <kbd className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-micro text-muted">{padKey(slot)}</kbd>
                           {sounding && <span aria-hidden className="h-2 w-2 rounded-full bg-live" />}
                         </span>
                         <span className="w-full truncate text-xs font-semibold">{track.title}</span>
@@ -1444,7 +1444,7 @@ export default function Studio() {
                       <GripVertical size={13} aria-hidden />
                     </span>
                     <button data-tour={i === 0 ? "sequence-select" : undefined} className="py-1.5 text-sm font-semibold" onClick={() => { setSequenceId(s.id); setTab("sequence"); }}>{s.name}</button>
-                    <span className="text-[11px] text-muted">{s.items.length}</span>
+                    <span className="text-micro text-muted">{s.items.length}</span>
                     {/* A sequence does not need a show to be run: this arms it and opens the
                         presenter window, in a project, outside any show. */}
                     <Button isIconOnly size="sm" variant="light" aria-label={`Run ${s.name} in presenter mode`}
@@ -1547,7 +1547,7 @@ export default function Studio() {
             const on = pane === p.id;
             return (
               <button key={p.id} type="button" data-tour={`pane-${p.id}`} aria-current={on} onPointerDown={(event) => event.preventDefault()} onClick={() => setPane(p.id)}
-                className={`flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 pt-2 text-[11px] font-semibold transition-colors ${on ? "text-accent" : "text-muted"}`}>
+                className={`flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 pt-2 text-micro font-semibold transition-colors ${on ? "text-accent" : "text-muted"}`}>
                 <p.icon size={19} aria-hidden />
                 {p.label}
               </button>
@@ -1762,7 +1762,7 @@ function DeckPreview({ track, className, playOnHover, onLinkSlide }: { track: Tr
             </div>
             <div className="flex items-center gap-2 px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate font-control text-xs">{slide.label}</span>
-              {onLinkSlide && <Button data-coach="cue-links" size="sm" variant="light" className="shrink-0 text-[11px]" onPress={() => onLinkSlide(track.id, slide.index)}>Link audio</Button>}
+              {onLinkSlide && <Button data-coach="cue-links" size="sm" variant="light" className="shrink-0 text-micro" onPress={() => onLinkSlide(track.id, slide.index)}>Link audio</Button>}
             </div>
             {contextSlide === slide.index && onLinkSlide && <div role="menu" className="absolute right-2 top-2 z-20 flex w-36 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass" onClick={event => event.stopPropagation()}><Button size="sm" variant="light" className="justify-start" onPress={() => { setContextSlide(null); onLinkSlide(track.id, slide.index); }}>Link audio</Button><Button size="sm" variant="light" className="justify-start" onPress={() => setContextSlide(null)}>Close</Button></div>}
 
@@ -2025,15 +2025,15 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                           <span className={`w-6 shrink-0 rounded-md text-center font-mono text-sm font-bold ${kind === "audio" ? "bg-audio/15 text-audio" : "bg-visual/15 text-visual"}`}>{numbers[i]}</span>
                           <Icon size={14} className="shrink-0 text-muted" aria-hidden />
                           <span className="truncate font-medium capitalize">{item.label}</span>
-                          {rehearsal.active && rehearsal.completed.includes(item.id) && <span className="rounded-full bg-live/15 px-1.5 py-0.5 text-[10px] font-semibold text-live">rehearsed</span>}
-                          {timerLeftFor(item.id, cueTimers) > 0 && <span className="rounded-md bg-armed/15 px-1.5 py-0.5 font-mono text-[10px] text-armed">{formatTimer(timerLeftFor(item.id, cueTimers))}</span>}
-                          {item.link && <span className="shrink-0 rounded-md bg-visual/15 px-1.5 font-mono text-[11px] font-bold text-visual" title="Fires together with this cue">+{numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}</span>}
+                          {rehearsal.active && rehearsal.completed.includes(item.id) && <span className="rounded-full bg-live/15 px-1.5 py-0.5 text-micro font-semibold text-live">rehearsed</span>}
+                          {timerLeftFor(item.id, cueTimers) > 0 && <span className="rounded-md bg-armed/15 px-1.5 py-0.5 font-mono text-micro text-armed">{formatTimer(timerLeftFor(item.id, cueTimers))}</span>}
+                          {item.link && <span className="shrink-0 rounded-md bg-visual/15 px-1.5 font-mono text-micro font-bold text-visual" title="Fires together with this cue">+{numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}</span>}
                           <span className="ml-auto hidden shrink-0 text-xs text-muted sm:inline">{track?.title ?? "missing"}</span>
                         </button>
                         {/* On a phone the transition picker takes its own line under the cue rather
                             than eating the label down to one letter. */}
                         <div className="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
-                          <label className="flex items-center gap-1 text-[10px] text-muted" title="Seconds before the next cue fires automatically">
+                          <label className="flex items-center gap-1 text-micro text-muted" title="Seconds before the next cue fires automatically">
                             <Clock3 size={12} /><input aria-label={`Auto advance seconds for ${item.label}`} type="number" min="0" max="3600" value={cueTimers[item.id] ?? 0} onChange={e => setCueTimer?.(item.id, Number(e.target.value))} className="w-14 rounded-md border border-border bg-surface/60 px-1.5 py-1 font-mono text-xs outline-none focus:border-accent" />s
                           </label>
                           {rehearsal.active && <input aria-label={`Private rehearsal note for ${item.label}`} defaultValue={rehearsal.notes?.[item.id] ?? ""} onBlur={e => onSaveRehearsalNote?.(item.id, e.target.value)} placeholder="note" className="w-24 rounded-md border border-border bg-surface/60 px-2 py-1 text-xs outline-none focus:border-accent" />}
@@ -2175,13 +2175,13 @@ function CueTransport({ element, label, onToggle, onStop, master, setMaster, com
       <Button isIconOnly size="sm" variant="flat" color="danger" aria-label="Stop all sound" title="Stop all sound" onPress={onStop}>
         <Square size={14} fill="currentColor" aria-hidden />
       </Button>
-      <span className="font-mono text-[11px] tabular-nums text-muted">{formatTimer(now)} / {span ? formatTimer(span) : "--:--"}</span>
+      <span className="font-mono text-micro tabular-nums text-muted">{formatTimer(now)} / {span ? formatTimer(span) : "--:--"}</span>
       <div className="min-w-32 flex-1">
         <Slider aria-label={`Scrub ${label}`} minValue={0} maxValue={span || 1} step={0.05}
           value={Math.min(now, span || 1)} isDisabled={!element || !span}
           onChange={next => { if (element) element.currentTime = next; }} />
       </div>
-      <span className="flex items-center gap-1.5 text-[11px] text-muted">
+      <span className="flex items-center gap-1.5 text-micro text-muted">
         <Volume2 size={13} aria-hidden />
         <span className="w-24">
           <Slider aria-label="Master output level" minValue={0} maxValue={1} step={0.01} value={master}

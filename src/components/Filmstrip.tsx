@@ -97,12 +97,12 @@ export default function Filmstrip({ url, duration, trimIn, trimOut, cues = [], o
           </button>
         ))}
       </div>
-      <div className="flex justify-between text-[11px] tabular-nums text-muted">
+      <div className="flex justify-between text-micro tabular-nums text-muted">
         <span>{trimIn.toFixed(2)}s</span>
         <span>{(end - trimIn).toFixed(2)}s on screen</span>
         <span>{end.toFixed(2)}s</span>
       </div>
-      <p className="text-[11px] text-muted">Pick up a handle and nudge it a frame with <kbd>,</kbd> and <kbd>.</kbd>{cues.length > 0 && ", it sticks to where other cues cut this file."}</p>
+      <p className="text-micro text-muted">Pick up a handle and nudge it a frame with <kbd>,</kbd> and <kbd>.</kbd>{cues.length > 0 && ", it sticks to where other cues cut this file."}</p>
     </div>
   );
 }

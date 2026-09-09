@@ -27,7 +27,7 @@ function Flash({ text }: { text: string }) {
   if (!text) return null;
   return (
     <div aria-live="polite" className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-8">
-      <div className="flash-message rounded-3xl bg-armed px-8 py-6 text-center text-3xl font-black text-black sm:text-5xl">{text}</div>
+      <div className="flash-message rounded-3xl bg-armed px-8 py-6 text-center text-title font-semibold text-black sm:text-display">{text}</div>
     </div>
   );
 }
@@ -56,7 +56,7 @@ function Door({ onIn, onClose, initialKey = "" }: { onIn: (t: Ticket) => void; o
           onPress={onClose}><X size={17} /></Button>
         <div className="pr-10">
           <p className="eyebrow text-accent">Join a show</p>
-          <h1 id="join-show-title" className="mt-2 text-3xl font-black tracking-tight">Type your key</h1>
+          <h1 id="join-show-title" className="mt-2 text-title font-semibold tracking-tight">Type your key</h1>
           <p id="join-show-description" className="mt-2 text-sm text-muted">
             No account needed. Whoever is running the show gives you a key, and the key is the job, type
             it and you are on followspot, or on sound, or holding the whole thing. Nothing to choose.
@@ -326,7 +326,7 @@ export default function Show() {
     return (
       <div className={`${themeClass(theme)} flex h-dvh flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground`}>
         <p className="eyebrow text-accent">{refused ? "Not in this show" : "Waiting room"}</p>
-        <h1 className="max-w-md text-3xl font-black tracking-tight">
+        <h1 className="max-w-md text-title font-semibold tracking-tight">
           {refused ? "You were not let in." : "Standing by to be let in."}
         </h1>
         <p className="max-w-md text-sm text-muted">
@@ -358,7 +358,7 @@ export default function Show() {
 
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h1 className="text-lg font-black tracking-tight">{ticket.name}</h1>
+          <h1 className="text-lg font-semibold tracking-tight">{ticket.name}</h1>
           <p className="text-xs text-muted">
             {ticket.role ?? "No job assigned"} · {started ? "live" : "standing by"}{note ? ` · ${note}` : ""}
           </p>

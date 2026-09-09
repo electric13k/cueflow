@@ -59,7 +59,7 @@ function Row({ c }: { c: Credit }) {
     <li className="border-t border-border py-4 first:border-0">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <a href={c.url} target="_blank" rel="noreferrer noopener" className="font-bold text-accent underline-offset-4 hover:underline">{c.name}</a>
-        <span className="rounded-full bg-surface/70 px-2 py-0.5 text-[11px] font-semibold text-muted">{c.licence}</span>
+        <span className="rounded-full bg-surface/70 px-2 py-0.5 text-micro font-semibold text-muted">{c.licence}</span>
       </div>
       <p className="mt-1 text-sm text-muted">{c.what}</p>
     </li>
@@ -72,13 +72,13 @@ export default function Credits() {
   return (
     <Page width="max-w-3xl"><div ref={root}>
       <p className="eyebrow text-accent">Thanks</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Standing on open shoulders</h1>
+      <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Standing on open shoulders</h1>
       <p className="mt-2 text-sm text-muted">
         CueFlow's editors were built by studying tools that got these problems right first.
       </p>
 
       <div data-reveal className="glass mt-10 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><Heart size={20} className="text-accent" />Behaviour, not code</h2>
+        <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Heart size={20} className="text-accent" />Behaviour, not code</h2>
 
         <Section title="What was borrowed">
           <p>
@@ -98,7 +98,7 @@ export default function Credits() {
       </div>
 
       <div data-reveal className="glass mt-6 p-6 sm:p-8">
-        <h2 className="text-2xl font-black tracking-tight">Editor software credits</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Editor software credits</h2>
         <p className="mt-2 text-sm text-muted">
           These projects power or inform CueFlow’s browser editor workflows. Their license notices remain part
           of the shipped application and should be reviewed before redistribution.
@@ -107,7 +107,7 @@ export default function Credits() {
       </div>
 
       <div data-reveal className="glass mt-6 p-6 sm:p-8">
-        <h2 className="text-2xl font-black tracking-tight">Where the media comes from</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Where the media comes from</h2>
         <p className="mt-2 text-sm text-muted">
           Licences vary per item and several require attribution. Checking what you are about to perform in
           public is on you.
@@ -116,7 +116,7 @@ export default function Credits() {
       </div>
 
       <div data-reveal className="glass mt-6 p-6 sm:p-8">
-        <h2 className="text-2xl font-black tracking-tight">Built with</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Built with</h2>
         <p className="mt-2 text-sm text-muted">
           React, Vite, Tailwind CSS, HeroUI, react-aria-components, Lucide icons, wavesurfer.js, Cropper.js,
           FFmpeg.wasm, Supabase, and the Web Audio API, which does the sound work here, in your browser, with

@@ -29,7 +29,7 @@ export default function ScreenCard({ shot, alt, title, body, points, fit = "cove
           className="glass absolute inset-0 flex flex-col justify-center gap-3 border-accent/25 p-6"
           style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
         >
-          <h3 className="text-xl font-black tracking-tight">{title}</h3>
+          <h3 className="text-xl font-semibold tracking-tight">{title}</h3>
           <p className="text-sm text-muted">{body}</p>
           <ul className="mt-1 space-y-2">
             {points.map(p => (

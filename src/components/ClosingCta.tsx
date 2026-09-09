@@ -27,7 +27,7 @@ export default function ClosingCta({ eyebrow, title, note, children, cta = "Open
       className="glass mt-16 flex flex-wrap items-center justify-between gap-5 p-8 sm:p-10">
       <div>
         {eyebrow && <p className="font-mono eyebrow text-brass">{eyebrow}</p>}
-        <h2 className={`text-3xl font-bold sm:text-4xl ${eyebrow ? "mt-3" : ""}`}>{title}</h2>
+        <h2 className={`text-title font-bold sm:text-banner ${eyebrow ? "mt-3" : ""}`}>{title}</h2>
         {note && <p className="mt-2 text-muted">{note}</p>}
       </div>
       <div className="flex flex-wrap items-center gap-2">

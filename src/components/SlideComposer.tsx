@@ -109,7 +109,7 @@ export default function SlideComposer({ open, onClose, onCreate }: {
                     </span>
                     <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setCurrentId(s.id)}>
                       <Thumb master={deck.master} slide={s} img={s.image ? images[s.image] : null} />
-                      <span className="mt-1 block truncate text-[11px] text-muted">{i + 1}. {slideName(s, i)}</span>
+                      <span className="mt-1 block truncate text-micro text-muted">{i + 1}. {slideName(s, i)}</span>
                     </button>
                     <Button isIconOnly size="sm" variant="light" color="danger" aria-label={`Delete slide ${i + 1}`}
                       isDisabled={deck.slides.length < 2}

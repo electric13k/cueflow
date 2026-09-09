@@ -9,14 +9,14 @@ export default function Terms() {
   return (
     <Page width="max-w-3xl">
       <p className="eyebrow text-accent">Legal</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Terms of Service</h1>
+      <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Terms of Service</h1>
       <p className="mt-2 text-sm text-muted">
         Last updated {UPDATED}. CueFlow is a hobby project offered free of charge. See also the{" "}
         <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</Link>.
       </p>
 
       <div className="glass mt-10 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><FileText size={20} className="text-accent" />The agreement</h2>
+        <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><FileText size={20} className="text-accent" />The agreement</h2>
 
         <Section title="Using CueFlow">
           CueFlow is a browser-based cue player for sound, slides and video. You may use it for personal, educational, community or commercial performances. You need a modern browser; nothing is installed on your machine.

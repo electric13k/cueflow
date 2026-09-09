@@ -8,13 +8,13 @@ export default function Cookies() {
   return (
     <Page width="max-w-3xl">
       <p className="eyebrow text-accent">Legal</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Cookies and local storage</h1>
+      <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Cookies and local storage</h1>
       <p className="mt-2 text-sm text-muted">
         Last updated {UPDATED}. See also the <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</Link> and <Link to="/terms" className="text-accent underline-offset-2 hover:underline">Terms of Service</Link>.
       </p>
 
       <div className="glass mt-10 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><Cookie size={20} className="text-accent" />How CueFlow stores information</h2>
+        <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Cookie size={20} className="text-accent" />How CueFlow stores information</h2>
 
         <Section title="Necessary storage">
           CueFlow uses first-party local storage for media references, sequences, scripts, keybinds, layout preferences, theme preferences, tutorial state, and demo ownership markers. First-party consent storage records your analytics and performance-cache choices. Authentication may use Supabase session storage when you sign in. These mechanisms are not used for advertising.

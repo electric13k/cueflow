@@ -90,7 +90,7 @@ export default function ProjectManager() {
       </motion.div>
 
       <motion.section {...reveal(.08)} data-coach="projects" className="glass mt-6 space-y-3 p-6">
-        <h2 className="flex items-center gap-2 text-lg font-black tracking-tight">
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <FolderOpen size={18} className="text-accent" />Start one
           <CoachHelp id="projects" className="ml-auto" />
         </h2>

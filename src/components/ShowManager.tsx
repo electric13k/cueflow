@@ -202,7 +202,7 @@ export default function ShowManager({
         className={`flex flex-wrap items-center gap-3 border-b px-4 py-3 transition-colors ${seqDrag.over === `show:${show.id}` ? "border-accent bg-accent/15" : "border-border"}`}>
         <Radio size={17} className={show.startedAt ? "text-live" : "text-accent"} aria-hidden />
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-black tracking-tight">{show.name}</h1>
+          <h1 className="truncate text-lg font-semibold tracking-tight">{show.name}</h1>
           <p className="font-mono label-cap text-muted">
             {show.startedAt ? `live · ${clock(elapsed)}` : show.password ?? "no key"}
           </p>
@@ -248,7 +248,7 @@ export default function ShowManager({
               <div className={`mt-2 flex flex-wrap items-center gap-3 rounded-xl border p-3 ${next ? "border-armed/50 bg-armed/10" : "border-border bg-surface/60"}`}>
                 <span className="label-cap text-muted">Next</span>
                 {next ? (<>
-                  <span className={`font-mono text-lg font-black ${next.kind === "audio" ? "text-audio" : "text-visual"}`}>{next.number}</span>
+                  <span className={`font-mono text-lg font-semibold ${next.kind === "audio" ? "text-audio" : "text-visual"}`}>{next.number}</span>
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold">{next.label}</span>
                   <span className="text-xs text-muted">{next.sequence}</span>
                   {next.sequenceId === armedSequenceId
@@ -291,7 +291,7 @@ export default function ShowManager({
             <h2 className="flex items-center gap-2 label-cap text-muted">
               <FileText size={14} aria-hidden />Script
               {script?.html && !link.script && <Button className="ml-auto" size="sm" variant="flat" onPress={onAddScript}>Add to the show</Button>}
-              {link.script && <span className="ml-auto text-[11px] normal-case tracking-normal text-muted">Goes out with the show</span>}
+              {link.script && <span className="ml-auto text-micro normal-case tracking-normal text-muted">Goes out with the show</span>}
             </h2>
             {!script?.html
               ? <p className="mt-2 text-sm text-muted">No script in this project yet.</p>
@@ -381,7 +381,7 @@ export default function ShowManager({
             <button type="button" onClick={() => setPanel("room")}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 ${panel === "room" ? "bg-accent/20 font-semibold text-accent" : "text-muted hover:text-foreground"}`}>
               <DoorOpen size={14} aria-hidden />In the room
-              {waitingCount > 0 && <span className="rounded-full bg-armed px-1.5 text-[10px] font-bold text-black">{waitingCount}</span>}
+              {waitingCount > 0 && <span className="rounded-full bg-armed px-1.5 text-micro font-bold text-black">{waitingCount}</span>}
             </button>
             <button type="button" onClick={() => setPanel("chat")}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 ${panel === "chat" ? "bg-accent/20 font-semibold text-accent" : "text-muted hover:text-foreground"}`}>
@@ -430,7 +430,7 @@ function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }
         <span className="text-xs text-muted">{person.role ?? "No job"}</span>
       </div>
       {person.perms.length > 0 && (
-        <p className="mt-1 text-[11px] text-muted">
+        <p className="mt-1 text-micro text-muted">
           {PERMS.filter(p => person.perms.includes(p.key)).map(p => p.label).join(" · ")}
         </p>
       )}

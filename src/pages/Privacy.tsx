@@ -8,14 +8,14 @@ export default function Privacy() {
   return (
     <Page width="max-w-3xl">
       <p className="eyebrow text-accent">Legal</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Privacy Policy</h1>
+      <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Privacy Policy</h1>
       <p className="mt-2 text-sm text-muted">
         Last updated {UPDATED}. See also the{" "}
         <Link to="/terms" className="text-accent underline-offset-2 hover:underline">Terms of Service</Link>.
       </p>
 
       <div className="glass mt-10 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight"><ShieldCheck size={20} className="text-accent" />What we hold</h2>
+        <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><ShieldCheck size={20} className="text-accent" />What we hold</h2>
 
         <Section title="The short version">
           No ads and no sale of personal data. Necessary storage keeps CueFlow working. Optional analytics is off by default and is used only after you choose to allow it. CueFlow does not use analytics to read your scripts, media files, passwords, access tokens, or private project content.

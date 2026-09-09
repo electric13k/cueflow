@@ -10,7 +10,7 @@ export default function Contact() {
   return (
     <Page width="max-w-3xl">
       <motion.p {...fade()} className="eyebrow text-accent">Contact</motion.p>
-      <motion.h1 {...fade(.05)} className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Say hello.</motion.h1>
+      <motion.h1 {...fade(.05)} className="mt-2 text-banner font-semibold tracking-tight sm:text-display">Say hello.</motion.h1>
       <motion.p {...fade(.1)} className="mt-4 text-lg text-muted">
         Bug reports, feature ideas, or a request to delete your account and its data. Signed in? The form already knows where to reply.
       </motion.p>

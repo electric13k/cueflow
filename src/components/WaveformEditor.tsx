@@ -397,7 +397,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
           <span className="font-semibold">Markers</span>
           {markers.map(marker => (
             <span key={marker.id} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface/70 pl-2">
-              <button type="button" className="py-1 font-mono text-[11px] hover:text-accent" onClick={() => jumpToMarker(marker)}>
+              <button type="button" className="py-1 font-mono text-micro hover:text-accent" onClick={() => jumpToMarker(marker)}>
                 {marker.label} {fmt(marker.time)}
               </button>
               <button type="button" aria-label={`Remove ${marker.label}`} className="p-1 text-muted hover:text-foreground" onClick={() => removeMarker(marker.id)}><Trash2 size={12} /></button>
@@ -516,7 +516,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
           <div key={i} className="rounded-xl border border-white/10 bg-white/[.03] p-3">
             <div className="mb-1 flex items-center justify-between">
               <span className="flex items-center gap-2 text-sm font-medium">
-                <span className="grid h-5 w-5 place-items-center rounded-md bg-accent/15 text-[10px] font-bold text-accent">{short(i)}</span>
+                <span className="grid h-5 w-5 place-items-center rounded-md bg-accent/15 text-micro font-bold text-accent">{short(i)}</span>
                 {labels[i]}
               </span>
               <Tooltip content={`${c.mute ? "Unmute" : "Mute"} ${labels[i]}`}>

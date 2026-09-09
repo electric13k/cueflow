@@ -61,7 +61,7 @@ export default function Tutorial() {
     <Page>
       <div ref={root}>
       <motion.p {...rise()} className="font-mono eyebrow text-brass">Tutorial</motion.p>
-      <motion.h1 {...rise(.05)} className="mt-3 max-w-3xl text-5xl font-bold leading-[1.02] sm:text-6xl">
+      <motion.h1 {...rise(.05)} className="mt-3 max-w-3xl text-display font-bold leading-[1.02] sm:text-6xl">
         Library, deck, <span className="italic text-accent">go.</span>
       </motion.h1>
       <motion.p {...rise(.1)} className="mt-5 max-w-xl text-lg text-muted">

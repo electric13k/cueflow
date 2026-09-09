@@ -34,11 +34,11 @@ export default function Settings() {
   return (
     <Shell width="max-w-3xl">
       <p className="eyebrow text-accent">Settings</p>
-      <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">How it behaves</h1>
+      <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">How it behaves</h1>
       <p className="mt-2 text-sm text-muted">These stay on this device. They are not tied to your account, so a borrowed laptop keeps its own.</p>
 
       <section className="glass mt-8 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Keyboard size={18} className="text-accent" />Keybinds</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Keyboard size={18} className="text-accent" />Keybinds</h2>
         <p className="mt-2 text-sm text-muted">
           Click a key box, then press a key. Arrows step every cue; WASD drives whatever is on the stage,
           so slides move without touching the sound underneath.
@@ -53,7 +53,7 @@ export default function Settings() {
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Palette size={18} className="text-accent" />Look</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Palette size={18} className="text-accent" />Look</h2>
         <div className="mt-4 space-y-4">
           <div>
             <Switch isSelected={theme === "dark"} onValueChange={v => setTheme(v ? "dark" : "light")}>Dark mode</Switch>
@@ -66,7 +66,7 @@ export default function Settings() {
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Bell size={18} className="text-accent" />Alerts</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Bell size={18} className="text-accent" />Alerts</h2>
         <p className="mt-2 text-sm text-muted">Choose where script cue warnings appear. The audience view is never covered by operator alerts.</p>
         <div className="mt-4">
           <Choice label="Alert surface" value={alertScope} onChange={scope => { setAlertScope(scope); saveAlertScope(scope); }}
@@ -78,7 +78,7 @@ export default function Settings() {
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><Cookie size={18} className="text-accent" />Cookies and analytics</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Cookie size={18} className="text-accent" />Cookies and analytics</h2>
         <p className="mt-2 text-sm text-muted">Necessary storage keeps Cueflow working. Optional analytics is off unless you choose to allow it, and you can change this choice later.</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Switch isSelected={consent.analytics === "accepted"} onValueChange={allowed => { const next = { ...consent, analytics: allowed ? "accepted" : "declined" } as ConsentState; setConsent(next); saveConsent(next); }}>
@@ -97,7 +97,7 @@ export default function Settings() {
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><LayoutGrid size={18} className="text-accent" />Layout</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><LayoutGrid size={18} className="text-accent" />Layout</h2>
         <p className="mt-2 text-sm text-muted">A phone and a desk are not asking the same question, so they get one setting each.</p>
         <div className="mt-5 space-y-6">
           <Choice label="On a computer" value={layout.pane} onChange={pane => setLayout({ pane })}
@@ -115,7 +115,7 @@ export default function Settings() {
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
-        <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><GraduationCap size={18} className="text-accent" />Tutorial</h2>
+        <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><GraduationCap size={18} className="text-accent" />Tutorial</h2>
         <p className="mt-2 text-sm text-muted">
           It walks you through building a deck and firing a cue, on a board it fills with demo sounds, pictures
           and a script. That material is cleared when you reach the end, and nothing you made yourself goes with it.

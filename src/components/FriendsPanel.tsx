@@ -51,7 +51,7 @@ export default function FriendsPanel() {
 
   return (
     <section className="glass mt-6 space-y-4 p-6 sm:p-8">
-      <h2 className="flex items-center gap-2 text-xl font-black tracking-tight"><UserRound size={18} className="text-accent" aria-hidden />People you work with</h2>
+      <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><UserRound size={18} className="text-accent" aria-hidden />People you work with</h2>
       <p className="text-sm text-muted">
         A list of usernames, so inviting someone to a project is picking a name instead of spelling it
         again. Being on it gives nobody access to anything: that still comes from a project role or a

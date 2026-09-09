@@ -73,7 +73,7 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
       >
         <span className="flex items-center gap-2">
           <Icon size={14} className={TINT[entry.kind]} aria-hidden />
-          <span className="font-mono text-[9px] uppercase tracking-[.2em] text-muted">{LABEL[entry.kind]}</span>
+          <span className="font-mono text-micro uppercase tracking-[.2em] text-muted">{LABEL[entry.kind]}</span>
         </span>
         <span className={`mt-1.5 block truncate font-control ${roomy ? "text-base font-bold" : "text-sm font-semibold"}`}>{entry.title}</span>
 
@@ -142,7 +142,7 @@ function CueList({ cues }: { cues: NonNullable<RecentEntry["cues"]> }) {
   const shown = cues.slice(0, 9);
   return (
     <span className="flex h-full flex-col gap-0.5 p-3">
-      <span className="mb-1 font-mono text-[9px] uppercase tracking-[.2em] text-brass">Cue list</span>
+      <span className="mb-1 font-mono text-micro uppercase tracking-[.2em] text-brass">Cue list</span>
       {shown.map(c => (
         <span key={c.n} className="flex items-baseline gap-2 text-xs">
           <span className={`w-4 shrink-0 font-mono ${c.kind === "audio" ? "text-audio" : "text-visual"}`}>{c.n}</span>
@@ -150,7 +150,7 @@ function CueList({ cues }: { cues: NonNullable<RecentEntry["cues"]> }) {
         </span>
       ))}
       {cues.length > shown.length && (
-        <span className="mt-auto font-mono text-[10px] text-muted">and {cues.length - shown.length} more</span>
+        <span className="mt-auto font-mono text-micro text-muted">and {cues.length - shown.length} more</span>
       )}
     </span>
   );
