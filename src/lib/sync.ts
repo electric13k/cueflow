@@ -21,21 +21,42 @@
  */
 export type SyncState = "off" | "live" | "down";
 
-let state: SyncState = "off";
+/**
+ * Two independent facts, not one state anybody sets directly.
+ *
+ * Setting the state directly made the answer depend on which callback landed last. The realtime
+ * channel subscribes whether or not anyone is signed in, so its "the socket is up" arrived after
+ * the hydrate's "there is no account" and the chrome cheerfully said "Synced" to a signed-out
+ * visitor with nothing to sync. Deriving the state from both facts means the order they arrive in
+ * cannot change the answer.
+ */
+let account = false;
+let channel = false;
+
+const derive = (): SyncState => (!account ? "off" : channel ? "live" : "down");
+
+let state: SyncState = derive();
 const watchers = new Set<(s: SyncState) => void>();
 
 export const syncState = () => state;
 
 /**
- * Announce a state. Idempotent on purpose: `watchCloud` re-reports `false` on every failed retry,
- * and with the backoff running up to 30s that is a steady drip of identical values. Re-rendering
- * the chrome for each one would be work with nothing to show for it.
+ * Announce only real changes. `watchCloud` re-reports its failure on every retry, and with the
+ * backoff running up to 30s that is a steady drip of identical values; re-rendering the chrome for
+ * each one would be work with nothing to show for it.
  */
-export function setSyncState(next: SyncState) {
+function settle() {
+  const next = derive();
   if (next === state) return;
   state = next;
   for (const watcher of watchers) watcher(state);
 }
+
+/** Whether there is an account to sync with. Local-only is a choice, so this is not a failure. */
+export function setSyncAccount(has: boolean) { account = has; settle(); }
+
+/** Whether the realtime channel is actually subscribed. */
+export function setSyncChannel(up: boolean) { channel = up; settle(); }
 
 /** Subscribe, and get the current state immediately: a component mounting mid-outage must see it. */
 export function onSyncState(watcher: (s: SyncState) => void) {

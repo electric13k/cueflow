@@ -36,6 +36,26 @@ export const currentProject = () => local.get<string | null>("project", null);
 export const scopedKey = (name: string) => { const project = currentProject(); return project ? `${name}:${project}` : name; };
 export const setCurrentProject = (id: string | null) => local.set("project", id);
 
+/**
+ * Switch project and stay on the screen you were already on.
+ *
+ * Two callers did this and disagreed about where you end up: the sidebar sent you to `/workspace`
+ * and the project manager sent you to `/studio`. Switching project from the Studio therefore cost
+ * two presses, because the first one took you somewhere you were not going.
+ *
+ * The reload is deliberate and stays. Storage keys are per project (`scopedKey` above), and the
+ * library, the open deck, the sequences and the shows are all read at mount, so a soft navigation
+ * would leave one project's deck sitting on another project's library. Reloading in place is the
+ * cheap way to be sure every one of those readers starts again, and it is one navigation instead of
+ * a navigation plus a press.
+ */
+export const switchProject = (id: string | null) => {
+  setCurrentProject(id);
+  // BASE_URL is respected by reloading the current URL rather than assembling a path: GitHub Pages
+  // serves the app from a subdirectory and a bare "/studio" leaves it.
+  location.reload();
+};
+
 export async function listProjects(): Promise<Project[]> {
   if (!supabase) return [];
   const user = await me();

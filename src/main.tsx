@@ -17,7 +17,6 @@ const Credits = lazy(() => import("./pages/Credits"));
 const Script = lazy(() => import("./pages/Script"));
 const Account = lazy(() => import("./pages/Account"));
 const Settings = lazy(() => import("./pages/Settings"));
-const Projects = lazy(() => import("./pages/Projects"));
 const Workspace = lazy(() => import("./pages/Workspace"));
 const Show = lazy(() => import("./pages/Show"));
 import RequireAuth from "./components/RequireAuth";
@@ -74,7 +73,10 @@ createRoot(document.getElementById("root")!).render(
         {/* An account buys a workspace, not the app. Studio, the library and sequences are open to
             anyone; these three do not render without a session. See plan.md §8. */}
         <Route path="/workspace" element={<RequireAuth><Workspace /></RequireAuth>} />
-        <Route path="/projects" element={<RequireAuth><Projects /></RequireAuth>} />
+        {/* Projects used to be its own page. It is a section of the workspace now, so the app has
+            one place for "your work" instead of two that listed the same things. The path stays as a
+            redirect: it is in browser histories, and in links people have already shared. */}
+        <Route path="/projects" element={<Navigate to="/workspace" replace />} />
         <Route path="/show" element={<Show />} />
         <Route path="/account" element={<Account />} />
         <Route path="/settings" element={<Settings />} />

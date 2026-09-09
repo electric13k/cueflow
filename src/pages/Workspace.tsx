@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Shell from "../components/Shell";
 import RecentTile from "../components/RecentTile";
+import ProjectManager from "../components/ProjectManager";
 import { RecentsSkeleton } from "../components/Skeleton";
 import {
   GRID_CLASS, GRID_STYLE, MONTH_DAYS, groupRecents, withinMonth,
@@ -182,6 +183,13 @@ export default function Workspace() {
                 ))}
               </div>
             )}
+      </section>
+
+      {/* Projects live here rather than on a page of their own: this is already the answer to "what
+          have I got", and a second list of the same projects one route away was the clearest case
+          of the app repeating itself. */}
+      <section className="mt-12 border-t border-white/10 pt-10">
+        <ProjectManager />
       </section>
 
       <motion.div

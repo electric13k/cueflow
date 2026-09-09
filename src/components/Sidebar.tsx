@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
 import { FolderClosed, FolderOpen, Home, LogIn, Plus, Radio, Settings, SlidersHorizontal, UserRound } from "lucide-react";
-import { currentProject, listProjects, setCurrentProject, type Project } from "../lib/projects";
+import { createProject, currentProject, listProjects, switchProject, type Project } from "../lib/projects";
 import { useSignedIn } from "./RequireAuth";
 import { teach } from "../lib/coach";
 import { CoachHelp } from "./Coach";
 import { Skeleton } from "./Skeleton";
+import { Input } from "../ui";
+import { toast } from "../lib/toast";
 
 const sidebarVariants = {
   hidden: { opacity: 0 },
@@ -28,6 +30,9 @@ const sidebarItemVariants = {
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
+  const [making, setMaking] = useState(false);
+  const [fresh, setFresh] = useState("");
+  const [busy, setBusy] = useState(false);
   const signedIn = useSignedIn();
   const here = currentProject();
   const { pathname } = useLocation();
@@ -41,9 +46,8 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   // The hierarchy explains itself the first time you can see it.
   useEffect(() => teach("sidebar"), []);
 
-  /** Switching reloads: the library, the open deck and the shows all change with the project. */
-  // BASE_URL, because GitHub Pages serves the app from /<repo>/ and a bare "/workspace" leaves it.
-  const open = (id: string | null) => { setCurrentProject(id); location.assign(`${import.meta.env.BASE_URL}workspace`); };
+  /** One switch for the whole app: sets the project and reloads in place. See `switchProject`. */
+  const open = switchProject;
 
   // min-h-11 is 44px, the smallest target a thumb hits reliably. At py-2 these were 36px rows and
   // picking a project on a phone took two goes.
@@ -99,7 +103,41 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <span className="min-w-0 flex-1 truncate">{p.name}</span>
           </button>
         ))}
-        <Link to="/projects" onClick={onNavigate} className={`${row} ${pathname === "/projects" ? on : off}`}><Plus size={16} /> New project</Link>
+        {/* Creating a project used to be a link to a page that held the field. Three steps for one
+            small thing: press "New project", arrive somewhere you did not ask to go, then find the
+            input. The field is here now, and Enter is the whole gesture. */}
+        {making ? (
+          <form
+            className="px-1 py-1"
+            onSubmit={e => {
+              e.preventDefault();
+              const name = fresh.trim();
+              if (!name || busy) return;
+              setBusy(true);
+              void createProject(name)
+                // Straight into it. Making a project and then not working in it is not a thing
+                // anybody wants, and `switchProject` reloads, so no state is left behind.
+                .then(p => switchProject(p.id))
+                .catch(e => { toast("Could not create that project", (e as Error).message, "warn"); setBusy(false); });
+            }}
+          >
+            <Input
+              autoFocus
+              size="sm"
+              aria-label="Name for the new project"
+              placeholder="Spring play"
+              value={fresh}
+              onValueChange={setFresh}
+              // Escape backs out, because a field that appeared under the cursor needs a way to
+              // disappear that is not "reload the page".
+              onKeyDown={e => { if (e.key === "Escape") { setMaking(false); setFresh(""); } }}
+            />
+          </form>
+        ) : (
+          <button type="button" onClick={() => setMaking(true)} className={`${row} ${off}`}>
+            <Plus size={16} /> New project
+          </button>
+        )}
       </motion.div>
 
       <motion.div variants={sidebarItemVariants} className="mt-auto space-y-1">

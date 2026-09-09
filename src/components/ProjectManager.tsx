@@ -2,16 +2,15 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button, Input, Select } from "../ui";
 import { FolderOpen, Pencil, Trash2, UserPlus, Users } from "lucide-react";
-import Shell from "../components/Shell";
-import { ProjectsSkeleton } from "../components/Skeleton";
-import { CoachHelp } from "../components/Coach";
+import { ProjectsSkeleton } from "./Skeleton";
+import { CoachHelp } from "./Coach";
 import { teach } from "../lib/coach";
-import ShareButton from "../components/ShareButton";
+import ShareButton from "./ShareButton";
 import { toast } from "../lib/toast";
 import { onAuth } from "../lib/store";
 import {
   addCollaborator, createProject, currentProject, deleteProject, listMembers, listProjects,
-  removeMember, setCurrentProject, setMemberRole, updateProject, type Member, type Project,
+  removeMember, setMemberRole, switchProject, updateProject, type Member, type Project,
 } from "../lib/projects";
 import { ROLES, type Role } from "../lib/collab";
 
@@ -22,7 +21,19 @@ const reveal = (delay = 0) => ({
   transition: { duration: .48, delay, ease: [.16, 1, .3, 1] as const },
 });
 
-export default function Projects() {
+/**
+ * Projects, as a section rather than a destination.
+ *
+ * This was its own page, which meant the app listed projects in three places: here, in the sidebar
+ * switcher, and by implication in the workspace recents. Someone wanting to add a collaborator
+ * pressed "New project" in the sidebar to reach a page they did not want, found the right card,
+ * pressed "Edit and share", and only then got the field they were after. Three presses and a route
+ * change for one small thing.
+ *
+ * The logic below is unchanged from that page. Only the frame is gone: no `Shell`, no second title,
+ * because whichever page mounts this has already said where you are.
+ */
+export default function ProjectManager() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -54,33 +65,31 @@ export default function Projects() {
   };
 
   /** Switching reloads: the open deck and the library both belong to the project you were in. */
-  const switchTo = (id: string | null) => { setCurrentProject(id); location.assign("/studio"); };
+  const switchTo = switchProject;
 
-  if (!ready) return <Shell width="max-w-3xl"><ProjectsSkeleton /></Shell>;
+  if (!ready) return <ProjectsSkeleton />;
 
   if (!signedIn) return (
-    <Shell width="max-w-3xl">
-      <h1 className="text-3xl font-black tracking-tight">Projects</h1>
-      <p className="mt-3 text-muted">
+    <div>
+      <h2 className="text-xl font-semibold tracking-tight">Projects</h2>
+      <p className="mt-2 text-sm text-muted">
         A project is a separate library, a separate set of sequences and its own shows, one per
         production, so last term's assembly is not in the way of this term's play. Sign in to make one.
       </p>
-      <Button className="mt-6" href="/studio" color="primary">Open the Studio</Button>
-    </Shell>
+    </div>
   );
 
   return (
-    <Shell width="max-w-3xl">
+    <div>
       <motion.div {...reveal()}>
-        <p className="eyebrow text-accent">Projects</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">One production, one project</h1>
-        <p className="mt-3 text-muted">
-        Each project keeps its own sounds, its own sequences and its own shows. People you add
+        <h2 className="text-xl font-semibold tracking-tight">One production, one project</h2>
+        <p className="mt-2 text-sm text-muted">
+          Each project keeps its own sounds, its own sequences and its own shows. People you add
           see all of it; everything outside a project stays yours alone.
         </p>
       </motion.div>
 
-      <motion.section {...reveal(.08)} data-coach="projects" className="glass mt-8 space-y-3 p-6">
+      <motion.section {...reveal(.08)} data-coach="projects" className="glass mt-6 space-y-3 p-6">
         <h2 className="flex items-center gap-2 text-lg font-black tracking-tight">
           <FolderOpen size={18} className="text-accent" />Start one
           <CoachHelp id="projects" className="ml-auto" />
@@ -174,6 +183,6 @@ export default function Projects() {
           </div>
         ))}
       </motion.section>
-    </Shell>
+    </div>
   );
 }

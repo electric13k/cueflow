@@ -37,7 +37,7 @@ import { search as rank, type Facet, type SortKey } from "../lib/search";
 import { cuePoints } from "../lib/trim";
 import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, searchOpenverse, uniqueTitle, type Hit, type Source } from "../lib/media";
 import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack, watchCloud } from "../lib/store";
-import { describeSync, setSyncState, syncState } from "../lib/sync";
+import { describeSync, setSyncAccount, setSyncChannel } from "../lib/sync";
 import { autoSave, flushSave, onSyncResult } from "../lib/autosync";
 import { toast } from "../lib/toast";
 import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual, type DeckSlide } from "../types";
@@ -536,8 +536,11 @@ export default function Studio() {
    * were already signed in and the project behind the app was switched off.
    */
   const mergeCloud = () => hydrateCloud(project).then(cloud => {
-    if (cloud === null) { setSyncState("off"); return "off" as const; }
-    if (cloud === false) { setSyncState("down"); return "down" as const; }
+    setSyncAccount(cloud !== null);
+    if (cloud === null) return "off" as const;
+    // Signed in and the read failed. The channel may still be up, so this is the fact that decides
+    // it: a cloud that cannot answer a select is not syncing, whatever the socket says.
+    if (cloud === false) { setSyncChannel(false); return "down" as const; }
     const merged = mergeInto(data.current.tracks, data.current.sequences, cloud);
     setTracks(merged.tracks); setSequences(merged.sequences);
     return "pulled" as const;
@@ -553,13 +556,7 @@ export default function Studio() {
    * Another device changed something. Pull and merge rather than reload: the merge is three-way and
    * knows the difference between their edit and yours, so nothing being worked on is lost.
    */
-  useEffect(() => watchCloud(project, () => { void mergeCloud(); }, undefined, live => {
-    // The channel is only meaningful once there is an account behind it. Without one this is a
-    // socket nobody asked for, and reporting it as an outage would put a fault on the chrome of
-    // every visitor who has not signed up.
-    if (live) setSyncState("live");
-    else if (syncState() !== "off") setSyncState("down");
-  }), []);
+  useEffect(() => watchCloud(project, () => { void mergeCloud(); }, undefined, setSyncChannel), []);
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
   useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences, project)); }), []);
   useEffect(() => {
