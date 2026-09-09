@@ -35,21 +35,45 @@ const store = (): CachesLike | null => {
 
 export const canKeepOffline = () => store() !== null;
 
+/**
+ * Opening the bucket can be refused outright rather than merely absent: Firefox private browsing,
+ * a storage policy and a full disk all reject the promise. That used to reject out of every call
+ * below, so the button span forever and nothing was ever said.
+ */
+async function openMedia(): Promise<CacheLike | null> {
+  try { return (await store()?.open(MEDIA_CACHE)) ?? null; }
+  catch { return null; }
+}
+
+/** Why files are missing, in the operator's terms, because "not ready" is not a diagnosis. */
+const REASONS = {
+  storage: "This device would not give CueFlow room to store them. Private browsing, a storage policy and a full disk all do this.",
+  network: "They could not be reached. A dropped connection, or a storage host that refuses to serve this page, will do this.",
+  server: "The storage host would not hand them over. An upload that has not finished, or a file that has since been removed, will do this.",
+} as const;
+type Cause = keyof typeof REASONS;
+const quota = (error: unknown) => error instanceof Error && /quota|exceeded|space/i.test(`${error.name} ${error.message}`);
+
 /** A `blob:` URL is this document's own memory and a `data:` one is already here. Neither is fetchable. */
 export const keepable = (url: string) => /^https?:/i.test(url);
 
 export type OfflineProgress = { done: number; total: number; url: string; ok: boolean };
+export type OfflineResult = { stored: number; failed: string[]; reason?: string };
 
 /**
  * Fetches every URL and holds it. Returns what could not be had, rather than throwing on the first
  * failure: one dead link in a library of forty should not stop the other thirty-nine being ready.
+ *
+ * `reason` says which of the three things went wrong, because every failure used to be reported as
+ * an unfinished upload and a blocked cache, a CORS refusal and a dead network are not that.
  */
-export async function keepOffline(urls: string[], onProgress?: (p: OfflineProgress) => void) {
-  const cache = await store()?.open(MEDIA_CACHE);
+export async function keepOffline(urls: string[], onProgress?: (p: OfflineProgress) => void): Promise<OfflineResult> {
+  const cache = await openMedia();
   const wanted = [...new Set(urls.filter(keepable))];
-  if (!cache) return { stored: 0, failed: wanted };
+  if (!cache) return { stored: 0, failed: wanted, reason: REASONS.storage };
 
   const failed: string[] = [];
+  const causes = new Set<Cause>();
   let stored = 0;
   for (const url of wanted) {
     let ok = false;
@@ -61,28 +85,37 @@ export async function keepOffline(urls: string[], onProgress?: (p: OfflineProgre
         // 404 would be cached as if it were the file and the cue would fail silently on the night.
         const response = await fetch(url, { mode: "cors", credentials: "omit" });
         if (response.ok) { await cache.put(url, response.clone()); ok = true; }
+        else causes.add("server");
       }
-    } catch { ok = false; }
+    } catch (error) { causes.add(quota(error) ? "storage" : "network"); }
     if (ok) stored += 1; else failed.push(url);
     onProgress?.({ done: stored + failed.length, total: wanted.length, url, ok });
   }
   if (stored) setOfflineWanted(true);
-  return { stored, failed };
+  // Worst first: a device that will not store anything is a different problem from one bad file.
+  const cause = (["storage", "network", "server"] as const).find(c => causes.has(c));
+  return { stored, failed, reason: cause && REASONS[cause] };
 }
 
 /** Which of these are already held, so the UI can say "31 of 34" rather than only "on" or "off". */
 export async function offlineHave(urls: string[]): Promise<string[]> {
-  const cache = await store()?.open(MEDIA_CACHE);
+  const cache = await openMedia();
   if (!cache) return [];
   const wanted = [...new Set(urls.filter(keepable))];
-  const held = await Promise.all(wanted.map(async url => ((await cache.match(url)) ? url : null)));
+  const held = await Promise.all(wanted.map(async url => {
+    try { return (await cache.match(url)) ? url : null; } catch { return null; }
+  }));
   return held.filter((url): url is string => url !== null);
 }
 
-/** Gives the space back. Does not touch the app shell, which is small and always worth keeping. */
-export async function forgetOffline() {
+/**
+ * Gives the space back. Does not touch the app shell, which is small and always worth keeping.
+ * Says whether it went, so the page cannot announce a clearance the browser refused.
+ */
+export async function forgetOffline(): Promise<boolean> {
   setOfflineWanted(false);
-  await store()?.delete(MEDIA_CACHE);
+  try { await store()?.delete(MEDIA_CACHE); return true; }
+  catch { return false; }
 }
 
 /**

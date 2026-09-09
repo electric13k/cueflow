@@ -13,7 +13,7 @@ import { currentProject, listProjects, type Project } from "../lib/projects";
 import { listShows, type Show } from "../lib/shows";
 import { listSessions, type EditorSession } from "../lib/editorSessions";
 import { search, type Facets } from "../lib/search";
-import { hydrateCloud, local, mergeInto, onAuth } from "../lib/store";
+import { hydrateCloud, isDeleted, local, onAuth } from "../lib/store";
 import { loadScript } from "../lib/script";
 import { cueNumbers, kindOf, type Sequence, type Track } from "../types";
 
@@ -40,19 +40,26 @@ export default function Workspace() {
    *
    * Workspace read localStorage and stopped there, so signing in on a second device showed an empty
    * recents list next to a Studio that had everything -- the same account, the same project, two
-   * different answers. The merge is the same three-way one the Studio uses, so opening this page
-   * cannot clobber work the Studio has open in another tab.
+   * different answers.
+   *
+   * Listing is the whole job here, so this adds what the cloud has and this device has not, and
+   * stops. It used to run the Studio's three-way merge, which commits a new sync baseline, and then
+   * dropped the merged arrays on the floor: a page that only reads was moving the state another
+   * tab's merge depends on, for a result nobody kept.
    */
   useEffect(() => {
     let live = true;
     void hydrateCloud(project).then(cloud => {
       if (!live || !cloud) return;
-      const merged = mergeInto(local.get(key("tracks"), []), local.get(key("sequences"), []), cloud);
-      setTracks(merged.tracks);
-      setSequences(merged.sequences);
+      const add = <T extends { id: string }>(here: T[], there: T[]) => {
+        const have = new Set(here.map(row => row.id));
+        return [...here, ...there.filter(row => !have.has(row.id) && !isDeleted(row.id))];
+      };
+      setTracks(here => add(here, cloud.tracks));
+      setSequences(here => add(here, cloud.sequences));
     });
     return () => { live = false; };
-  }, []);
+  }, [project]);
 
   useEffect(() => {
     let live = true;

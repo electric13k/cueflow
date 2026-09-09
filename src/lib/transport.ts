@@ -64,6 +64,7 @@ export interface Transport {
 }
 
 const DEVICE_KEY = "cueflow:device";
+const SEQ_KEY = "cueflow:seq";
 
 /** Stable per-device id, so a message relayed back to us is recognised as one already seen. */
 export function deviceId(): string {
@@ -76,6 +77,29 @@ export function deviceId(): string {
   } catch {
     // Private mode, or storage disabled. A per-session id still de-duplicates within this run.
     return crypto.randomUUID();
+  }
+}
+
+/** How many sequence numbers one run claims at a time. */
+const SEQ_BLOCK = 10_000;
+
+/**
+ * The next run of sequence numbers this device may use, taken out of storage before it is used.
+ *
+ * `from` outlives the tab, so a counter that began again at 0 handed peers numbers their `seenGate`
+ * had already seen: a reloaded host's deck and every cue behind it were discarded as duplicates,
+ * leaving the room on a stale deck with no error at either end. Claimed in blocks rather than
+ * written on every send, because a live show must not touch the disk once per cue.
+ */
+export function reserveSequence(block = SEQ_BLOCK): { first: number; last: number } {
+  try {
+    const held = Number(localStorage.getItem(SEQ_KEY));
+    const first = (Number.isFinite(held) && held > 0 ? held : 0) + 1;
+    localStorage.setItem(SEQ_KEY, String(first + block));
+    return { first, last: first + block };
+  } catch {
+    // Private mode, where `deviceId()` is a fresh id every run too, so nothing of ours can collide.
+    return { first: 1, last: Number.MAX_SAFE_INTEGER };
   }
 }
 
@@ -133,7 +157,12 @@ export async function openShowLink(
   const fresh = seenGate();
   let link: Link | null = null;
   let closed = false;
-  let seq = 0;
+  let block = reserveSequence();
+  let seq = block.first - 1;
+  const nextSeq = () => {
+    if (seq >= block.last) { block = reserveSequence(); seq = block.first - 1; }
+    return ++seq;
+  };
 
   const receive = (envelope: Envelope) => {
     if (envelope.show !== show || envelope.from === me) return;
@@ -159,7 +188,15 @@ export async function openShowLink(
     onTransportChange?.(null);
   };
 
-  const reconnect = async () => { link = null; onTransportChange?.(null); await connect(); };
+  const reconnect = async () => {
+    // Closed, not merely dropped: a channel left registered keeps auto-rejoining and keeps its
+    // handler bound, so five wifi blips leave six of them parsing every envelope that arrives.
+    const dead = link;
+    link = null;
+    dead?.close();
+    onTransportChange?.(null);
+    await connect();
+  };
 
   await connect();
 
@@ -169,7 +206,7 @@ export async function openShowLink(
     send(msg) {
       const open = link;
       if (!open) throw new Error("No link to the room, so nothing was sent.");
-      open.send({ v: 1, show, from: me, seq: ++seq, msg });
+      open.send({ v: 1, show, from: me, seq: nextSeq(), msg });
     },
     close() {
       closed = true;

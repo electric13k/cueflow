@@ -100,7 +100,28 @@ describe("keepOffline", () => {
   it("treats a network error as a failure rather than throwing at the caller", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline already"); }));
     const result = await keepOffline(["https://files.example/a.mp3"]);
-    expect(result).toEqual({ stored: 0, failed: ["https://files.example/a.mp3"] });
+    expect(result.stored).toBe(0);
+    expect(result.failed).toEqual(["https://files.example/a.mp3"]);
+  });
+
+  it("says the network was the problem, rather than blaming the upload", async () => {
+    // Every failure used to be reported as an unfinished upload. A blocked cache, a CORS refusal
+    // and a dead network are three different things and the operator can only act on the right one.
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline already"); }));
+    const result = await keepOffline(["https://files.example/a.mp3"]);
+    expect(result.reason).toMatch(/could not be reached/i);
+  });
+
+  it("blames the host, not the network, when the host answers with an error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    const result = await keepOffline(["https://files.example/a.mp3"]);
+    expect(result.reason).toMatch(/would not hand them over/i);
+  });
+
+  it("says nothing went wrong when nothing did", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ok()));
+    const result = await keepOffline(["https://files.example/a.mp3"]);
+    expect(result.reason).toBeUndefined();
   });
 
   it("never stores a 404 as if it were the file", async () => {

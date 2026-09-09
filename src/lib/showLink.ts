@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ShowMsg } from "./shows";
-import { openShowLink, type Router, type Transport } from "./transport";
+import { openShowLink, PayloadTooLarge, type Router, type Transport } from "./transport";
 import { cloudTransport } from "./transports/cloud";
 import { bleTransport } from "./transports/ble";
+import { toast } from "./toast";
 
 /**
  * The transports a show will try, in order of preference.
@@ -34,6 +35,8 @@ export type ShowLink = {
   /** Which wire is carrying the show, or null while there is none. */
   transport: string | null;
   ready: boolean;
+  /** Re-probe the transports now. See `ShowLinkHandle.reopen`. */
+  reopen: () => void;
 };
 
 export type ShowLinkOptions = {
@@ -46,6 +49,14 @@ export type ShowLinkOptions = {
    */
   hello?: () => ShowMsg | null;
   onTransport?: (id: string | null) => void;
+  /**
+   * A message no link in the room can carry.
+   *
+   * Requeueing it retried it for ever: it went to the back of the queue on every flush while
+   * `QUEUE_LIMIT` shifted real cues off the front, and nobody was ever told the deck had not gone
+   * out. A refusal is an answer, so it is reported rather than retried.
+   */
+  onRefused?: (msg: ShowMsg, error: PayloadTooLarge) => void;
   /** Both injectable so tests do not have to wait out a real backoff. `delay` returns a canceller. */
   open?: typeof openShowLink;
   delay?: (fn: () => void, ms: number) => () => void;
@@ -54,6 +65,15 @@ export type ShowLinkOptions = {
 export type ShowLinkHandle = {
   send: (msg: ShowMsg) => void;
   close: () => void;
+  /**
+   * Probe the transports again, now, without waiting out the backoff.
+   *
+   * The reason this exists is Bluetooth. `bleTransport.available()` answers false until the operator
+   * has pressed something, because `requestDevice` puts the browser's own chooser on screen and will
+   * not run from a background probe. So the press that turns Bluetooth on has to be able to say "ask
+   * again", or the transport it just enabled would not be considered until the next reconnect.
+   */
+  reopen: () => void;
   readonly transport: string | null;
   /** Exposed for tests and for the "N messages waiting" state a slow link deserves to show. */
   readonly queued: number;
@@ -131,6 +151,18 @@ export function createShowLink(options: ShowLinkOptions): ShowLinkHandle {
       if (!open?.transport) { push(msg); return; }
       try { open.send(msg); } catch { push(msg); }
     },
+    reopen() {
+      if (closed) return;
+      // Drop any pending retry first, or it fires later against the router this call replaces and
+      // tears down a link that is by then working.
+      cancelRetry?.();
+      cancelRetry = null;
+      attempt = 0;
+      router?.close();
+      router = null;
+      options.onTransport?.(null);
+      void connect();
+    },
     close() {
       closed = true;
       cancelRetry?.();
@@ -171,5 +203,6 @@ export function useShowLink(
     transport,
     ready: transport !== null,
     send: (msg: ShowMsg) => handle.current?.send(msg),
+    reopen: () => handle.current?.reopen(),
   };
 }

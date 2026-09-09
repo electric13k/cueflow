@@ -5,7 +5,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
  *
  * Three jobs, in this order:
  *   1. guests: an upload with no owner goes 30 days after it landed. Nobody can be warned, because
- *      a guest upload carries no address, which is exactly why its clock is short.
+ *      a guest upload carries no address, which is exactly why its clock is short. Ownerless means
+ *      no tracks row anywhere points at it, and that has to be read in full before anything goes.
  *   2. warn: an account quiet for 335 days gets one email, and a deadline 30 days out is written
  *      down. Coming back clears the notice, so the mail can only ever be sent once per idle spell.
  *   3. delete: an account past its deadline loses its files, its rows and its login.
@@ -82,10 +83,60 @@ async function send(to: string, subject: string, html: string, text: string) {
   return { sent: res.ok, reason: res.ok ? "" : `${res.status} ${await res.text()}` };
 }
 
+const OBJECT_PREFIX = `/object/public/${BUCKET}/`;
+
+/** The storage API lists a name decoded and a public URL spells it encoded; both name one object. */
+function spellings(path: string) {
+  try {
+    const decoded = decodeURIComponent(path);
+    return decoded === path ? [path] : [path, decoded];
+  } catch {
+    return [path];   // a malformed escape is not a second spelling of anything
+  }
+}
+
+/**
+ * Every object one tracks row points at, whichever column recorded it.
+ *
+ * `storage_path` went unwritten for a long time, so a row from before that carries its object only
+ * inside `source_url`. A row read as pointing at nothing is a file the guest sweep below deletes,
+ * so both columns have to count.
+ */
+function claimsOf(row: { storage_path?: string | null; source_url?: string | null }) {
+  const found: string[] = [];
+  if (row.storage_path) found.push(row.storage_path);
+  const url = row.source_url ?? "";
+  const at = url.indexOf(OBJECT_PREFIX);
+  if (at !== -1) found.push(url.slice(at + OBJECT_PREFIX.length).split("?")[0]);
+  return found.flatMap(spellings);
+}
+
 /** Every stored path a user owns, so a deletion takes the blobs and not just the rows. */
 async function pathsOf(userId: string) {
-  const { data } = await admin.from("tracks").select("storage_path").eq("user_id", userId);
-  return (data ?? []).map(r => r.storage_path).filter(Boolean) as string[];
+  const { data } = await admin.from("tracks").select("storage_path,source_url").eq("user_id", userId);
+  return [...new Set((data ?? []).flatMap(claimsOf))];
+}
+
+/**
+ * Every object the tracks table points at, or `null` when that list could not be read in full.
+ *
+ * Nothing under `public/` records who uploaded it, so a tracks row is the only ownership signal
+ * there is. A partial answer reads as "nobody claims these", which is the exact sentence that
+ * deletes a paying member's audio, so a read that did not finish returns nothing rather than a
+ * short list the caller would trust.
+ */
+async function allClaimed(): Promise<Set<string> | null> {
+  const claimed = new Set<string>();
+  const PAGE = 1000;
+  for (let page = 0; page < 200; page++) {
+    const from = page * PAGE;
+    const { data, error } = await admin.from("tracks")
+      .select("storage_path,source_url").order("id", { ascending: true }).range(from, from + PAGE - 1);
+    if (error) return null;
+    for (const row of data ?? []) for (const path of claimsOf(row)) claimed.add(path);
+    if ((data?.length ?? 0) < PAGE) return claimed;
+  }
+  return null;   // more rows than this job will read means it cannot say what is unclaimed
 }
 
 async function sweepGuests() {
@@ -102,14 +153,17 @@ async function sweepGuests() {
     }
     if (data.length < 100) break;
   }
-  // A guest upload that an account later claimed is somebody's asset now, so it is not a guest file.
-  const claimed = new Set<string>();
-  if (doomed.length) {
-    const { data } = await admin.from("tracks").select("storage_path").in("storage_path", doomed);
-    for (const r of data ?? []) if (r.storage_path) claimed.add(r.storage_path);
-  }
+  if (!doomed.length) return { scanned: 0, deleted: 0 };
+  // A guest upload that an account claimed is somebody's asset now, so it is not a guest file. An
+  // object is only deleted here once it has been positively identified as claimed by nobody, so if
+  // the claim list cannot be had this sweep deletes nothing: a guest file kept too long costs a few
+  // megabytes, and a member's audio deleted by a service-role job cannot be got back.
+  const claimed = await allClaimed();
+  if (!claimed) return { scanned: doomed.length, deleted: 0, held: "tracks could not be read in full" };
   const remove = doomed.filter(p => !claimed.has(p));
-  if (remove.length) await admin.storage.from(BUCKET).remove(remove);
+  if (!remove.length) return { scanned: doomed.length, deleted: 0 };
+  const { error } = await admin.storage.from(BUCKET).remove(remove);
+  if (error) return { scanned: doomed.length, deleted: 0, held: error.message };
   return { scanned: doomed.length, deleted: remove.length };
 }
 

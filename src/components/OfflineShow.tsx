@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CloudDownload, Trash2, WifiOff } from "lucide-react";
 import { Button } from "../ui";
+import { ensureCueflowCache } from "../lib/cache";
 import { canKeepOffline, forgetOffline, keepOffline, mediaForShow, offlineHave } from "../lib/offline";
 import { toast } from "../lib/toast";
 import type { Sequence, Track } from "../types";
@@ -23,7 +24,7 @@ export default function OfflineShow({ sequences, tracks }: { sequences: Sequence
 
   const check = useCallback(() => {
     if (!canKeepOffline()) { setHeld(null); return; }
-    void offlineHave(wanted).then(have => setHeld(have.length));
+    void offlineHave(wanted).then(have => setHeld(have.length), () => setHeld(null));
   }, [wanted.join("\n")]);
 
   useEffect(check, [check]);
@@ -32,24 +33,41 @@ export default function OfflineShow({ sequences, tracks }: { sequences: Sequence
 
   const download = async () => {
     setBusy({ done: 0, total: wanted.length });
-    const result = await keepOffline(wanted, p => setBusy({ done: p.done, total: p.total }));
-    setBusy(null);
-    check();
-    if (result.failed.length) {
-      toast(
-        "Some cues are not ready",
-        `${result.stored} of ${wanted.length} are on this device. The rest could not be fetched -- an upload that has not finished will do this.`,
-        "warn",
-      );
-    } else {
-      toast("Ready to run offline", `${result.stored} file${result.stored === 1 ? "" : "s"} held on this device.`, "success");
+    // Registered alongside the download rather than after it: the files are useless without a worker
+    // to serve them, and a device that declined performance cookies has none until it is asked.
+    const worker = ensureCueflowCache().catch(() => false);
+    try {
+      const result = await keepOffline(wanted, p => setBusy({ done: p.done, total: p.total }));
+      const serving = await worker;
+      if (result.failed.length) {
+        toast(
+          result.stored ? "Some cues are not ready" : "Nothing could be kept on this device",
+          `${result.stored} of ${wanted.length} are on this device. ${result.reason ?? ""}`.trim(),
+          "warn",
+        );
+      } else if (!serving) {
+        // Held, but nothing is intercepting the request for them, so the cue would still be silent.
+        toast(
+          "Held, but not ready yet",
+          `${result.stored} file${result.stored === 1 ? "" : "s"} are on this device. Reload this page to let CueFlow serve them with the network down.`,
+          "warn",
+        );
+      } else {
+        toast("Ready to run offline", `${result.stored} file${result.stored === 1 ? "" : "s"} held on this device.`, "success");
+      }
+    } catch {
+      toast("Could not keep this show", "This device stopped part way through. Try again once there is a connection.", "warn");
+    } finally {
+      setBusy(null);
+      check();
     }
   };
 
   const drop = async () => {
-    await forgetOffline();
+    const gone = await forgetOffline();
     check();
-    toast("Space given back", "The held cues have gone. They will still play with a connection.", "info");
+    if (gone) toast("Space given back", "The held cues have gone. They will still play with a connection.", "info");
+    else toast("The held cues are still there", "This device would not let CueFlow clear them. Clearing site data in the browser will.", "warn");
   };
 
   const ready = held !== null && wanted.length > 0 && held === wanted.length;

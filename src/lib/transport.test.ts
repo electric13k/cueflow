@@ -153,10 +153,27 @@ describe("openShowLink", () => {
     const router = await openShowLink("show-1", [lan.transport], () => {});
     router.send(cue(0));
     router.send(cue(1));
-    expect(lan.sent.map(e => e.seq)).toEqual([1, 2]);
+    // Rising, not starting at 1. The device id is persisted, so a counter that restarted from zero
+    // on every reload landed inside the range a peer had already seen and marked as duplicates: the
+    // host reloaded mid-show and every cue it sent after that was silently dropped by the crew.
+    const [first, second] = lan.sent.map(e => e.seq);
+    expect(second).toBe(first + 1);
+    expect(first).toBeGreaterThan(0);
     expect(lan.sent[0].show).toBe("show-1");
     expect(lan.sent[0].from).toBe(lan.sent[1].from);
     expect(lan.sent[0].from).toBeTruthy();
+  });
+
+  it("does not reuse a sequence number after a restart", async () => {
+    const lan = fake("lan");
+    const first = await openShowLink("show-1", [lan.transport], () => {});
+    first.send(cue(0));
+    const before = lan.sent.at(-1)!.seq;
+    // A second router stands in for the same device after a reload: same persisted id, so its
+    // numbers have to carry on from where the last run stopped rather than collide with it.
+    const again = await openShowLink("show-1", [lan.transport], () => {});
+    again.send(cue(1));
+    expect(lan.sent.at(-1)!.seq).toBeGreaterThan(before);
   });
 
   it("does not act on its own message coming back off the wire", async () => {
