@@ -4,6 +4,7 @@ import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Backdrop from "./Backdrop";
 import Nav from "./Nav";
 import Sidebar from "./Sidebar";
+import SyncPill from "./SyncPill";
 import { SiteFooter, SkipLink } from "./Page";
 import { Button } from "../ui";
 import { useDeviceCapabilities, useLayout } from "../lib/layout";
@@ -156,6 +157,7 @@ export default function Shell({ children, width = "" }: { children: React.ReactN
               aria-label={collapsed ? "Show sidebar" : "Hide sidebar"} onPress={() => setLayout({ pane: collapsed ? "panel" : "focus" })}>
               {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
             </Button>
+            <SyncPill />
           </div>
           {children}
         </motion.main>

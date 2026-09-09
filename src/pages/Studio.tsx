@@ -37,6 +37,7 @@ import { search as rank, type Facet, type SortKey } from "../lib/search";
 import { cuePoints } from "../lib/trim";
 import { downloadAsset, embedUrl, kindFromFile, kindFromUrl, prettyName, resolveHit, searchArchive, searchCommons, searchOpenverse, uniqueTitle, type Hit, type Source } from "../lib/media";
 import { deleteSequenceEverywhere, deleteTrackEverywhere, hydrateCloud, isDeleted, local, mergeInto, onAuth, persist, uploadTrack, watchCloud } from "../lib/store";
+import { describeSync, setSyncState, syncState } from "../lib/sync";
 import { autoSave, flushSave, onSyncResult } from "../lib/autosync";
 import { toast } from "../lib/toast";
 import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kindOf, Effects, Kind, Sequence, SequenceItem, Stage as StageState, Track, Visual, type DeckSlide } from "../types";
@@ -528,24 +529,37 @@ export default function Studio() {
   }, []);
   useEffect(() => { local.set(key("session"), { selectedId, sequenceId, cueIndex, tab } satisfies Session); }, [selectedId, sequenceId, cueIndex, tab]);
   const data = useRef({ tracks, sequences }); data.current = { tracks, sequences };
+  /**
+   * `hydrateCloud` answers with three things and they must not be flattened into two: a `CloudCopy`
+   * is a successful read, `null` means there is no account to read for, and `false` means there is
+   * one and the read failed. Collapsing the last two is what told an operator to sign in while they
+   * were already signed in and the project behind the app was switched off.
+   */
   const mergeCloud = () => hydrateCloud(project).then(cloud => {
-    if (!cloud) return false;
+    if (cloud === null) { setSyncState("off"); return "off" as const; }
+    if (cloud === false) { setSyncState("down"); return "down" as const; }
     const merged = mergeInto(data.current.tracks, data.current.sequences, cloud);
     setTracks(merged.tracks); setSequences(merged.sequences);
-    return true;
+    return "pulled" as const;
   });
   /** Manual pull, for when a second device has work this one has not seen yet. */
-  const syncNow = () => mergeCloud().then(pulled => toast(
-    pulled ? "Synced" : "Nothing to sync",
-    pulled ? "Pulled everything saved to your account." : "Sign in to sync across devices.",
-    pulled ? "success" : "warn",
-  ));
+  const syncNow = () => mergeCloud().then(result => {
+    if (result === "pulled") return toast("Synced", "Pulled everything saved to your account.", "success");
+    if (result === "down") return toast("Could not reach the cloud", describeSync("down").detail, "warn");
+    return toast("Nothing to sync", describeSync("off").detail, "warn");
+  });
   useEffect(() => { void mergeCloud(); }, []);
   /**
    * Another device changed something. Pull and merge rather than reload: the merge is three-way and
    * knows the difference between their edit and yours, so nothing being worked on is lost.
    */
-  useEffect(() => watchCloud(project, () => { void mergeCloud(); }), []);
+  useEffect(() => watchCloud(project, () => { void mergeCloud(); }, undefined, live => {
+    // The channel is only meaningful once there is an account behind it. Without one this is a
+    // socket nobody asked for, and reporting it as an outage would put a fault on the chrome of
+    // every visitor who has not signed up.
+    if (live) setSyncState("live");
+    else if (syncState() !== "off") setSyncState("down");
+  }), []);
   // On sign-in: pull the account's saved data and push whatever is currently local up to it.
   useEffect(() => onAuth(email => { if (!email) return; void mergeCloud().then(() => persist(data.current.tracks, data.current.sequences, project)); }), []);
   useEffect(() => {
