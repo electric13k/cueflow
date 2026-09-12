@@ -57,7 +57,7 @@ function Door({ onIn, onClose, initialKey = "" }: { onIn: (t: Ticket) => void; o
         <div className="pr-10">
           <p className="eyebrow text-accent">Join a show</p>
           <h1 id="join-show-title" className="mt-2 text-title font-semibold tracking-tight">Type your key</h1>
-          <p id="join-show-description" className="mt-2 text-sm text-muted">
+          <p id="join-show-description" className="mt-2 text-body text-muted">
             No account needed. Whoever is running the show gives you a key, and the key is the job, type
             it and you are on followspot, or on sound, or holding the whole thing. Nothing to choose.
           </p>
@@ -66,9 +66,9 @@ function Door({ onIn, onClose, initialKey = "" }: { onIn: (t: Ticket) => void; o
           <Input autoFocus label="Your key" value={key} onValueChange={v => setKey(v.trim())}
             className="font-mono" placeholder="K7QM2X" onKeyDown={e => { if (e.key === "Enter") void go(); }} />
           <Input label="Your name" value={name} onValueChange={setName} placeholder="Sam on sound" />
-          {note && <p className="text-sm text-live">{note}</p>}
+          {note && <p className="text-body text-live">{note}</p>}
           <Button color="primary" isLoading={busy} isDisabled={key.trim().length < 4} onPress={go}>Go in</Button>
-          <p className="text-xs text-muted">
+          <p className="text-label text-muted">
             Lost it, or it stopped working? Ask whoever is running the show, they can hand out a new one,
             and the old one dies the moment they do.
           </p>
@@ -329,13 +329,13 @@ export default function Show() {
         <h1 className="max-w-md text-title font-semibold tracking-tight">
           {refused ? "You were not let in." : "Standing by to be let in."}
         </h1>
-        <p className="max-w-md text-sm text-muted">
+        <p className="max-w-md text-body text-muted">
           {door.note ?? (refused
             ? "Ask whoever is running the show if you think that is wrong."
             : "Whoever is running the show can see you at the door. This screen changes on its own.")}
         </p>
         <div className="flex gap-2">
-          {!refused && <span aria-live="polite" className="flex items-center gap-2 text-xs text-muted"><span className="armed-dot h-2 w-2 rounded-full bg-armed" />Still waiting</span>}
+          {!refused && <span aria-live="polite" className="flex items-center gap-2 text-label text-muted"><span className="armed-dot h-2 w-2 rounded-full bg-armed" />Still waiting</span>}
           <Button size="sm" variant="light" onPress={() => { forgetTicket(); setTicket(null); setDoor(null); }}>Leave</Button>
         </div>
       </div>
@@ -359,10 +359,10 @@ export default function Show() {
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">{ticket.name}</h1>
-          <p className="text-xs text-muted">
+          <p className="text-label text-muted">
             {ticket.role ?? "No job assigned"} · {started ? "live" : "standing by"}{note ? ` · ${note}` : ""}
           </p>
-          {soundNote && <p className="mt-1 text-xs text-armed" role="status">{soundNote}</p>}
+          {soundNote && <p className="mt-1 text-label text-armed" role="status">{soundNote}</p>}
         </div>
         <div className="flex items-center gap-2">
           {/* A collaborator holds the show password, which is the host's own key: they can call it on. */}
@@ -370,13 +370,13 @@ export default function Show() {
             ? <Button size="sm" variant="flat" color="danger" onPress={() => { bus.send({ type: "end" }); setStarted(null); }}>End</Button>
             : <Button size="sm" color="primary" onPress={() => { const at = new Date().toISOString(); bus.send({ type: "start", at }); setStarted(at); startCurtain(); }}>Start the show</Button>)}
           {started
-            ? <span className="flex items-center gap-1 text-xs text-live"><Lock size={13} />Locked in</span>
-            : <span className="flex items-center gap-1 text-xs text-muted"><Unlock size={13} />Not started</span>}
+            ? <span className="flex items-center gap-1 text-label text-live"><Lock size={13} />Locked in</span>
+            : <span className="flex items-center gap-1 text-label text-muted"><Unlock size={13} />Not started</span>}
           <DarkToggle />
           <Button isIconOnly size="sm" variant="light" aria-label="Full screen"
             onPress={() => void document.documentElement.requestFullscreen?.().catch(() => {})}><Maximize size={15} /></Button>
           {can(ticket, "fire") && (soundOn
-            ? <span className="flex items-center gap-1 text-xs text-ready"><Volume2 size={13} aria-hidden />Sound on</span>
+            ? <span className="flex items-center gap-1 text-label text-ready"><Volume2 size={13} aria-hidden />Sound on</span>
             : <Button size="sm" variant="flat" startContent={<VolumeX size={14} aria-hidden />} onPress={enableSound}>
                 Turn sound on
               </Button>)}
@@ -390,7 +390,7 @@ export default function Show() {
             * to be the same gesture that opens the chooser, which is why `reopen` exists.
             */}
           {bluetoothPossible() && (btOn
-            ? <span className="flex items-center gap-1 text-xs text-ready"><Bluetooth size={13} aria-hidden />Bluetooth on</span>
+            ? <span className="flex items-center gap-1 text-label text-ready"><Bluetooth size={13} aria-hidden />Bluetooth on</span>
             : <Button size="sm" variant="flat" startContent={<Bluetooth size={14} aria-hidden />}
                 onPress={() => { enableBluetooth(); setBtOn(true); link.reopen(); }}>
                 Use Bluetooth
@@ -406,10 +406,10 @@ export default function Show() {
              under stage light is the one place refraction costs more than it gives. */
           <section className="glass-soft min-h-0 overflow-auto p-3">
             <h2 className="mb-2 label-cap text-muted">Sequence</h2>
-            {cues.length === 0 && <p className="text-sm text-muted">Waiting for the host to send the deck…</p>}
+            {cues.length === 0 && <p className="text-body text-muted">Waiting for the host to send the deck…</p>}
             <ol className="space-y-1">
               {cues.map((cue, i) => (
-                <li key={cue.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${i === index ? "bg-live/20 ring-1 ring-live" : "bg-white/5"}`}>
+                <li key={cue.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-body ${i === index ? "bg-live/20 ring-1 ring-live" : "bg-white/5"}`}>
                   <span className={`w-7 shrink-0 text-center font-mono font-bold ${cue.kind === "audio" ? "text-audio" : "text-visual"}`}>{cue.number}</span>
                   {can(ticket, "edit") ? (
                     // Renaming is the edit that actually happens mid-show. The host's copy is the
@@ -453,14 +453,14 @@ export default function Show() {
               )}
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-black/40">
-              {!stage && <p className="text-sm text-muted">Nothing up.</p>}
+              {!stage && <p className="text-body text-muted">Nothing up.</p>}
               {stage && <Stage stage={{ ...stage, visual: { ...stage.visual, muted: !hearStage } }} className="h-full w-full" />}
             </div>
           </section>
         )}
 
         {!can(ticket, "cues") && !can(ticket, "script") && !can(ticket, "stage") && (
-          <section className="glass flex items-center justify-center p-8 text-center text-sm text-muted lg:col-span-2">
+          <section className="glass flex items-center justify-center p-8 text-center text-body text-muted lg:col-span-2">
             You are in. Your job does not need the cue list or the script, messages will still reach you.
           </section>
         )}

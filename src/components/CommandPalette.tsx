@@ -47,11 +47,11 @@ export default function CommandPalette({ open, onOpen, onClose, commands }: {
             <Input autoFocus value={query} onValueChange={setQuery} placeholder="Search actions…" startContent={<Search size={15} />} />
             <div className="mt-3 max-h-[52vh] overflow-y-auto rounded-2xl border border-border bg-surface/50 p-1">
               {filtered.length ? filtered.map(command => (
-                <button key={command.id} type="button" onClick={() => { command.run(); close(); }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                  <span><span className="block font-semibold">{command.label}</span>{command.group && <span className="text-xs text-muted">{command.group}</span>}</span>
+                <button key={command.id} type="button" onClick={() => { command.run(); close(); }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-body transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                  <span><span className="block font-semibold">{command.label}</span>{command.group && <span className="text-label text-muted">{command.group}</span>}</span>
                   {command.hint && <kbd className="rounded-md border border-border px-1.5 py-0.5 font-mono text-micro text-muted">{command.hint}</kbd>}
                 </button>
-              )) : <p className="px-3 py-8 text-center text-sm text-muted">No matching actions.</p>}
+              )) : <p className="px-3 py-8 text-center text-body text-muted">No matching actions.</p>}
             </div>
           </ModalBody>
           <ModalFooter><Button variant="light" onPress={close}>Close</Button></ModalFooter>

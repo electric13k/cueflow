@@ -91,7 +91,7 @@ export function Input({ label, value, onValueChange, className, startContent, si
 }) {
   return (
     <label className={cn("block", className)}>
-      {label && <span className="mb-1 block text-sm text-muted">{label}</span>}
+      {label && <span className="mb-1 block text-body text-muted">{label}</span>}
       <span className="relative block">
         {startContent && <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-muted">{startContent}</span>}
         <I {...rest} className={cn(startContent && "pl-9")} fullWidth value={value} onChange={e => onValueChange?.(e.target.value)} />
@@ -133,7 +133,7 @@ export function Slider({ label, getValue, value, className, orientation = "horiz
     <S {...sliderProps} orientation={orientation} value={value}
       className={cn("control-slider", vertical ? "flex h-full flex-col items-center gap-1" : "w-full", className)}>
       {(label || getValue) && (
-        <div className={cn("text-xs text-muted", vertical ? "order-last flex flex-col items-center gap-0.5 text-center" : "mb-1 flex items-center justify-between")}>
+        <div className={cn("text-label text-muted", vertical ? "order-last flex flex-col items-center gap-0.5 text-center" : "mb-1 flex items-center justify-between")}>
           <span>{label}</span>
           <span className="tabular-nums">{getValue && value !== undefined ? getValue(value) : value}</span>
         </div>

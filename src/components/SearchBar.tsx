@@ -37,7 +37,7 @@ export default function SearchBar({ query, setQuery, sort, setSort, kinds = [], 
         <div className="flex flex-wrap gap-1">
           {kinds.map(k => (
             <button key={k} type="button" onClick={() => toggle(k)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${kind.includes(k) ? "border-accent bg-accent/15 text-foreground" : "border-border bg-surface/50 text-muted hover:text-foreground"}`}>
+              className={`rounded-full border px-3 py-1.5 text-label font-semibold capitalize transition-colors ${kind.includes(k) ? "border-accent bg-accent/15 text-foreground" : "border-border bg-surface/50 text-muted hover:text-foreground"}`}>
               {k}
             </button>
           ))}

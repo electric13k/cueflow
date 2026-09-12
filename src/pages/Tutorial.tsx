@@ -71,7 +71,7 @@ export default function Tutorial() {
 
       <section className="mt-14">
         <motion.h2 {...rise()} className="font-mono eyebrow text-muted">The four screens</motion.h2>
-        <p className="mt-2 text-sm text-muted">Tap a card to turn it over.</p>
+        <p className="mt-2 text-body text-muted">Tap a card to turn it over.</p>
         <div className="mt-7 grid gap-4 sm:grid-cols-2">
           {screens.map((s, i) => <ScreenCard key={s.title} {...s} delay={i * .05} />)}
         </div>
@@ -87,7 +87,7 @@ export default function Tutorial() {
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-sm text-muted">All of them rebindable in <a className="text-accent underline-offset-4 hover:underline" href="/settings">Settings</a>.</p>
+        <p className="mt-4 text-body text-muted">All of them rebindable in <a className="text-accent underline-offset-4 hover:underline" href="/settings">Settings</a>.</p>
       </section>
 
       <ClosingCta title="Open it and add one sound." note="That is genuinely the first step.">

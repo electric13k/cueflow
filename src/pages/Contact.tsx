@@ -25,7 +25,7 @@ export default function Contact() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: .3, margin: "0px 0px -8% 0px" }}
         transition={{ duration: .42, ease: [.16, 1, .3, 1] }}
-        className="mt-6 text-sm text-muted">
+        className="mt-6 text-body text-muted">
         Data questions are covered in the <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</Link>, and what you agree to by using CueFlow is in the <Link to="/terms" className="text-accent underline-offset-2 hover:underline">Terms</Link>.
       </motion.p>
     </Page>

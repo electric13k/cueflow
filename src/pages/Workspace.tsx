@@ -151,7 +151,7 @@ export default function Workspace() {
       <motion.div {...rise()}>
         <p className="font-mono eyebrow text-brass">{project ? "Project" : "Everything not in a project"}</p>
         <h1 className="mt-2 text-banner font-bold sm:text-display">{name}</h1>
-        <p className="mt-3 text-sm text-muted">
+        <p className="mt-3 text-body text-muted">
           The last {MONTH_DAYS} days, by category, most important first. Everything older is still in the Studio.
         </p>
       </motion.div>
@@ -161,7 +161,7 @@ export default function Workspace() {
           ? <RecentsSkeleton />
           : groups.length === 0
             ? (
-              <p className="rounded-md border border-dashed border-white/15 px-4 py-6 text-sm text-muted">
+              <p className="rounded-md border border-dashed border-white/15 px-4 py-6 text-body text-muted">
                 Nothing from the last {MONTH_DAYS} days. Open the Studio and add a sound or a slide.
               </p>
             )
@@ -173,7 +173,7 @@ export default function Workspace() {
                       <h2 className="font-mono eyebrow text-brass">{group.title}</h2>
                       <span className="font-mono text-micro text-muted">{group.items.length}</span>
                     </div>
-                    <p className="mt-1 text-xs text-muted">{group.blurb}</p>
+                    <p className="mt-1 text-label text-muted">{group.blurb}</p>
                     <ul className={`mt-3 ${GRID_CLASS}`} style={GRID_STYLE}>
                       {group.items.map((entry, i) => (
                         <RecentTile key={entry.id} entry={entry} delay={Math.min(i, 10) * .03} />

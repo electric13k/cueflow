@@ -36,7 +36,7 @@ export function SiteFooter() {
       viewport={{ once: true, amount: .2, margin: "0px 0px -8% 0px" }}
       transition={{ duration: .45, ease: [.16, 1, .3, 1] }}
       className="border-t border-white/10 py-8">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-sm text-muted sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 text-body text-muted sm:px-6 lg:px-8">
         <span className="flex items-center gap-2"><LogoMark size={24} /> CueFlow</span>
         <span className="flex flex-wrap items-center gap-4">
           {/* min-h-6 so a footer link clears the 24px minimum tap target on a phone; at 20px they failed it. */}
@@ -59,7 +59,7 @@ export function Section({ title, id, children }: { title: string; id?: string; c
       transition={{ duration: .48, ease: [.16, 1, .3, 1] }}
       className="mt-7 scroll-mt-20">
       <h3 className="text-base font-bold">{title}</h3>
-      <div className="mt-2 space-y-2 text-sm leading-relaxed text-muted">{children}</div>
+      <div className="mt-2 space-y-2 text-body leading-relaxed text-muted">{children}</div>
     </motion.section>
   );
 }
@@ -73,7 +73,7 @@ export function Section({ title, id, children }: { title: string; id?: string; c
 export function SkipLink() {
   return (
     <a href="#main"
-      className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-xl focus:border focus:border-accent focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground">
+      className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-xl focus:border focus:border-accent focus:bg-background focus:px-4 focus:py-2 focus:text-body focus:font-semibold focus:text-foreground">
       Skip to the main content
     </a>
   );

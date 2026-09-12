@@ -70,7 +70,7 @@ type Beat = (typeof beats)[number];
 
 function ShotImage({ desktopSrc, mobileSrc, alt, className, width, height, loading = "lazy", fetchPriority }: { desktopSrc: string; mobileSrc: string; alt: string; className: string; width: number; height: number; loading?: "eager" | "lazy"; fetchPriority?: "high" | "low" | "auto" }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <div role="img" aria-label={alt} className={`${className} shot-fallback flex items-center justify-center p-6 text-center text-sm text-muted`}>{alt}</div>;
+  if (failed) return <div role="img" aria-label={alt} className={`${className} shot-fallback flex items-center justify-center p-6 text-center text-body text-muted`}>{alt}</div>;
   return <picture>
     <source media="(max-width: 639px)" srcSet={mobileSrc} />
     <img key={`${desktopSrc}|${mobileSrc}`} src={desktopSrc} alt={alt} loading={loading} decoding="async" fetchPriority={fetchPriority}

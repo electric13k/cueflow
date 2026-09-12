@@ -61,7 +61,7 @@ function Row({ c }: { c: Credit }) {
         <a href={c.url} target="_blank" rel="noreferrer noopener" className="font-bold text-accent underline-offset-4 hover:underline">{c.name}</a>
         <span className="rounded-full bg-surface/70 px-2 py-0.5 text-micro font-semibold text-muted">{c.licence}</span>
       </div>
-      <p className="mt-1 text-sm text-muted">{c.what}</p>
+      <p className="mt-1 text-body text-muted">{c.what}</p>
     </li>
   );
 }
@@ -73,7 +73,7 @@ export default function Credits() {
     <Page width="max-w-3xl"><div ref={root}>
       <p className="eyebrow text-accent">Thanks</p>
       <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Standing on open shoulders</h1>
-      <p className="mt-2 text-sm text-muted">
+      <p className="mt-2 text-body text-muted">
         CueFlow's editors were built by studying tools that got these problems right first.
       </p>
 
@@ -99,7 +99,7 @@ export default function Credits() {
 
       <div data-reveal className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-semibold tracking-tight">Editor software credits</h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           These projects power or inform CueFlow’s browser editor workflows. Their license notices remain part
           of the shipped application and should be reviewed before redistribution.
         </p>
@@ -108,7 +108,7 @@ export default function Credits() {
 
       <div data-reveal className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-semibold tracking-tight">Where the media comes from</h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           Licences vary per item and several require attribution. Checking what you are about to perform in
           public is on you.
         </p>
@@ -117,7 +117,7 @@ export default function Credits() {
 
       <div data-reveal className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-2xl font-semibold tracking-tight">Built with</h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           React, Vite, Tailwind CSS, HeroUI, react-aria-components, Lucide icons, wavesurfer.js, Cropper.js,
           FFmpeg.wasm, Supabase, and the Web Audio API, which does the sound work here, in your browser, with
           nothing uploaded to process it. PowerPoint export uses CueFlow’s slide model and a self-contained

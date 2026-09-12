@@ -76,12 +76,12 @@ export default function OfflineShow({ sequences, tracks }: { sequences: Sequence
     <section className="rounded-2xl border border-border bg-surface/40 p-3">
       <h3 className="label-cap flex items-center gap-1.5 text-muted"><WifiOff size={13} aria-hidden />Running with no network</h3>
       {wanted.length === 0 ? (
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           Nothing to hold yet. Sounds land here once they have finished uploading.
         </p>
       ) : (
         <>
-          <p className="mt-2 text-sm text-muted" aria-live="polite">
+          <p className="mt-2 text-body text-muted" aria-live="polite">
             {busy
               ? `Fetching ${busy.done} of ${busy.total}…`
               : ready

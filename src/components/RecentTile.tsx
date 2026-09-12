@@ -75,13 +75,13 @@ export default function RecentTile({ entry, delay = 0 }: { entry: RecentEntry; d
           <Icon size={14} className={TINT[entry.kind]} aria-hidden />
           <span className="font-mono text-micro uppercase tracking-[.2em] text-muted">{LABEL[entry.kind]}</span>
         </span>
-        <span className={`mt-1.5 block truncate font-control ${roomy ? "text-base font-bold" : "text-sm font-semibold"}`}>{entry.title}</span>
+        <span className={`mt-1.5 block truncate font-control ${roomy ? "text-base font-bold" : "text-body font-semibold"}`}>{entry.title}</span>
 
         {/* A tall tile has room to say something useful before you ever hover it. */}
         {entry.kind === "sequence" && cues.length > 0 && (
           <span className="mt-2 block space-y-0.5 overflow-hidden">
             {cues.slice(0, 3).map(c => (
-              <span key={c.n} className="flex items-baseline gap-2 text-xs">
+              <span key={c.n} className="flex items-baseline gap-2 text-label">
                 <span className={`w-4 shrink-0 font-mono ${c.kind === "audio" ? "text-audio" : "text-visual"}`}>{c.n}</span>
                 <span className="truncate text-muted">{c.label}</span>
               </span>
@@ -119,7 +119,7 @@ function TilePreview({ entry, interactive = false, onClose }: { entry: RecentEnt
       const src = entry.src;
       const slides = entry.slides?.length ? entry.slides : [{ index: 0, label: "First slide" }];
       const slideUrl = (index: number) => `${src}${src.includes("?") ? "&" : "?"}slide=${index + 1}#slide=${index + 1}`;
-      return <div className="h-full overflow-y-auto p-2"><div className="grid gap-2">{slides.map(slide => <div key={slide.index} className="overflow-hidden rounded-lg border border-border"><iframe src={slideUrl(slide.index)} title={`${entry.title}, ${slide.label}`} loading="lazy" referrerPolicy="no-referrer" className="aspect-video h-auto w-full border-0" /><p className="px-2 py-1 font-control text-xs">{slide.label}</p></div>)}</div></div>;
+      return <div className="h-full overflow-y-auto p-2"><div className="grid gap-2">{slides.map(slide => <div key={slide.index} className="overflow-hidden rounded-lg border border-border"><iframe src={slideUrl(slide.index)} title={`${entry.title}, ${slide.label}`} loading="lazy" referrerPolicy="no-referrer" className="aspect-video h-auto w-full border-0" /><p className="px-2 py-1 font-control text-label">{slide.label}</p></div>)}</div></div>;
     }
     if (entry.kind === "sequence" && entry.cues?.length) return <CueList cues={entry.cues} />;
     return null;
@@ -144,7 +144,7 @@ function CueList({ cues }: { cues: NonNullable<RecentEntry["cues"]> }) {
     <span className="flex h-full flex-col gap-0.5 p-3">
       <span className="mb-1 font-mono text-micro uppercase tracking-[.2em] text-brass">Cue list</span>
       {shown.map(c => (
-        <span key={c.n} className="flex items-baseline gap-2 text-xs">
+        <span key={c.n} className="flex items-baseline gap-2 text-label">
           <span className={`w-4 shrink-0 font-mono ${c.kind === "audio" ? "text-audio" : "text-visual"}`}>{c.n}</span>
           <span className="truncate">{c.label}</span>
         </span>
@@ -176,7 +176,7 @@ function Waveform({ url }: { url: string }) {
     return () => { cancelled = true; };
   }, [url]);
 
-  if (failed) return <span className="flex h-full items-center justify-center text-xs text-muted">No preview</span>;
+  if (failed) return <span className="flex h-full items-center justify-center text-label text-muted">No preview</span>;
   return <canvas ref={ref} className="h-full w-full text-audio" aria-hidden />;
 }
 

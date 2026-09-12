@@ -52,7 +52,7 @@ export default function FriendsPanel() {
   return (
     <section className="glass mt-6 space-y-4 p-6 sm:p-8">
       <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><UserRound size={18} className="text-accent" aria-hidden />People you work with</h2>
-      <p className="text-sm text-muted">
+      <p className="text-body text-muted">
         A list of usernames, so inviting someone to a project is picking a name instead of spelling it
         again. Being on it gives nobody access to anything: that still comes from a project role or a
         show key.
@@ -73,7 +73,7 @@ export default function FriendsPanel() {
           <ul className="mt-2 space-y-2">
             {incoming.map(friend => (
               <li key={friend.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface/50 px-3 py-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{friendLabel(friend)}</span>
+                <span className="min-w-0 flex-1 truncate text-body font-semibold">{friendLabel(friend)}</span>
                 <Button size="sm" color="primary" startContent={<Check size={14} aria-hidden />}
                   onPress={() => void act(acceptFriend(friend.id), "Added")}>Accept</Button>
                 <Button size="sm" variant="light" startContent={<X size={14} aria-hidden />}
@@ -87,20 +87,20 @@ export default function FriendsPanel() {
       <div>
         <h3 className="label-cap text-muted">Your list</h3>
         {settled.length === 0 && waiting.length === 0
-          ? <p className="mt-2 text-sm text-muted">Nobody yet. Ask by username above.</p>
+          ? <p className="mt-2 text-body text-muted">Nobody yet. Ask by username above.</p>
           : (
             <ul className="mt-2 space-y-2">
               {settled.map(friend => (
                 <li key={friend.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface/50 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{friendLabel(friend)}</span>
-                  {friend.username && <span className="text-xs text-muted">@{friend.username}</span>}
+                  <span className="min-w-0 flex-1 truncate text-body font-semibold">{friendLabel(friend)}</span>
+                  {friend.username && <span className="text-label text-muted">@{friend.username}</span>}
                   <Button size="sm" variant="light" color="danger" onPress={() => void act(removeFriend(friend.id), "Removed")}>Remove</Button>
                 </li>
               ))}
               {waiting.map(friend => (
                 <li key={friend.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-border px-3 py-2 text-muted">
-                  <span className="min-w-0 flex-1 truncate text-sm">{friendLabel(friend)}</span>
-                  <span className="text-xs">Waiting for them</span>
+                  <span className="min-w-0 flex-1 truncate text-body">{friendLabel(friend)}</span>
+                  <span className="text-label">Waiting for them</span>
                   <Button size="sm" variant="light" onPress={() => void act(removeFriend(friend.id), "Withdrawn")}>Withdraw</Button>
                 </li>
               ))}

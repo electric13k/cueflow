@@ -10,7 +10,7 @@ export default function Terms() {
     <Page width="max-w-3xl">
       <p className="eyebrow text-accent">Legal</p>
       <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Terms of Service</h1>
-      <p className="mt-2 text-sm text-muted">
+      <p className="mt-2 text-body text-muted">
         Last updated {UPDATED}. CueFlow is a hobby project offered free of charge. See also the{" "}
         <Link to="/privacy" className="text-accent underline-offset-2 hover:underline">Privacy Policy</Link>.
       </p>

@@ -55,14 +55,14 @@ export default function UsernamePrompt() {
         <ModalHeader>Pick a username</ModalHeader>
         <ModalBody>
           <div className="space-y-3">
-            <p className="text-sm text-muted">
+            <p className="text-body text-muted">
               It is how someone adds you to a project. No two people can have the same one, and it is the
               only part of your account anyone else can look up.
             </p>
             <Input autoFocus label="Username" value={name} onValueChange={v => setName(v.trim())} placeholder="stage_left"
               onKeyDown={e => { if (e.key === "Enter") void claim(); }} />
-            <p className="text-xs text-muted">3–20 characters. Letters, numbers and underscores, starting with a letter.</p>
-            {note && <p className="text-sm text-live">{note}</p>}
+            <p className="text-label text-muted">3–20 characters. Letters, numbers and underscores, starting with a letter.</p>
+            {note && <p className="text-body text-live">{note}</p>}
           </div>
         </ModalBody>
         <ModalFooter>

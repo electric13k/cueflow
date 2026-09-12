@@ -50,7 +50,7 @@ export default function AuthButton() {
     <div className="group/account relative" onContextMenu={event => { event.preventDefault(); setAccountMenu(true); }}>
       <Button size="sm" variant="light" isIconOnly aria-label="Account menu" title="Account menu" onPress={() => setAccountMenu(open => !open)}><MoreHorizontal size={17} /></Button>
       <div className={`absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-surface p-2 shadow-glass ${accountMenu ? "block" : "hidden group-hover/account:block"}`}>
-        <p className="truncate px-3 py-2 text-xs text-muted" title={email}>{email}</p>
+        <p className="truncate px-3 py-2 text-label text-muted" title={email}>{email}</p>
         <Button size="sm" variant="light" className="w-full justify-start" startContent={<LogOut size={15} />} onPress={() => void signOut()}>Sign out</Button>
       </div>
     </div>
@@ -62,12 +62,12 @@ export default function AuthButton() {
         <ModalContent>{onClose => (<>
           <ModalHeader className="flex items-center gap-2"><User size={18} className="text-accent" />{mode === "in" ? "Sign in" : "Create account"}</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-muted">Saves your sounds and sequences to your account so they follow you across devices.</p>
+            <p className="text-body text-muted">Saves your sounds and sequences to your account so they follow you across devices.</p>
             <Button variant="bordered" startContent={<GoogleMark />} className="font-medium"
               onPress={() => void signInWith("google").catch(e => setNote((e as Error).message))}>
               Continue with Google
             </Button>
-            <p className="text-xs text-muted">
+            <p className="text-label text-muted">
               Already have a password account? Sign in with it, then add Google from your account page.
               Signing in with Google first makes a second, separate account.
             </p>
@@ -78,12 +78,12 @@ export default function AuthButton() {
               autoComplete={mode === "up" ? "email" : "username"}
               value={form.email} onValueChange={v => setForm(f => ({ ...f, email: v }))} />
             <Input type="password" label="Password" autoComplete={mode === "in" ? "current-password" : "new-password"} value={form.password} onValueChange={v => setForm(f => ({ ...f, password: v }))} onKeyDown={e => e.key === "Enter" && submit()} />
-            {note && <p className="text-xs text-warning">{note}</p>}
-            <button className="self-start text-xs text-accent" onClick={() => { setMode(m => m === "in" ? "up" : "in"); setNote(""); }}>
+            {note && <p className="text-label text-warning">{note}</p>}
+            <button className="self-start text-label text-accent" onClick={() => { setMode(m => m === "in" ? "up" : "in"); setNote(""); }}>
               {mode === "in" ? "No account? Create one" : "Have an account? Sign in"}
             </button>
             {mode === "up" && (
-              <p className="text-xs text-muted">
+              <p className="text-label text-muted">
                 By creating an account you agree to the{" "}
                 <a href={`${import.meta.env.BASE_URL}legal#terms`} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Terms</a> and{" "}
                 <a href={`${import.meta.env.BASE_URL}legal#privacy`} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Privacy Policy</a>.

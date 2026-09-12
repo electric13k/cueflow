@@ -65,7 +65,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
 
   if (!show) return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">
+      <p className="text-body text-muted">
         A show is one performance across however many devices are in the room. Everyone types the same
         code, no accounts, and what each of them can see and do comes from the job you give them.
       </p>
@@ -81,7 +81,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
           <p className="label-cap text-muted">Or reopen one</p>
           {shows.map(s => (
             <button key={s.id} type="button" onClick={() => void enterAsOwner(s).then(() => setShow(s)).catch(e => toast("Could not reopen the show", (e as Error).message, "warn"))}
-              className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10">
+              className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-left text-body hover:bg-white/10">
               <span>{s.name}</span>
               <span className="font-mono tracking-widest text-muted">{s.password}</span>
             </button>
@@ -119,7 +119,7 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
           Save
         </Button>
       </div>
-      <p className="text-xs text-muted">
+      <p className="text-label text-muted">
         The password lets someone in as a <strong>collaborator</strong>: everything a job can see, plus
         firing cues, editing them and calling the show on. Give it only to the person running it with
         you. It is yours to choose, 4 to 12 letters and numbers, and it may be the same string as one
@@ -128,8 +128,8 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       </p>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-bold">Jobs and their keys</h3>
-        <p className="text-xs text-muted">
+        <h3 className="text-body font-bold">Jobs and their keys</h3>
+        <p className="text-label text-muted">
           Each job has its own key. Whoever types it lands in that job, you decide who does what by
           deciding who gets which key, and a key you replace stops working the moment you save it.
         </p>
@@ -155,9 +155,9 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {PERMS.map(p => (
-                <label key={p.key} className="flex items-start gap-2 text-sm">
+                <label key={p.key} className="flex items-start gap-2 text-body">
                   <Switch size="sm" isSelected={role.perms.includes(p.key)} onValueChange={() => togglePerm(role, p.key)} aria-label={p.label} />
-                  <span><span className="font-medium">{p.label}</span><br /><span className="text-xs text-muted">{p.hint}</span></span>
+                  <span><span className="font-medium">{p.label}</span><br /><span className="text-label text-muted">{p.hint}</span></span>
                 </label>
               ))}
             </div>
@@ -173,14 +173,14 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-bold">Say something</h3>
+        <h3 className="text-body font-bold">Say something</h3>
         <div className="flex gap-2">
           <Input className="flex-1" value={message} onValueChange={setMessage} placeholder="Hold the next cue"
             onKeyDown={e => { if (e.key === "Enter" && message.trim()) { onFlash(message.trim()); setMessage(""); } }} />
           <Button isIconOnly color="primary" aria-label="Flash it"
             onPress={() => { if (message.trim()) { onFlash(message.trim()); setMessage(""); } }}><Send size={16} /></Button>
         </div>
-        <p className="text-xs text-muted">It flashes on every device in the show. No sound, ever, that is the point.</p>
+        <p className="text-label text-muted">It flashes on every device in the show. No sound, ever, that is the point.</p>
       </section>
 
       <section className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">

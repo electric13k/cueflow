@@ -51,7 +51,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   // min-h-11 is 44px, the smallest target a thumb hits reliably. At py-2 these were 36px rows and
   // picking a project on a phone took two goes.
-  const row = "flex min-h-11 w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors";
+  const row = "flex min-h-11 w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-body transition-colors";
   const on = "bg-accent/12 text-foreground";
   const off = "text-muted hover:bg-white/5 hover:text-foreground";
 
@@ -63,7 +63,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       </motion.div>
       <motion.div variants={sidebarItemVariants} className="space-y-2 rounded-md border border-dashed border-white/15 p-3">
-        <p className="text-xs text-muted">Your sounds and sequences live in this browser. An account gives them a workspace that follows you.</p>
+        <p className="text-label text-muted">Your sounds and sequences live in this browser. An account gives them a workspace that follows you.</p>
         {/* One auth modal in the app, and the nav owns it. This asks for it rather than cloning it. */}
         <button type="button" className={`${row} ${off}`} onClick={() => { onNavigate?.(); window.dispatchEvent(new Event("cueflow:signin")); }}>
           <LogIn size={16} /> Sign in

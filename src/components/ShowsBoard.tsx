@@ -62,7 +62,7 @@ export default function ShowsBoard({
         className={panel(focus === "shows", focus === "script")}>
         <div className="flex items-center gap-2">
           <Radio size={16} className="text-accent" aria-hidden />
-          <h2 className="text-sm font-bold uppercase tracking-widest">Shows</h2>
+          <h2 className="text-body font-bold uppercase tracking-widest">Shows</h2>
           <CoachHelp id="show" className="ml-auto" />
         </div>
 
@@ -84,7 +84,7 @@ export default function ShowsBoard({
                     <span className="mt-1 block font-mono label-cap text-muted">
                       {s.startedAt ? "live" : "open manager"}
                     </span>
-                    <span className="mt-1 block text-xs text-muted">
+                    <span className="mt-1 block text-label text-muted">
                       {s.sequenceId ? seqName(s.sequenceId) : "no sequence yet"}
                       {carried.length > 1 ? ` +${carried.length - 1} more` : ""}
                       {link.script ? " · script" : ""}
@@ -112,12 +112,12 @@ export default function ShowsBoard({
               </div>
             ) : (
               <button type="button" data-coach="show" onClick={() => setNaming(true)}
-                className="flex min-h-24 items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-muted transition-colors hover:border-accent hover:text-foreground">
+                className="flex min-h-24 items-center justify-center gap-2 rounded-xl border border-dashed border-border text-body text-muted transition-colors hover:border-accent hover:text-foreground">
                 <Plus size={16} /> New show
               </button>
             )}
           </div>
-          <p className="mt-3 text-xs text-muted">Drag a sequence or the script onto a show to add it. Several sequences can go into one.</p>
+          <p className="mt-3 text-label text-muted">Drag a sequence or the script onto a show to add it. Several sequences can go into one.</p>
         </>)}
       </section>
 
@@ -125,7 +125,7 @@ export default function ShowsBoard({
         className={panel(focus === "script", focus === "shows")}>
         <div className="flex items-center gap-2">
           <FileText size={15} className="text-brass" aria-hidden />
-          <h2 className="text-sm font-bold uppercase tracking-widest">Script</h2>
+          <h2 className="text-body font-bold uppercase tracking-widest">Script</h2>
           <CoachHelp id="script" className="ml-auto" />
         </div>
 
@@ -145,8 +145,8 @@ export default function ShowsBoard({
                 <GripVertical size={15} aria-hidden />
               </span>
               <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpenScript}>
-                <span className="block truncate text-sm font-semibold">{script?.name || "Script"}</span>
-                <span className="block text-xs text-muted">{script?.cues.length ?? 0} marked {script?.cues.length === 1 ? "cue" : "cues"}</span>
+                <span className="block truncate text-body font-semibold">{script?.name || "Script"}</span>
+                <span className="block text-label text-muted">{script?.cues.length ?? 0} marked {script?.cues.length === 1 ? "cue" : "cues"}</span>
               </button>
             </div>
             <Button size="sm" variant="light" onPress={onOpenScript}>Open the reader</Button>

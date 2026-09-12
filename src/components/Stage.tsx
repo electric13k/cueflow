@@ -78,7 +78,7 @@ export default function Stage({ stage, className = "", blank = "black" }: { stag
         {stage.kind === "image" && <img src={stage.url} alt={stage.label} className="h-full w-full" style={visualStyle(stage.visual)} />}
         {stage.kind === "video" && <>
           <video ref={video} src={stage.url} playsInline autoPlay muted={stage.visual.muted} className="h-full w-full" style={visualStyle(stage.visual)} />
-          {playBlocked && <button type="button" onClick={() => { const el = video.current; if (!el) return; el.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true)); }} className="absolute inset-0 m-auto h-fit w-fit rounded-xl bg-black/75 px-5 py-3 text-sm font-semibold text-white shadow-lg">Tap to play video</button>}
+          {playBlocked && <button type="button" onClick={() => { const el = video.current; if (!el) return; el.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true)); }} className="absolute inset-0 m-auto h-fit w-fit rounded-xl bg-black/75 px-5 py-3 text-body font-semibold text-white shadow-lg">Tap to play video</button>}
         </>}
         {stage.kind === "embed" && <iframe src={presentationUrl} title={stage.label} allowFullScreen className="h-full w-full border-0" />}
         {stage.kind !== "embed" && <Grade v={stage.visual} />}

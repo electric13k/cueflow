@@ -171,7 +171,7 @@ export default function ShowManager({
     <div className="fixed inset-0 z-[60] bg-black">
       <Stage stage={stage} blank={blank} className="absolute inset-0" />
       <CurtainTransition open={curtain} />
-      <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-3 p-4 text-sm text-white/70">
+      <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-3 p-4 text-body text-white/70">
         <span className="font-semibold text-white/90">{show.name}</span>
         <span className="text-muted">{show.startedAt ? "live" : "standing by"} · audience mode</span>
         <span className="ml-auto flex flex-wrap items-center gap-2">
@@ -228,7 +228,7 @@ export default function ShowManager({
               thing for the same reason: both read the one stage the desk publishes. */}
           <section className="space-y-2">
             <Stage stage={stage} blank={blank} className="aspect-video w-full rounded-2xl border border-border" />
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+            <div className="flex flex-wrap items-center gap-2 text-label text-muted">
               <span>{stage ? `On now: ${stage.label}` : `Nothing up. The room is holding ${blank}.`}</span>
               <button type="button" className="ml-auto underline decoration-dotted underline-offset-4 hover:text-foreground"
                 onClick={() => hold(blank === "black" ? "white" : "black")}>
@@ -243,29 +243,29 @@ export default function ShowManager({
               <Clock size={14} aria-hidden />Coming up
             </h2>
             {plan.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">This show carries no sequences yet. Drag one onto the header, or add it below.</p>
+              <p className="mt-2 text-body text-muted">This show carries no sequences yet. Drag one onto the header, or add it below.</p>
             ) : (<>
               <div className={`mt-2 flex flex-wrap items-center gap-3 rounded-xl border p-3 ${next ? "border-armed/50 bg-armed/10" : "border-border bg-surface/60"}`}>
                 <span className="label-cap text-muted">Next</span>
                 {next ? (<>
                   <span className={`font-mono text-lg font-semibold ${next.kind === "audio" ? "text-audio" : "text-visual"}`}>{next.number}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{next.label}</span>
-                  <span className="text-xs text-muted">{next.sequence}</span>
+                  <span className="min-w-0 flex-1 truncate text-body font-semibold">{next.label}</span>
+                  <span className="text-label text-muted">{next.sequence}</span>
                   {next.sequenceId === armedSequenceId
                     ? <Button size="sm" color="primary" startContent={<Play size={14} />} onPress={() => onFire(next.index)}>Go</Button>
                     : <Button size="sm" variant="flat" onPress={() => onRunSequence(next.sequenceId)}>Arm {next.sequence}</Button>}
-                </>) : <span className="text-sm text-muted">That was the last cue.</span>}
+                </>) : <span className="text-body text-muted">That was the last cue.</span>}
               </div>
 
               <ol className="mt-2 space-y-1">
                 {coming.slice(0, 12).map(cue => {
                   const gap = cue.offset - from;
                   return (
-                    <li key={`${cue.sequenceId}:${cue.id}`} className="flex items-center gap-2 rounded-xl bg-surface/50 px-3 py-1.5 text-sm">
+                    <li key={`${cue.sequenceId}:${cue.id}`} className="flex items-center gap-2 rounded-xl bg-surface/50 px-3 py-1.5 text-body">
                       <span className={`w-7 shrink-0 text-center font-mono font-bold ${cue.kind === "audio" ? "text-audio" : "text-visual"}`}>{cue.number}</span>
                       <span className="min-w-0 flex-1 truncate">{cue.label}</span>
-                      <span className="shrink-0 text-xs text-muted">{cue.sequence}</span>
-                      <span className="w-16 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
+                      <span className="shrink-0 text-label text-muted">{cue.sequence}</span>
+                      <span className="w-16 shrink-0 text-right font-mono text-label tabular-nums text-muted">
                         {gap > 0 ? `+${clock(gap)}` : "on the press"}
                       </span>
                       {cue.sequenceId === armedSequenceId && (
@@ -277,7 +277,7 @@ export default function ShowManager({
                   );
                 })}
               </ol>
-              <p className="mt-2 text-xs text-muted">
+              <p className="mt-2 text-label text-muted">
                 Times are the sound that has to play before each cue can be reached, counted from the cue that is out.
                 A slide or a video holds until somebody calls the next one, so it adds nothing: treat every number as
                 the earliest a cue can land, not a schedule.
@@ -294,7 +294,7 @@ export default function ShowManager({
               {link.script && <span className="ml-auto text-micro normal-case tracking-normal text-muted">Goes out with the show</span>}
             </h2>
             {!script?.html
-              ? <p className="mt-2 text-sm text-muted">No script in this project yet.</p>
+              ? <p className="mt-2 text-body text-muted">No script in this project yet.</p>
               : <div className="mt-2 h-80 min-h-0"><ScriptReader doc={script} setDoc={() => {}} editable={false} /></div>}
           </section>
 
@@ -304,7 +304,7 @@ export default function ShowManager({
               <ListMusic size={14} aria-hidden />Sequences
             </h2>
             {sequences.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">No sequences in this project yet.</p>
+              <p className="mt-2 text-body text-muted">No sequences in this project yet.</p>
             ) : (
               <ol ref={seqDrag.list} className="mt-2 auto-grid">
                 {sequences.map((s, i) => (
@@ -317,8 +317,8 @@ export default function ShowManager({
                       <GripVertical size={13} aria-hidden />
                     </span>
                     <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onAddSequence(s.id)}>
-                      <span className="block truncate text-sm font-semibold">{s.name}</span>
-                      <span className="block text-xs text-muted">
+                      <span className="block truncate text-body font-semibold">{s.name}</span>
+                      <span className="block text-label text-muted">
                         {s.items.length} {s.items.length === 1 ? "cue" : "cues"}{carries(s.id) ? " · in this show" : " · add to the show"}
                       </span>
                     </button>
@@ -339,7 +339,7 @@ export default function ShowManager({
               <Layers size={14} aria-hidden />Library
             </h2>
             {tracks.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">Nothing in the library yet.</p>
+              <p className="mt-2 text-body text-muted">Nothing in the library yet.</p>
             ) : (<>
               <ol ref={libDrag.list} className="mt-2 auto-grid">
                 {tracks.map((t, i) => (
@@ -351,8 +351,8 @@ export default function ShowManager({
                     <button type="button" className="min-w-0 flex-1 text-left disabled:cursor-default"
                       title={isVisual(t) ? "Put this up now" : "Sounds are fired from the deck"}
                       disabled={!isVisual(t)} onClick={() => onStage(t)}>
-                      <span className="block truncate text-sm font-medium capitalize">{t.title}</span>
-                      <span className="block text-xs capitalize text-muted">{kindOf(t)}</span>
+                      <span className="block truncate text-body font-medium capitalize">{t.title}</span>
+                      <span className="block text-label capitalize text-muted">{kindOf(t)}</span>
                     </button>
                     {sequences.length > 0 && (
                       <Select aria-label={`Add ${t.title} to a sequence`} value=""
@@ -362,7 +362,7 @@ export default function ShowManager({
                   </li>
                 ))}
               </ol>
-              <p className="mt-2 text-xs text-muted">
+              <p className="mt-2 text-label text-muted">
                 Drag a card onto a sequence above, or use the box on it. Both do the same thing, because a drag on its
                 own is no use to a keyboard.
               </p>
@@ -373,7 +373,7 @@ export default function ShowManager({
         {/* Roles, their powers, the keys -- and what the room has been saying. Same panel the host
             has always had, so there is one permission model and it lives in lib/shows.ts. */}
         <aside className="glass flex min-h-0 min-w-0 flex-col gap-3 p-4">
-          <div className="flex gap-1 rounded-full border border-border p-1 text-sm">
+          <div className="flex gap-1 rounded-full border border-border p-1 text-body">
             <button type="button" onClick={() => setPanel("roles")}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 ${panel === "roles" ? "bg-accent/20 font-semibold text-accent" : "text-muted hover:text-foreground"}`}>
               <Users size={14} aria-hidden />Jobs and keys
@@ -426,8 +426,8 @@ function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }
   const Person = ({ person, children }: { person: Props["members"][number]; children?: ReactNode }) => (
     <li className="rounded-xl border border-border bg-surface/50 p-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{person.name || "Unnamed device"}</span>
-        <span className="text-xs text-muted">{person.role ?? "No job"}</span>
+        <span className="min-w-0 flex-1 truncate text-body font-semibold">{person.name || "Unnamed device"}</span>
+        <span className="text-label text-muted">{person.role ?? "No job"}</span>
       </div>
       {person.perms.length > 0 && (
         <p className="mt-1 text-micro text-muted">
@@ -441,7 +441,7 @@ function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
       <Switch isSelected={admission} onValueChange={onAdmission}>Hold new arrivals at the door</Switch>
-      <p className="text-xs text-muted">
+      <p className="text-label text-muted">
         Off, a key gets you straight in. On, whoever is running the show lets each person in, which is
         what you want when the key has been passed around more than you would like.
       </p>
@@ -465,7 +465,7 @@ function Room({ members, roles, admission, onAdmission, onAnswerDoor, onSetJob }
       <section>
         <h3 className="label-cap text-muted">In the room</h3>
         {inside.length === 0
-          ? <p className="mt-2 text-sm text-muted">Nobody has joined yet. Hand out a key and they appear here.</p>
+          ? <p className="mt-2 text-body text-muted">Nobody has joined yet. Hand out a key and they appear here.</p>
           : (
             <ul className="mt-2 space-y-2">
               {inside.map(person => (

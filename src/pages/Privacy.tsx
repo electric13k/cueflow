@@ -9,7 +9,7 @@ export default function Privacy() {
     <Page width="max-w-3xl">
       <p className="eyebrow text-accent">Legal</p>
       <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Privacy Policy</h1>
-      <p className="mt-2 text-sm text-muted">
+      <p className="mt-2 text-body text-muted">
         Last updated {UPDATED}. See also the{" "}
         <Link to="/terms" className="text-accent underline-offset-2 hover:underline">Terms of Service</Link>.
       </p>

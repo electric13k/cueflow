@@ -1311,7 +1311,7 @@ export default function Studio() {
           while looking at the deck is no use if it does not say what it was for. */}
       <AnimatePresence mode="wait">
         {alertNote && (
-          <motion.div key={alertNote} initial={{ y: -10, opacity: 0, scale: .96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -8, opacity: 0, scale: .98 }} transition={{ type: "spring", stiffness: 340, damping: 24 }} className={`pointer-events-none fixed inset-x-0 top-16 z-50 mx-auto w-fit rounded-full border px-4 py-1.5 text-sm font-semibold shadow-glass ${flash === "hit" ? "border-live/50 bg-live/20" : "border-armed/50 bg-armed/20"}`}>
+          <motion.div key={alertNote} initial={{ y: -10, opacity: 0, scale: .96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -8, opacity: 0, scale: .98 }} transition={{ type: "spring", stiffness: 340, damping: 24 }} className={`pointer-events-none fixed inset-x-0 top-16 z-50 mx-auto w-fit rounded-full border px-4 py-1.5 text-body font-semibold shadow-glass ${flash === "hit" ? "border-live/50 bg-live/20" : "border-armed/50 bg-armed/20"}`}>
             {alertNote}
           </motion.div>
         )}
@@ -1349,10 +1349,10 @@ export default function Studio() {
         {armed && (
           <div data-tour="armed-banner" className={`mt-4 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 ${cueIndex < 0 ? "border-armed/40 bg-armed/10" : "border-live/40 bg-live/10"}`}>
             <span className={`armed-dot h-2.5 w-2.5 rounded-full ${cueIndex < 0 ? "bg-armed" : "bg-live"}`} />
-            <span className="text-sm font-semibold">
+            <span className="text-body font-semibold">
               {cueIndex < 0 ? "Deck armed. Nothing has gone out yet." : `Cue ${cueIndex + 1} of ${selectedSequence?.items.length ?? 0} is out.`}
             </span>
-            <span className="text-xs text-muted">Press → for the next cue, ← to go back.</span>
+            <span className="text-label text-muted">Press → for the next cue, ← to go back.</span>
             <CueTransport element={liveVoice()?.element ?? null} label={liveVoice()?.trackId ? (trackById.get(liveVoice()!.trackId!)?.title ?? "the cue") : "the cue"}
               onToggle={pauseOrResume} onStop={stopAllSound} master={master} setMaster={setMaster} commitMaster={commitMaster} />
             <span className="ml-auto flex items-center gap-1">
@@ -1373,7 +1373,7 @@ export default function Studio() {
                 Soundboard
               </Button>
               {padsOpen && padBanks > 1 && (
-                <span className="flex items-center gap-1 text-xs text-muted">
+                <span className="flex items-center gap-1 text-label text-muted">
                   {Array.from({ length: padBanks }, (_, index) => (
                     <Button key={index} size="sm" variant={index === bank ? "flat" : "light"} aria-pressed={index === bank}
                       aria-label={`Pad bank ${index + 1}`} onPress={() => setPadBank(index)}>{index + 1}</Button>
@@ -1396,13 +1396,13 @@ export default function Studio() {
                           <kbd className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-micro text-muted">{padKey(slot)}</kbd>
                           {sounding && <span aria-hidden className="h-2 w-2 rounded-full bg-live" />}
                         </span>
-                        <span className="w-full truncate text-xs font-semibold">{track.title}</span>
+                        <span className="w-full truncate text-label font-semibold">{track.title}</span>
                       </button>
                     </li>
                   );
                 })}
               </ul>
-            ) : <p className="mt-2 text-sm text-muted">No sounds in this project yet.</p>)}
+            ) : <p className="mt-2 text-body text-muted">No sounds in this project yet.</p>)}
           </section>
         )}
 
@@ -1432,7 +1432,7 @@ export default function Studio() {
               </div>
             </div>
             {shownSequences.length === 0 ? (
-              <p className="text-sm text-muted">{sequences.length ? "Nothing matches that." : "No sequences yet. Make one, then drag sounds and slides onto it."}</p>
+              <p className="text-body text-muted">{sequences.length ? "Nothing matches that." : "No sequences yet. Make one, then drag sounds and slides onto it."}</p>
             ) : (
               <ol ref={seqDrag.list} className="flex flex-wrap gap-2">
                 {shownSequences.map((s, i) => (
@@ -1443,7 +1443,7 @@ export default function Studio() {
                       onPointerDown={seqDrag.start(i)} onPointerMove={seqDrag.move} onPointerUp={seqDrag.end} onPointerCancel={seqDrag.end}>
                       <GripVertical size={13} aria-hidden />
                     </span>
-                    <button data-tour={i === 0 ? "sequence-select" : undefined} className="py-1.5 text-sm font-semibold" onClick={() => { setSequenceId(s.id); setTab("sequence"); }}>{s.name}</button>
+                    <button data-tour={i === 0 ? "sequence-select" : undefined} className="py-1.5 text-body font-semibold" onClick={() => { setSequenceId(s.id); setTab("sequence"); }}>{s.name}</button>
                     <span className="text-micro text-muted">{s.items.length}</span>
                     {/* A sequence does not need a show to be run: this arms it and opens the
                         presenter window, in a project, outside any show. */}
@@ -1470,7 +1470,7 @@ export default function Studio() {
             no longer an Editor tab: you open a thing, you do not visit a room. */}
         {!armed && !editingId && picked.length > 0 && (
           <div className="glass mt-4 flex flex-wrap items-center gap-2 p-3">
-            <span className="text-sm font-semibold">{picked.length} selected</span>
+            <span className="text-body font-semibold">{picked.length} selected</span>
             <Button size="sm" variant="flat" startContent={<SlidersHorizontal size={15} />} onPress={() => openEditor(picked[0])}>Edit</Button>
             <Select aria-label="Add to sequence" value="" size="sm" className="min-w-40"
               onChange={value => { if (value) addTracksTo(value, picked); }}
@@ -1572,7 +1572,7 @@ export default function Studio() {
                 {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
               </Button>
               {countdownSeconds > 0 && <CueCountdown seconds={countdownSeconds} cueKey={`${selectedSequence?.id ?? ""}:${cueIndex}`} onElapsed={() => advance(1)} />}
-              {features.rehearsal.active && <span className="shrink-0 rounded-xl border border-live/40 bg-live/10 px-2 py-1 text-xs text-live">Rehearsal</span>}
+              {features.rehearsal.active && <span className="shrink-0 rounded-xl border border-live/40 bg-live/10 px-2 py-1 text-label text-live">Rehearsal</span>}
               <CoachHelp id="transport" />
             </div>
             <ArmedEffectControls effects={armedEffects} update={updateArmedEffects} commit={commitArmedEffects} />
@@ -1596,12 +1596,12 @@ export default function Studio() {
           <ModalBody>
             <div className="max-h-[55vh] space-y-1 overflow-y-auto">
               {features.runHistory.length ? [...features.runHistory].reverse().map(event => (
-                <div key={event.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface/50 px-3 py-2 text-sm">
-                  <span className="w-20 shrink-0 font-mono text-xs text-muted">{new Date(event.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <div key={event.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface/50 px-3 py-2 text-body">
+                  <span className="w-20 shrink-0 font-mono text-label text-muted">{new Date(event.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                   <span className="min-w-0 flex-1"><b className="capitalize">{event.type}</b>{event.sequenceName ? ` · ${event.sequenceName}` : ""}{event.label ? ` · ${event.label}` : ""}</span>
-                  {event.cueIndex !== undefined && <span className="font-mono text-xs text-muted">#{event.cueIndex + 1}</span>}
+                  {event.cueIndex !== undefined && <span className="font-mono text-label text-muted">#{event.cueIndex + 1}</span>}
                 </div>
-              )) : <p className="py-8 text-center text-sm text-muted">No run activity yet. Fire a cue or start a rehearsal to create history.</p>}
+              )) : <p className="py-8 text-center text-body text-muted">No run activity yet. Fire a cue or start a rehearsal to create history.</p>}
             </div>
           </ModalBody>
           <ModalFooter><Button variant="light" onPress={() => { clearRunHistory(); onClose(); }}>Clear history</Button><Button color="primary" onPress={onClose}>Close</Button></ModalFooter>
@@ -1664,7 +1664,7 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid place-items-center rounded-2xl border border-dashed border-border py-16 text-center">
           <LogoMark size={40} className="opacity-45" />
           <p className="mt-3 font-semibold">{total ? "Nothing matches that" : "Nothing here yet"}</p>
-          <p className="text-sm text-muted">{total ? "Clear the search to see everything." : "Upload audio, images or video, or search the free libraries above."}</p>
+          <p className="text-body text-muted">{total ? "Clear the search to see everything." : "Upload audio, images or video, or search the free libraries above."}</p>
         </motion.div>
       ) : (
         <motion.div layout className="auto-grid">
@@ -1691,7 +1691,7 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
                       </span>
                       <Tooltip content={isChecked ? `Cue ${pick + 1} of the selection, click to drop it` : "Select (shift-click to take a run)"}>
                         <Button aria-label={isChecked ? `Drop ${t.title} from the selection` : `Select ${t.title}`} aria-pressed={isChecked} isIconOnly size="sm" variant={isChecked ? "solid" : "light"} color={isChecked ? "primary" : "default"} onPress={(e: any) => onToggleSelect(t.id, i, !!e?.shiftKey)}>
-                          {isChecked ? <span className="text-xs font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
+                          {isChecked ? <span className="text-label font-bold tabular-nums">{pick + 1}</span> : <Check size={14} />}
                         </Button>
                       </Tooltip>
                       <ShareButton iconOnly label={`Share ${t.title}`} url={studioShareUrl({ tab: "library", track: t.id })} title={`${t.title} · CueFlow`} text={`Open ${t.title} in CueFlow`} />
@@ -1708,8 +1708,8 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
                     </div>
                   </div>
                   {t.error
-                    ? <p className="flex items-center gap-1 text-xs text-warning"><TriangleAlert size={12} /> local only, cloud save failed</p>
-                    : <p className="pl-10 text-xs capitalize text-muted">{kind === "audio" ? `${t.effects.speed}x • ${Math.round(t.effects.volume * 100)}% vol${t.effects.reverb ? " • reverb" : ""}` : `${kind} • ${t.visual?.transition ?? "fade"} in`}</p>}
+                    ? <p className="flex items-center gap-1 text-label text-warning"><TriangleAlert size={12} /> local only, cloud save failed</p>
+                    : <p className="pl-10 text-label capitalize text-muted">{kind === "audio" ? `${t.effects.speed}x • ${Math.round(t.effects.volume * 100)}% vol${t.effects.reverb ? " • reverb" : ""}` : `${kind} • ${t.visual?.transition ?? "fade"} in`}</p>}
                 </CardBody>
               </Card>
             </motion.div>
@@ -1761,7 +1761,7 @@ function DeckPreview({ track, className, playOnHover, onLinkSlide }: { track: Tr
               <iframe src={slideUrl(slide.index)} title={`${track.title}, ${slide.label}`} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full border-0" />
             </div>
             <div className="flex items-center gap-2 px-2 py-1.5">
-              <span className="min-w-0 flex-1 truncate font-control text-xs">{slide.label}</span>
+              <span className="min-w-0 flex-1 truncate font-control text-label">{slide.label}</span>
               {onLinkSlide && <Button data-coach="cue-links" size="sm" variant="light" className="shrink-0 text-micro" onPress={() => onLinkSlide(track.id, slide.index)}>Link audio</Button>}
             </div>
             {contextSlide === slide.index && onLinkSlide && <div role="menu" className="absolute right-2 top-2 z-20 flex w-36 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass" onClick={event => event.stopPropagation()}><Button size="sm" variant="light" className="justify-start" onPress={() => { setContextSlide(null); onLinkSlide(track.id, slide.index); }}>Link audio</Button><Button size="sm" variant="light" className="justify-start" onPress={() => setContextSlide(null)}>Close</Button></div>}
@@ -1770,7 +1770,7 @@ function DeckPreview({ track, className, playOnHover, onLinkSlide }: { track: Tr
         ))}
       </div>
       {!playOnHover && slides.length > 1 && (
-        <Button size="sm" variant="light" className="mt-2 w-full text-xs" onPress={() => { setExpanded(open => !open); if (!expanded) teach("ppt-slides"); }}>
+        <Button size="sm" variant="light" className="mt-2 w-full text-label" onPress={() => { setExpanded(open => !open); if (!expanded) teach("ppt-slides"); }}>
           {expanded ? "Show first slide only" : `Show all ${slides.length} slides`}
         </Button>
       )}
@@ -1825,7 +1825,7 @@ function AudioPreview({ url, title }: { url: string; title: string }) {
     }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
   }, [url, visible]);
-  return failed ? <span className="flex h-full items-center px-4 text-xs text-muted">Audio preview unavailable</span> : <div data-coach="waveforms" className="h-full w-full"><canvas ref={canvas} className="h-full w-full" aria-hidden /><span className="sr-only">Audio waveform preview for {title}</span></div>;
+  return failed ? <span className="flex h-full items-center px-4 text-label text-muted">Audio preview unavailable</span> : <div data-coach="waveforms" className="h-full w-full"><canvas ref={canvas} className="h-full w-full" aria-hidden /><span className="sr-only">Audio waveform preview for {title}</span></div>;
 }
 
 // "My library" is gone: the library has its own search box above this one, and two boxes that both
@@ -1877,7 +1877,7 @@ function SearchPanel({ importAsset }: { importAsset: (title: string, url: string
 
   return (
     <div className="glass-soft space-y-3 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold"><Search size={15} className="text-accent" /> Find media</p>
+      <p className="flex items-center gap-2 text-body font-semibold"><Search size={15} className="text-accent" /> Find media</p>
       <div className="flex flex-wrap gap-2">
         <Select aria-label="Where to search" value={source} size="sm"
           onChange={value => { setSource(value as Source); setHits([]); setNote(""); }}
@@ -1889,23 +1889,23 @@ function SearchPanel({ importAsset }: { importAsset: (title: string, url: string
         </Button>
       </div>
       {(source === "archive" || source === "commons") && (
-        <p className="text-xs text-muted">Public-domain and freely licensed recordings. Imports land in your library under a cleaned-up name; check the licence before you perform anything publicly.</p>
+        <p className="text-label text-muted">Public-domain and freely licensed recordings. Imports land in your library under a cleaned-up name; check the licence before you perform anything publicly.</p>
       )}
-      {source === "url" && <p className="text-xs text-muted">Direct file links only. A Google Slides or PowerPoint Online link is added as an embedded deck instead of a download.</p>}
+      {source === "url" && <p className="text-label text-muted">Direct file links only. A Google Slides or PowerPoint Online link is added as an embedded deck instead of a download.</p>}
       {hits.length > 0 && (
         <ul className="max-h-64 space-y-1 overflow-auto border-t border-border pt-3">
           {hits.map(h => (
             <li key={h.id}>
               <button className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-white/5" onClick={() => void take(h)}>
                 <Plus size={14} className="shrink-0 text-accent" />
-                <span className="min-w-0 flex-1 truncate text-sm">{h.title}</span>
-                {h.by && <span className="shrink-0 truncate text-xs text-muted">{h.by}</span>}
+                <span className="min-w-0 flex-1 truncate text-body">{h.title}</span>
+                {h.by && <span className="shrink-0 truncate text-label text-muted">{h.by}</span>}
               </button>
             </li>
           ))}
         </ul>
       )}
-      {note && <p className="text-xs text-warning">{note}</p>}
+      {note && <p className="text-label text-warning">{note}</p>}
     </div>
   );
 }
@@ -1920,7 +1920,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
   if (kind !== "audio") return (
     <div className="mt-5 space-y-6">
       {heading}
-      <p className="max-w-2xl text-sm text-muted">
+      <p className="max-w-2xl text-body text-muted">
         {kind === "embed"
           ? "An embedded deck. Edit the slides in Google Slides or PowerPoint itself; the transition and caption below are what CueFlow adds when the cue fires."
           : "Framing, colour and timing ride with this asset and are applied when the cue fires, so the original file is never touched. Flatten to a new image if you want a copy with the look baked in."}
@@ -1931,7 +1931,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
   return (
     <div className="mt-5 space-y-6">
       {heading}
-      <p className="max-w-2xl text-sm text-muted">Effects save with this sound and apply live in playback and sequences. The waveform tools render new cloud-backed WAVs, clip a region, mix to mono, or balance the left/right channels.</p>
+      <p className="max-w-2xl text-body text-muted">Effects save with this sound and apply live in playback and sequences. The waveform tools render new cloud-backed WAVs, clip a region, mix to mono, or balance the left/right channels.</p>
       <WaveformEditor track={track} onSave={onSave} onPreview={onPreview} />
       <EffectGrid effects={track.effects} update={update} />
       <div className="glass-soft flex flex-wrap items-center gap-4 p-4">
@@ -1981,7 +1981,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
             {/* Off, a grip needs a long press so a thumb can still scroll the deck. On, grips drag
                 the moment you touch them and the list stops scrolling under your finger. */}
             <Switch size="sm" isSelected={cueDrag.reorder} onValueChange={cueDrag.setReorder}>Reorder mode</Switch>
-            <span className="ml-auto text-xs text-muted">{cueDrag.reorder ? "Drag any grip to move a cue. Scrolling is off while this is on." : cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → audio cues, A / D visual cues, W / S zoom"}</span>
+            <span className="ml-auto text-label text-muted">{cueDrag.reorder ? "Drag any grip to move a cue. Scrolling is off while this is on." : cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → audio cues, A / D visual cues, W / S zoom"}</span>
           </div>
 
           {/* What the audience window is showing. Also the whole preview when no window is open. */}
@@ -1989,7 +1989,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
             {/* min-w-0: a grid item's min width is its content by default, and a cue row full of
                 controls is wider than a phone -- without this the whole deck scrolls sideways. */}
             <div className="order-2 min-w-0 space-y-3 lg:order-1">
-              <div className="flex items-center gap-2 text-sm text-muted">
+              <div className="flex items-center gap-2 text-body text-muted">
                 <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected items</b>.</> : <>Adds the selected item{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
                 <Button data-tour="add-cue" size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
               </div>
@@ -2022,21 +2022,21 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                           <GripVertical size={15} aria-hidden />
                         </span>
                         <button data-coach={i === 0 ? "fire" : undefined} className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => playCue(i)}>
-                          <span className={`w-6 shrink-0 rounded-md text-center font-mono text-sm font-bold ${kind === "audio" ? "bg-audio/15 text-audio" : "bg-visual/15 text-visual"}`}>{numbers[i]}</span>
+                          <span className={`w-6 shrink-0 rounded-md text-center font-mono text-body font-bold ${kind === "audio" ? "bg-audio/15 text-audio" : "bg-visual/15 text-visual"}`}>{numbers[i]}</span>
                           <Icon size={14} className="shrink-0 text-muted" aria-hidden />
                           <span className="truncate font-medium capitalize">{item.label}</span>
                           {rehearsal.active && rehearsal.completed.includes(item.id) && <span className="rounded-full bg-live/15 px-1.5 py-0.5 text-micro font-semibold text-live">rehearsed</span>}
                           {timerLeftFor(item.id, cueTimers) > 0 && <span className="rounded-md bg-armed/15 px-1.5 py-0.5 font-mono text-micro text-armed">{formatTimer(timerLeftFor(item.id, cueTimers))}</span>}
                           {item.link && <span className="shrink-0 rounded-md bg-visual/15 px-1.5 font-mono text-micro font-bold text-visual" title="Fires together with this cue">+{numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}</span>}
-                          <span className="ml-auto hidden shrink-0 text-xs text-muted sm:inline">{track?.title ?? "missing"}</span>
+                          <span className="ml-auto hidden shrink-0 text-label text-muted sm:inline">{track?.title ?? "missing"}</span>
                         </button>
                         {/* On a phone the transition picker takes its own line under the cue rather
                             than eating the label down to one letter. */}
                         <div className="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
                           <label className="flex items-center gap-1 text-micro text-muted" title="Seconds before the next cue fires automatically">
-                            <Clock3 size={12} /><input aria-label={`Auto advance seconds for ${item.label}`} type="number" min="0" max="3600" value={cueTimers[item.id] ?? 0} onChange={e => setCueTimer?.(item.id, Number(e.target.value))} className="w-14 rounded-md border border-border bg-surface/60 px-1.5 py-1 font-mono text-xs outline-none focus:border-accent" />s
+                            <Clock3 size={12} /><input aria-label={`Auto advance seconds for ${item.label}`} type="number" min="0" max="3600" value={cueTimers[item.id] ?? 0} onChange={e => setCueTimer?.(item.id, Number(e.target.value))} className="w-14 rounded-md border border-border bg-surface/60 px-1.5 py-1 font-mono text-label outline-none focus:border-accent" />s
                           </label>
-                          {rehearsal.active && <input aria-label={`Private rehearsal note for ${item.label}`} defaultValue={rehearsal.notes?.[item.id] ?? ""} onBlur={e => onSaveRehearsalNote?.(item.id, e.target.value)} placeholder="note" className="w-24 rounded-md border border-border bg-surface/60 px-2 py-1 text-xs outline-none focus:border-accent" />}
+                          {rehearsal.active && <input aria-label={`Private rehearsal note for ${item.label}`} defaultValue={rehearsal.notes?.[item.id] ?? ""} onBlur={e => onSaveRehearsalNote?.(item.id, e.target.value)} placeholder="note" className="w-24 rounded-md border border-border bg-surface/60 px-2 py-1 text-label outline-none focus:border-accent" />}
                         </div>
                         {kind !== "audio" && (
                           <Select aria-label="Transition" value={item.visual?.transition ?? "fade"} size="sm" className="order-last w-full shrink-0 sm:order-none sm:w-auto"
@@ -2086,7 +2086,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                 {stage && <Button size="sm" variant="light" onPress={clearStage}>Blackout</Button>}
               </div>
               <Stage stage={stage} className="aspect-video w-full rounded-xl border border-border" />
-              <p className="text-xs text-muted">{stage ? stage.label : "Black. Audio-only cues leave the room dark."}</p>
+              <p className="text-label text-muted">{stage ? stage.label : "Black. Audio-only cues leave the room dark."}</p>
             </div>
           </div>
         </div>
@@ -2100,9 +2100,13 @@ function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effect
   // NaN, which a slider renders as an empty thumb. Fall back to the defaults for anything missing.
   const base = defaultEffects();
   return (
-    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+    // Ten controls in a row of vertical faders, which is what a rack of them is called everywhere
+    // else in the world and what an operator's hand already knows. Laid out horizontally these read
+    // as ten unrelated settings; stood up side by side they read as one desk, and the relative
+    // position of two faders is legible at a glance instead of requiring both labels to be read.
+    <div className="grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-5 xl:grid-cols-10">
       {controls.map(c => (
-        <Slider key={c.key} size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
+        <Slider key={c.key} orientation="vertical" className="h-36" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
           value={Number(effects[c.key] ?? base[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
           getValue={v => `${Number(v).toFixed(c.step < .1 ? 2 : 1)}${c.unit ?? ""}`} />
       ))}
@@ -2134,7 +2138,7 @@ function CueCountdown({ seconds, cueKey, onElapsed }: { seconds: number; cueKey:
     return () => clearInterval(id);
   }, [seconds, cueKey]);
   if (left <= 0) return null;
-  return <span className="shrink-0 rounded-xl border border-armed/40 bg-armed/10 px-2 py-1 font-mono text-xs text-armed">{formatTimer(left)}</span>;
+  return <span className="shrink-0 rounded-xl border border-armed/40 bg-armed/10 px-2 py-1 font-mono text-label text-armed">{formatTimer(left)}</span>;
 }
 
 /**
@@ -2195,10 +2199,10 @@ function CueTransport({ element, label, onToggle, onStop, master, setMaster, com
 
 function ArmedEffectControls({ effects, update, commit }: { effects: Effects; update: (fx: Effects) => void; commit: () => void }) {
   return (
-    <div data-armed-effects className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-border/70 bg-surface/35 p-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div data-armed-effects className="grid min-w-0 grid-cols-3 gap-x-3 gap-y-4 rounded-xl border border-border/70 bg-surface/35 p-3 sm:grid-cols-5">
       {ARMED_CONTROL_KEYS.map(key => {
         const control = controls.find(candidate => candidate.key === key)!;
-        return <Slider key={control.key} aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
+        return <Slider key={control.key} orientation="vertical" className="h-28" aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
           minValue={control.min} maxValue={control.max} step={control.step} value={Number(effects[control.key])}
           onChange={value => update({ ...effects, [control.key]: Array.isArray(value) ? value[0] : value })}
           onChangeEnd={commit}
@@ -2242,13 +2246,13 @@ function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setL
       {/* Phones get the title above the transport; there is no room for both on one line. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1">
-          <p aria-live="polite" data-player-track-id={track.id} className="flex items-center gap-2 truncate text-sm font-bold capitalize">
+          <p aria-live="polite" data-player-track-id={track.id} className="flex items-center gap-2 truncate text-body font-bold capitalize">
             {track.title}
             {unsaved && <span className="shrink-0 rounded-full border border-secondary/40 bg-secondary/15 px-2 py-0.5 label-cap text-secondary">Unsaved edit</span>}
           </p>
           {/* playbackRate never touches element.duration, so at 2x a 30s file still reports 30s.
               Divide by speed to show how long it will actually take. */}
-          <p className="text-xs text-muted">
+          <p className="text-label text-muted">
             {format(time / speed)} / {format(duration / speed)}
             {speed !== 1 && <span className="ml-1 text-accent">{speed}x</span>}
           </p>
@@ -2268,9 +2272,9 @@ function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setL
       <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => { const next = Array.isArray(v) ? v[0] : v; setTime(next); seek(next); }} />
       <AnimatePresence>{open && (
         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-          <div className="mt-3 grid gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-3 grid grid-cols-4 gap-x-3 gap-y-3 border-t border-border pt-3">
             {controls.slice(0, 4).map(c => (
-              <Slider key={c.key} size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
+              <Slider key={c.key} orientation="vertical" className="h-28" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
                 value={Number(effects[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
                 getValue={v => `${Number(v).toFixed(c.step < .1 ? 2 : 1)}${c.unit ?? ""}`} />
             ))}

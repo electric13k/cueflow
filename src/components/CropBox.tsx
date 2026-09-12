@@ -85,7 +85,7 @@ export default function CropBox({ url, title, onCancel, onApply }: {
         <Tooltip content="Put the box, the turn and the mirror back where they started">
           <Button isIconOnly size="sm" variant="light" aria-label="Reset" onPress={reset}><Undo2 size={15} /></Button>
         </Tooltip>
-        <span className="text-xs text-muted">Drag inside the picture to move the box, drag an edge to resize it.</span>
+        <span className="text-label text-muted">Drag inside the picture to move the box, drag an edge to resize it.</span>
         <span className="ml-auto flex gap-2">
           <Button size="sm" variant="light" startContent={<X size={14} />} onPress={onCancel}>Cancel</Button>
           <Tooltip content="Writes the framed part out as a new image in the library">

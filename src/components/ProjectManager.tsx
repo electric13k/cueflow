@@ -72,7 +72,7 @@ export default function ProjectManager() {
   if (!signedIn) return (
     <div>
       <h2 className="text-xl font-semibold tracking-tight">Projects</h2>
-      <p className="mt-2 text-sm text-muted">
+      <p className="mt-2 text-body text-muted">
         A project is a separate library, a separate set of sequences and its own shows, one per
         production, so last term's assembly is not in the way of this term's play. Sign in to make one.
       </p>
@@ -83,7 +83,7 @@ export default function ProjectManager() {
     <div>
       <motion.div {...reveal()}>
         <h2 className="text-xl font-semibold tracking-tight">One production, one project</h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           Each project keeps its own sounds, its own sequences and its own shows. People you add
           see all of it; everything outside a project stays yours alone.
         </p>
@@ -107,7 +107,7 @@ export default function ProjectManager() {
         <button type="button" onClick={() => switchTo(null)}
           className={`glass block w-full p-5 text-left ${here ? "" : "ring-1 ring-accent"}`}>
           <p className="font-bold">Your personal library</p>
-          <p className="text-sm text-muted">Everything not in a project. {here ? "Click to work here." : "You are working here."}</p>
+          <p className="text-body text-muted">Everything not in a project. {here ? "Click to work here." : "You are working here."}</p>
         </button>
 
         {projects.map(p => (
@@ -115,7 +115,7 @@ export default function ProjectManager() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-bold">{p.name}</p>
-                <p className="text-sm text-muted">
+                <p className="text-body text-muted">
                   Code <span className="font-mono tracking-widest text-foreground">{p.code}</span>
                   {p.role === "owner" ? " · yours" : " · shared with you"}
                 </p>
@@ -134,8 +134,8 @@ export default function ProjectManager() {
             {openId === p.id && (
               <div className="mt-5 space-y-5 border-t border-white/10 pt-5">
                 <div>
-                  <p className="flex items-center gap-2 text-sm font-bold"><Pencil size={15} className="text-accent" />Edit project</p>
-                  <p className="mt-1 text-xs text-muted">Change the project name or room code at any time. Existing collaborators keep access.</p>
+                  <p className="flex items-center gap-2 text-body font-bold"><Pencil size={15} className="text-accent" />Edit project</p>
+                  <p className="mt-1 text-label text-muted">Change the project name or room code at any time. Existing collaborators keep access.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Input className="min-w-40 flex-1" label="Name" value={name} onValueChange={setName} />
@@ -143,16 +143,16 @@ export default function ProjectManager() {
                   <Button className="self-end" isLoading={busy}
                     onPress={() => void run(() => updateProject(p.id, { name, code }), "Project updated.")}>Save</Button>
                 </div>
-                <p className="text-xs text-muted">
+                <p className="text-label text-muted">
                   The code is yours to choose, 4 to 12 letters and numbers, and no two projects can
                   share one. Treat it like a password: anyone you give it to can ask to be let in.
                 </p>
 
                 <div className="space-y-2">
-                  <h3 className="flex items-center gap-2 text-sm font-bold"><Users size={15} className="text-accent" />People</h3>
-                  {members.length === 0 && <p className="text-sm text-muted">Nobody else yet. Add a collaborator below.</p>}
+                  <h3 className="flex items-center gap-2 text-body font-bold"><Users size={15} className="text-accent" />People</h3>
+                  {members.length === 0 && <p className="text-body text-muted">Nobody else yet. Add a collaborator below.</p>}
                   {members.map(m => (
-                    <div key={m.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm">
+                    <div key={m.userId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 text-body">
                       <span className="min-w-0 flex-1 truncate">{m.username ? `@${m.username}` : m.displayName ?? "Someone"}</span>
                       <div className="flex items-center gap-2">
                         <Select aria-label={`Role for ${m.username ?? m.displayName ?? "collaborator"}`} value={m.role}

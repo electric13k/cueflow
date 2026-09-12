@@ -36,7 +36,7 @@ export default function ShowChat({ show, canSend = true, onSend, className = "" 
     <div className={`flex min-h-0 flex-col gap-2 ${className}`}>
       <div className="flex items-center gap-2">
         <h3 className="label-cap text-muted">Messages</h3>
-        <span className="text-xs text-muted">{lines.length ? `${lines.length} kept on this device` : "nothing yet"}</span>
+        <span className="text-label text-muted">{lines.length ? `${lines.length} kept on this device` : "nothing yet"}</span>
         {lines.length > 0 && (
           <Button isIconOnly size="sm" variant="light" className="ml-auto" aria-label="Clear the history on this device"
             onPress={() => { if (confirm("Clear the messages kept on this device? Nobody else's copy changes.")) clearChat(show); }}>
@@ -47,14 +47,14 @@ export default function ShowChat({ show, canSend = true, onSend, className = "" 
 
       <ol className="min-h-24 flex-1 space-y-1.5 overflow-auto pr-1">
         {lines.length === 0 && (
-          <li className="text-sm text-muted">
+          <li className="text-body text-muted">
             Nothing has been said yet. A line here flashes on every device in the show and makes no sound.
           </li>
         )}
         {lines.map(line => (
           <li key={line.id} className={line.kind === "event"
-            ? "text-xs italic text-muted"
-            : "rounded-xl bg-surface/60 px-3 py-2 text-sm"}>
+            ? "text-label italic text-muted"
+            : "rounded-xl bg-surface/60 px-3 py-2 text-body"}>
             <span className="mr-2 font-mono label-cap text-muted">{time(line.at)}</span>
             {line.kind === "message" && <span className="mr-2 font-semibold text-accent">{line.from}</span>}
             <span className={line.kind === "message" ? "" : "text-muted"}>{line.text}</span>

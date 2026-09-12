@@ -110,13 +110,13 @@ export default function Account() {
     <Shell width="max-w-2xl">
       <p className="eyebrow text-accent">Account</p>
       <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">{profile.username ? `@${profile.username}` : "Your account"}</h1>
-      <p className="mt-2 text-sm text-muted">{profile.email}</p>
+      <p className="mt-2 text-body text-muted">{profile.email}</p>
 
-      {note && <p className="mt-4 rounded-xl border border-live/40 bg-live/10 px-4 py-2 text-sm">{note}</p>}
+      {note && <p className="mt-4 rounded-xl border border-live/40 bg-live/10 px-4 py-2 text-body">{note}</p>}
 
       <section className="glass mt-8 space-y-4 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><UserRound size={18} className="text-accent" />Profile</h2>
-        <p className="text-sm text-muted">
+        <p className="text-body text-muted">
           Your username is how people add you to a project. It is the only part of your account anyone
           else can look up, your email address is never shown to them.
         </p>
@@ -139,7 +139,7 @@ export default function Account() {
 
       <section className="glass mt-6 space-y-4 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Link2 size={18} className="text-accent" />Ways in</h2>
-        <p className="text-sm text-muted">
+        <p className="text-body text-muted">
           Every method below opens this same account and the same library. Adding one does not make a
           second account, and removing one leaves everything where it is.
         </p>
@@ -148,8 +148,8 @@ export default function Account() {
             <li key={i.id} className="flex items-center gap-3 rounded-md border border-white/10 px-3 py-2.5">
               {i.provider === "google" ? <GoogleMark /> : <KeyRound size={16} className="text-muted" />}
               <span className="min-w-0 flex-1">
-                <span className="text-sm font-semibold capitalize">{i.provider === "email" ? "Email and password" : i.provider}</span>
-                {i.email && <span className="block truncate text-xs text-muted">{i.email}</span>}
+                <span className="text-body font-semibold capitalize">{i.provider === "email" ? "Email and password" : i.provider}</span>
+                {i.email && <span className="block truncate text-label text-muted">{i.email}</span>}
               </span>
               {/* Hidden rather than disabled on the last one: an unusable control invites the click
                   that produces the refusal, and the refusal is not news anybody wants. */}
@@ -160,7 +160,7 @@ export default function Account() {
           ))}
         </ul>
         {identities.some(i => i.provider === "google") ? (
-          <p className="text-xs text-muted">Google is connected. The button in the sign-in box will bring you straight here.</p>
+          <p className="text-label text-muted">Google is connected. The button in the sign-in box will bring you straight here.</p>
         ) : (
           <Button variant="bordered" startContent={<GoogleMark />} isDisabled={busy || linkingGoogle} isLoading={linkingGoogle}
             onPress={() => void connectGoogle()}>
@@ -174,18 +174,18 @@ export default function Account() {
       <section className="glass mt-6 space-y-4 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Download size={18} className="text-accent" />Your data</h2>
         {notice ? (
-          <p className="rounded-xl border border-live/40 bg-live/10 px-4 py-3 text-sm">
+          <p className="rounded-xl border border-live/40 bg-live/10 px-4 py-3 text-body">
             This account has been idle, so it is scheduled for deletion on{" "}
             <strong>{new Date(notice.deadline).toLocaleDateString()}</strong>. Using CueFlow at all cancels that,
             you are doing it right now by reading this.
           </p>
         ) : (
-          <p className="text-sm text-muted">
+          <p className="text-body text-muted">
             An account that goes unopened for {ACCOUNT_DAYS} days is deleted, with one email a month beforehand.
             Anything uploaded without an account goes after 30 days. Opening CueFlow resets the clock.
           </p>
         )}
-        <p className="text-sm text-muted">
+        <p className="text-body text-muted">
           The export is one zip: your files under their own names, and your projects, sequences, shows and
           scripts as plain JSON that opens without CueFlow.
         </p>
@@ -196,7 +196,7 @@ export default function Account() {
 
       <section className="glass mt-6 p-6 sm:p-8">
         <h2 className="text-xl font-semibold tracking-tight">Signing out</h2>
-        <p className="mt-2 text-sm text-muted">Your library stays on this device. Sign back in to pull down anything saved from another one.</p>
+        <p className="mt-2 text-body text-muted">Your library stays on this device. Sign back in to pull down anything saved from another one.</p>
         <Button className="mt-4" variant="bordered" startContent={<LogOut size={16} />} onPress={() => void signOut().then(load)}>Sign out</Button>
       </section>
     </Shell>

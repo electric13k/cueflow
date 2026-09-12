@@ -46,7 +46,7 @@ export default function Toaster() {
               <Icon size={20} className={`mt-0.5 shrink-0 ${tones[t.tone ?? "info"]}`} />
               <div className="min-w-0 flex-1">
                 <p className="text-base font-semibold leading-6">{t.title}</p>
-                {t.body && <p className="mt-1 text-sm leading-6 text-muted">{t.body}</p>}
+                {t.body && <p className="mt-1 text-body leading-6 text-muted">{t.body}</p>}
               </div>
               <button onClick={() => drop(t.id)} aria-label="Dismiss"
                 className="-my-1 -mr-1 grid size-8 shrink-0 place-items-center rounded-md text-muted hover:bg-white/10 hover:text-foreground"><X size={17} /></button>

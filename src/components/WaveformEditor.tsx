@@ -344,7 +344,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   };
 
   if (loading) return <div className="glass-soft flex items-center gap-3 p-6 text-muted"><Spinner size="sm" /> Loading waveform…</div>;
-  if (err) return <div className="glass-soft p-6 text-sm text-warning">Couldn’t load audio for editing: {err}</div>;
+  if (err) return <div className="glass-soft p-6 text-body text-warning">Couldn’t load audio for editing: {err}</div>;
   if (!buffer) return null;
 
   const stereo = buffer.numberOfChannels > 1;
@@ -353,10 +353,10 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   return (
     <div className="glass-soft space-y-4 p-4 outline-none" tabIndex={0} onKeyDown={keys}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">
+        <p className="text-body font-semibold">
           Waveform by wavesurfer.js. Drag across it to mark a region, drag the region’s edges to trim it, click to park the playhead.
         </p>
-        <p className="text-xs text-muted">
+        <p className="text-label text-muted">
           {stereo ? (buffer.numberOfChannels === 2 ? "Stereo" : `${buffer.numberOfChannels}ch`) : "Mono"} • {fmt(buffer.duration)} • at {fmt(at)}
           {sel && <> • {sel.channel == null ? "both channels" : labels[sel.channel]} {fmt(sel.start)}–{fmt(sel.end)} ({fmt(sel.end - sel.start)})</>}
         </p>
@@ -364,7 +364,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
 
       <div ref={host} className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/30 p-1" />
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-label">
         <span className="text-muted">Zoom</span>
         <Tooltip content="Show less of the clip, in more detail">
           <Button isIconOnly size="sm" variant="bordered" aria-label="Zoom in" onPress={() => zoomBy(1.6)}><ZoomIn size={14} /></Button>
@@ -393,7 +393,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       </div>
 
       {markers.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-armed/30 bg-armed/10 p-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-armed/30 bg-armed/10 p-2 text-label">
           <span className="font-semibold">Markers</span>
           {markers.map(marker => (
             <span key={marker.id} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface/70 pl-2">
@@ -407,7 +407,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       )}
 
       {env && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-curtain/40 bg-curtain/10 p-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-curtain/40 bg-curtain/10 p-2 text-label">
           <span className="font-semibold">Gain over time</span>
           <span className="text-muted">Drag a dot, double-click the lane to add one. The line rides from 0 to full.</span>
           <Tooltip content="Bake the curve into the working copy, where it can still be undone">
@@ -420,7 +420,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       )}
 
       {pending && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-visual/40 bg-visual/10 p-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-visual/40 bg-visual/10 p-2 text-label">
           <span className="font-semibold">Previewing: {pending.steps.join(" → ")}</span>
           <span className="text-muted">Play hears it, nothing is committed until you apply.</span>
           <Button size="sm" color="primary" variant="flat" startContent={<Check size={14} />} onPress={keep}>Apply</Button>
@@ -429,7 +429,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       )}
 
       {sel && stereo && !mono && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-label">
           <span className="text-muted">Selection covers:</span>
           {[null, ...chan.map((_, i) => i)].map(c => (
             <button key={String(c)} onClick={() => scopeTo(c as number | null)}
@@ -467,7 +467,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-        <span className="text-xs font-semibold text-muted">Edit {act}</span>
+        <span className="text-label font-semibold text-muted">Edit {act}</span>
         <Tooltip content="Copy the selection to the clipboard, it survives switching sounds">
           <span><Button size="sm" variant="bordered" isDisabled={!sel || tooShort} startContent={<Copy size={14} />} onPress={copy}>Copy</Button></span>
         </Tooltip>
@@ -515,7 +515,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
         {chan.map((c, i) => (
           <div key={i} className="rounded-xl border border-white/10 bg-white/[.03] p-3">
             <div className="mb-1 flex items-center justify-between">
-              <span className="flex items-center gap-2 text-sm font-medium">
+              <span className="flex items-center gap-2 text-body font-medium">
                 <span className="grid h-5 w-5 place-items-center rounded-md bg-accent/15 text-micro font-bold text-accent">{short(i)}</span>
                 {labels[i]}
               </span>
@@ -523,7 +523,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
                 <Button isIconOnly size="sm" variant={c.mute ? "solid" : "light"} color={c.mute ? "danger" : "default"} aria-label={`${c.mute ? "Unmute" : "Mute"} ${labels[i]}`} onPress={() => { setC(i, { mute: !c.mute }); rerender(); }}>{c.mute ? <VolumeX size={14} /> : <Volume2 size={14} />}</Button>
               </Tooltip>
             </div>
-            <Slider size="sm" color="primary" aria-label={`${labels[i]} gain`} minValue={0} maxValue={2} step={0.05} isDisabled={c.mute} value={c.gain} onChange={v => setC(i, { gain: Array.isArray(v) ? v[0] : v })} onChangeEnd={rerender} getValue={v => `${Number(v).toFixed(2)}x`} />
+            <Slider orientation="vertical" className="h-32" size="sm" color="primary" aria-label={`${labels[i]} gain`} minValue={0} maxValue={2} step={0.05} isDisabled={c.mute} value={c.gain} onChange={v => setC(i, { gain: Array.isArray(v) ? v[0] : v })} onChangeEnd={rerender} getValue={v => `${Number(v).toFixed(2)}x`} />
           </div>
         ))}
         <Switch size="sm" isSelected={mono} onValueChange={setMono}>Mix to mono</Switch>
@@ -533,7 +533,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
         <Tooltip content="Renders what you are hearing to a new WAV in the library">
           <Button color="primary" isLoading={saving} startContent={canUndo ? <Crop size={16} /> : <Save size={16} />} onPress={save}>Save as new sound</Button>
         </Tooltip>
-        <span className="text-xs text-muted">
+        <span className="text-label text-muted">
           {dirty ? "Play already plays what you have. Saving renders a new cloud-backed WAV; the original is untouched." : "Renders a new cloud-backed WAV; the original is untouched."}
         </span>
       </div>

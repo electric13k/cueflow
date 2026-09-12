@@ -274,7 +274,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
               <label className="flex">
                 <input type="file" accept=".docx,.pdf,.txt,.md,.rtf" className="sr-only"
                   onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void load(f); }} />
-                <span className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-sm font-medium hover:border-accent sm:h-9 sm:w-auto sm:justify-start">
+                <span className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/60 px-3 text-body font-medium hover:border-accent sm:h-9 sm:w-auto sm:justify-start">
                   <FileUp size={15} />{busy ? "Reading…" : doc.name || "Open a script"}
                 </span>
               </label>
@@ -290,9 +290,9 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
               )}
           <div className="flex flex-wrap items-center gap-2">
             <Tooltip content="Smaller text"><Button aria-label="Smaller text" size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.max(12, s - 2))}><Minus size={14} /></Button></Tooltip>
-            <span className="w-10 text-center text-xs tabular-nums text-muted">{size}px</span>
+            <span className="w-10 text-center text-label tabular-nums text-muted">{size}px</span>
             <Tooltip content="Bigger text"><Button aria-label="Bigger text" size="sm" variant="flat" isIconOnly onPress={() => setSize(s => Math.min(48, s + 2))}><Plus size={14} /></Button></Tooltip>
-            <label className="inline-flex items-center gap-1 text-xs text-muted">
+            <label className="inline-flex items-center gap-1 text-label text-muted">
               Colour
               <input type="color" aria-label="Text colour" value={colour || "#d8cfc4"} onChange={e => setColour(e.target.value)}
                 className="h-8 w-9 cursor-pointer rounded-lg border border-border bg-transparent p-0.5" />
@@ -300,7 +300,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
             {colour && <Button size="sm" variant="light" aria-label="Reset text colour" onPress={() => setColour("")}>Default colour</Button>}
             <Button size="sm" variant="flat" startContent={<Bell size={14} />} onPress={addBlankCue}>Alert word</Button>
             <Switch size="sm" isSelected={yellowEnabled} onValueChange={setYellowEnabled}>Yellow alerts</Switch>
-            {marked.hits > 0 && <span className="text-xs text-muted">{marked.hits} marked</span>}
+            {marked.hits > 0 && <span className="text-label text-muted">{marked.hits} marked</span>}
           </div>
         </div>
       )}
@@ -315,8 +315,8 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
         <Tooltip content="Back to the top, clock to zero">
           <Button size="sm" variant="flat" isIconOnly aria-label="Rewind" onPress={rewind}><RotateCcw size={14} /></Button>
         </Tooltip>
-        <span className="tabular-nums text-sm font-semibold" aria-label="Elapsed">{clock(elapsed)}</span>
-        <label className="flex items-center gap-2 text-xs text-muted">
+        <span className="tabular-nums text-body font-semibold" aria-label="Elapsed">{clock(elapsed)}</span>
+        <label className="flex items-center gap-2 text-label text-muted">
           Speed
           <Slider aria-label="Script speed" minValue={10} maxValue={300} step={5} value={speed} onChange={setSpeed} />
           <span className="w-16 tabular-nums">{speed} px/s</span>
@@ -328,7 +328,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
           <Search size={14} className="text-muted" />
           <Input className="min-w-0 flex-1 sm:w-44 sm:flex-none" size="sm" placeholder="Find in script" value={query} onValueChange={setQuery}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCueForText(selectedPhrase || query, "all"); } }} />
-          <span className="w-14 text-center text-xs tabular-nums text-muted">
+          <span className="w-14 text-center text-label tabular-nums text-muted">
             {found.hits ? `${at + 1}/${found.hits}` : query.trim() ? "none" : ""}
           </span>
           <Button size="sm" variant="light" isIconOnly aria-label="Previous match" onPress={() => step(-1)}><ChevronUp size={14} /></Button>
@@ -339,8 +339,8 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
         </div>
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
-      {selectedPhrase && <p className="text-xs text-muted">Selected phrase: <b className="text-foreground">{selectedPhrase}</b>. Press Enter to assign it as a cue.</p>}
+      {error && <p className="text-body text-danger">{error}</p>}
+      {selectedPhrase && <p className="text-label text-muted">Selected phrase: <b className="text-foreground">{selectedPhrase}</b>. Press Enter to assign it as a cue.</p>}
 
       {editable && doc.cues.length > 0 && (
         <div className="space-y-2">
@@ -390,7 +390,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
         {scan && <motion.span aria-hidden key={scan.key} className="script-line-scan" style={{ top: scan.top, left: scan.start }} initial={{ opacity: 0, x: 0 }} animate={{ opacity: [0, 1, 1, 0], x: scan.travel }} transition={{ duration: Math.min(2.2, .7 + Math.abs(scan.travel) / 160), ease: "linear" }} />}
         {contextMenu && (
           <motion.div initial={{ opacity: 0, scale: .96, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="absolute z-30 w-56 rounded-xl border border-border bg-surface p-2 shadow-glass" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onClick={e => e.stopPropagation()}>
-            <p className="truncate px-2 py-1 text-xs text-muted">{contextMenu.text}</p>
+            <p className="truncate px-2 py-1 text-label text-muted">{contextMenu.text}</p>
             <Button size="sm" variant="light" className="w-full justify-start" onPress={() => addCueForText(contextMenu.text, "first")}>Assign selected cue</Button>
             <Button size="sm" variant="light" className="w-full justify-start" onPress={() => addCueForText(contextMenu.text, "all")}>Assign all occurrences</Button>
             <Button size="sm" variant="light" className="w-full justify-start" onPress={() => setContextMenu(null)}><X size={14} />Close</Button>
@@ -399,7 +399,7 @@ export default function ScriptReader({ doc, setDoc, onAlert, editable = true, al
       </div>
 
       <AnimatePresence mode="wait">
-        {message && <motion.p key={message} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .18 }} className="text-center text-sm font-semibold text-muted">{message}</motion.p>}
+        {message && <motion.p key={message} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .18 }} className="text-center text-body font-semibold text-muted">{message}</motion.p>}
       </AnimatePresence>
     </div>
   );

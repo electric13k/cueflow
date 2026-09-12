@@ -62,13 +62,13 @@ export default function Control() {
           <p className="eyebrow text-accent">Control panel</p>
           <h1 className="truncate text-lg font-semibold tracking-tight">{deck?.name ?? "Waiting for the desk"}</h1>
         </div>
-        <span className={`shrink-0 text-xs ${deck?.armed ? "text-armed" : "text-muted"}`}>
+        <span className={`shrink-0 text-label ${deck?.armed ? "text-armed" : "text-muted"}`}>
           {deck?.armed ? (deck.index < 0 ? "Armed" : `Cue ${deck.index + 1}`) : "Standing by"}
         </span>
       </header>
 
       {!deck && (
-        <p className="text-sm text-muted">
+        <p className="text-body text-muted">
           Keep the Studio open in another window on this browser. This panel mirrors it and calls cues
           back to it; it does not run a show on its own.
         </p>
@@ -81,11 +81,11 @@ export default function Control() {
               aria-current={i === deck.index ? "true" : undefined}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left ${i === deck.index ? "bg-live/20 ring-1 ring-live" : "bg-surface/60 hover:bg-surface"}`}>
               <span className={`w-8 shrink-0 text-center font-mono font-bold ${cue.kind === "audio" ? "text-audio" : "text-visual"}`}>{cue.number}</span>
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{cue.label}</span>
+              <span className="min-w-0 flex-1 truncate text-body font-semibold">{cue.label}</span>
             </button>
           </li>
         ))}
-        {deck?.cues.length === 0 && <li className="text-sm text-muted">This sequence has no cues yet.</li>}
+        {deck?.cues.length === 0 && <li className="text-body text-muted">This sequence has no cues yet.</li>}
       </ol>
 
       <div className="flex items-center gap-2">

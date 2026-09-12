@@ -37,7 +37,7 @@ function ModulePanel({ m, v, off, onVisual, onToggle, children }: {
           {MODULES.indexOf(m) + 1}
         </span>
         <Switch size="sm" isSelected={on} onValueChange={onToggle}>{m.label}</Switch>
-        <span className="hidden text-xs text-muted sm:inline">{m.hint}</span>
+        <span className="hidden text-label text-muted sm:inline">{m.hint}</span>
         <Tooltip content={`Reset ${m.label.toLowerCase()}`}>
           <span className="ml-auto">
             <Button aria-label={`Reset ${m.label.toLowerCase()}`} size="sm" variant="light" isIconOnly isDisabled={!on || !moduleTouched(v, m)}
@@ -158,7 +158,7 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
       <Stage stage={{ url: track.url, kind, visual: v, label: track.title, n: replay }} className="aspect-video w-full rounded-2xl border border-border" />
 
       <div className="glass-soft flex flex-wrap items-center gap-2 p-3">
-        <span className="mr-1 text-xs font-semibold text-muted">Looks</span>
+        <span className="mr-1 text-label font-semibold text-muted">Looks</span>
         {PRESETS.map(preset => (
           <Button key={preset.name} size="sm" variant="flat" onPress={() => set(preset.patch)}>{preset.name}</Button>
         ))}
@@ -170,9 +170,9 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
         <Select label="Fill the screen" value={v.fit} onChange={value => set({ fit: value as Visual["fit"] })}
           options={[{ value: "contain", label: "Fit inside (letterbox)" }, { value: "cover", label: "Fill and crop" }]} />
         <label className="block">
-          <span className="mb-1 flex items-center gap-1 text-xs text-muted"><Type size={12} />Caption on the slide</span>
+          <span className="mb-1 flex items-center gap-1 text-label text-muted"><Type size={12} />Caption on the slide</span>
           <input value={v.caption} onChange={e => set({ caption: e.target.value })} placeholder="Optional text over the media"
-            className="w-full rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent" />
+            className="w-full rounded-xl border border-border bg-surface/60 px-3 py-2 text-body outline-none focus:border-accent" />
         </label>
       </div>
 
@@ -181,14 +181,14 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
           <div className="space-y-3 pt-3">
             <div className="flex flex-wrap items-center gap-2">
               <Tooltip content="Keep part of the picture as a new image"><span><Button size="sm" variant="flat" isDisabled={kind !== "image"} startContent={<Crop size={14} />} onPress={() => setCropping(true)}>Crop</Button></span></Tooltip>
-              <span className="text-xs text-muted">Crop writes a new image; everything below rides with the cue.</span>
+              <span className="text-label text-muted">Crop writes a new image; everything below rides with the cue.</span>
             </div>
             {stack("geometry")}
           </div>
         </Tab>
         <Tab id="tone" title="Tone">
           <div className="space-y-3 pt-3">
-            <p className="text-xs text-muted">Applied top to bottom. Switch a module off to bypass it without losing its settings.</p>
+            <p className="text-label text-muted">Applied top to bottom. Switch a module off to bypass it without losing its settings.</p>
             {stack("tone")}
           </div>
         </Tab>
@@ -197,12 +197,12 @@ export default function MediaEditor({ track, cues = [], onChange, onSave }: {
       {kind === "video" && (
         <div className="glass-soft space-y-4 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold">Trim and render</p>
+            <p className="text-body font-semibold">Trim and render</p>
             <Button size="sm" color="primary" variant="flat" isDisabled={busy || !duration} isLoading={busy} startContent={<Save size={14} />} onPress={() => void renderVideo()}>
               {busy ? `Rendering ${Math.round(renderProgress * 100)}%` : "Render video"}
             </Button>
           </div>
-          <p className="text-xs text-muted">Creates a new MP4 in your library. Processing runs locally in your browser.</p>
+          <p className="text-label text-muted">Creates a new MP4 in your library. Processing runs locally in your browser.</p>
           <Filmstrip url={track.url} duration={duration} trimIn={v.trimIn} trimOut={v.trimOut} cues={cues} onChange={set} />
           <Slider size="sm" color="primary" label="Speed" minValue={.25} maxValue={2} step={.05} value={v.rate}
             onChange={n => set({ rate: Array.isArray(n) ? n[0] : n })} getValue={n => `${Number(n).toFixed(2)}x`} />

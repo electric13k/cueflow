@@ -93,7 +93,7 @@ export default function SlideComposer({ open, onClose, onCreate }: {
           <div className="grid gap-4 md:grid-cols-[200px_minmax(0,1fr)]">
             {/* The deck. Order here is the order the cues land in the library. */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted">
+              <div className="flex items-center justify-between text-label text-muted">
                 <span>{deck.slides.length} slide{deck.slides.length === 1 ? "" : "s"}</span>
                 <Switch size="sm" isSelected={strip.reorder} onValueChange={strip.setReorder}>Reorder</Switch>
               </div>
@@ -136,7 +136,7 @@ export default function SlideComposer({ open, onClose, onCreate }: {
               <div className="flex flex-wrap items-center gap-2">
                 <Select aria-label="Slide layout" value={current.layout} onChange={value => patch({ layout: value as Layout })}
                   options={LAYOUTS.map(l => ({ value: l.id, label: l.name }))} size="sm" className="min-w-36" />
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-border px-2 py-1 text-sm hover:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus)]">
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-border px-2 py-1 text-body hover:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--focus)]">
                   <ImagePlus size={14} aria-hidden />{current.image ? "Replace image" : "Image"}
                   {/* sr-only, not hidden: `display: none` takes it out of the tab order entirely. */}
                   <input type="file" accept="image/*" className="sr-only" aria-label={current.image ? "Replace the slide image" : "Add a slide image"} onChange={e => void pick(e.target.files?.[0])} />
@@ -144,23 +144,23 @@ export default function SlideComposer({ open, onClose, onCreate }: {
                 {current.image && (
                   <Button size="sm" variant="light" startContent={<X size={13} />} onPress={() => { drop(current.image); patch({ image: undefined }); }}>Clear image</Button>
                 )}
-                {wantsImage(current.layout) && !current.image && <span className="text-xs text-muted">This layout wants an image.</span>}
+                {wantsImage(current.layout) && !current.image && <span className="text-label text-muted">This layout wants an image.</span>}
               </div>
               <Input label="Title" value={current.title} onValueChange={v => patch({ title: v })} placeholder="Act two" />
               {current.layout !== "image" && (
                 <label className="block">
-                  <span className="mb-1 block text-xs text-muted">
+                  <span className="mb-1 block text-label text-muted">
                     {current.layout === "title" ? "Standfirst" : "Lines (one per row, a blank row leaves a gap)"}
                   </span>
                   <textarea rows={3} value={current.body} onChange={e => patch({ body: e.target.value })}
                     placeholder={"House to half\nStandby sound 4"}
-                    className="w-full resize-y rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-accent" />
+                    className="w-full resize-y rounded-xl border border-border bg-surface/60 px-3 py-2 text-body outline-none focus:border-accent" />
                 </label>
               )}
 
               {/* The master. One theme for the deck, which is the point of having a deck. */}
               <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                <span className="text-xs text-muted">Master</span>
+                <span className="text-label text-muted">Master</span>
                 {THEMES.map(t => (
                   <button key={t.name} type="button" onClick={() => master({ bg: t.bg, fg: t.fg, accent: t.accent })}
                     aria-label={t.name} title={t.name}

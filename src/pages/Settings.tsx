@@ -35,11 +35,11 @@ export default function Settings() {
     <Shell width="max-w-3xl">
       <p className="eyebrow text-accent">Settings</p>
       <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">How it behaves</h1>
-      <p className="mt-2 text-sm text-muted">These stay on this device. They are not tied to your account, so a borrowed laptop keeps its own.</p>
+      <p className="mt-2 text-body text-muted">These stay on this device. They are not tied to your account, so a borrowed laptop keeps its own.</p>
 
       <section className="glass mt-8 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Keyboard size={18} className="text-accent" />Keybinds</h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           Click a key box, then press a key. Arrows step every cue; WASD drives whatever is on the stage,
           so slides move without touching the sound underneath.
         </p>
@@ -57,7 +57,7 @@ export default function Settings() {
         <div className="mt-4 space-y-4">
           <div>
             <Switch isSelected={theme === "dark"} onValueChange={v => setTheme(v ? "dark" : "light")}>Dark mode</Switch>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-label text-muted">
               This device only. It covers the app chrome and working surfaces, nobody else in the show
               sees it, and what the audience sees is black either way.
             </p>
@@ -67,7 +67,7 @@ export default function Settings() {
 
       <section className="glass mt-6 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Bell size={18} className="text-accent" />Alerts</h2>
-        <p className="mt-2 text-sm text-muted">Choose where script cue warnings appear. The audience view is never covered by operator alerts.</p>
+        <p className="mt-2 text-body text-muted">Choose where script cue warnings appear. The audience view is never covered by operator alerts.</p>
         <div className="mt-4">
           <Choice label="Alert surface" value={alertScope} onChange={scope => { setAlertScope(scope); saveAlertScope(scope); }}
             options={[
@@ -79,26 +79,26 @@ export default function Settings() {
 
       <section className="glass mt-6 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><Cookie size={18} className="text-accent" />Cookies and analytics</h2>
-        <p className="mt-2 text-sm text-muted">Necessary storage keeps Cueflow working. Optional analytics is off unless you choose to allow it, and you can change this choice later.</p>
+        <p className="mt-2 text-body text-muted">Necessary storage keeps Cueflow working. Optional analytics is off unless you choose to allow it, and you can change this choice later.</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Switch isSelected={consent.analytics === "accepted"} onValueChange={allowed => { const next = { ...consent, analytics: allowed ? "accepted" : "declined" } as ConsentState; setConsent(next); saveConsent(next); }}>
             Allow optional analytics
           </Switch>
-          <span className="text-xs text-muted">Current choice: {consent.analytics === "accepted" ? "allowed" : consent.analytics === "declined" ? "only necessary" : "not chosen"}</span>
+          <span className="text-label text-muted">Current choice: {consent.analytics === "accepted" ? "allowed" : consent.analytics === "declined" ? "only necessary" : "not chosen"}</span>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Switch isSelected={consent.performance !== "declined"} onValueChange={allowed => { const next = { ...consent, performance: allowed ? "accepted" : "declined" } as ConsentState; setConsent(next); saveConsent(next); window.location.reload(); }}>
             Allow performance caching
           </Switch>
-          <span className="text-xs text-muted">Improves shell loading and offline recovery. Stored only as a first-party preference.</span>
+          <span className="text-label text-muted">Improves shell loading and offline recovery. Stored only as a first-party preference.</span>
         </div>
-        <p className="mt-3 text-xs text-muted">Analytics is intended for aggregated route, feature, performance, and error signals. It does not need script contents, media files, passwords, access tokens, or private project data.</p>
-        <p className="mt-3 text-xs text-muted"><a href={`${import.meta.env.BASE_URL}cookies`} className="text-accent underline-offset-2 hover:underline">Read the Cookies policy</a></p>
+        <p className="mt-3 text-label text-muted">Analytics is intended for aggregated route, feature, performance, and error signals. It does not need script contents, media files, passwords, access tokens, or private project data.</p>
+        <p className="mt-3 text-label text-muted"><a href={`${import.meta.env.BASE_URL}cookies`} className="text-accent underline-offset-2 hover:underline">Read the Cookies policy</a></p>
       </section>
 
       <section className="glass mt-6 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><LayoutGrid size={18} className="text-accent" />Layout</h2>
-        <p className="mt-2 text-sm text-muted">A phone and a desk are not asking the same question, so they get one setting each.</p>
+        <p className="mt-2 text-body text-muted">A phone and a desk are not asking the same question, so they get one setting each.</p>
         <div className="mt-5 space-y-6">
           <Choice label="On a computer" value={layout.pane} onChange={pane => setLayout({ pane })}
             options={[
@@ -116,7 +116,7 @@ export default function Settings() {
 
       <section className="glass mt-6 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><GraduationCap size={18} className="text-accent" />Tutorial</h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-2 text-body text-muted">
           It walks you through building a deck and firing a cue, on a board it fills with demo sounds, pictures
           and a script. That material is cleared when you reach the end, and nothing you made yourself goes with it.
         </p>
@@ -140,18 +140,18 @@ function Choice<T extends string>({ label, value, options, onChange }: {
 }) {
   return (
     <div>
-      <p className="text-sm font-semibold">{label}</p>
+      <p className="text-body font-semibold">{label}</p>
       {/* min-h-11 is 44px: this is a control someone sets on the device it describes. */}
       <div role="radiogroup" aria-label={label} className="mt-2 flex flex-wrap gap-1.5">
         {options.map(o => (
           <button key={o.id} type="button" role="radio" aria-checked={value === o.id} onClick={() => onChange(o.id)}
-            className={`min-h-11 rounded-md border px-4 text-sm transition-colors ${
+            className={`min-h-11 rounded-md border px-4 text-body transition-colors ${
               value === o.id ? "border-accent bg-accent/12 font-semibold text-foreground" : "border-white/15 text-muted hover:text-foreground"}`}>
             {o.label}
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-muted">{options.find(o => o.id === value)?.note}</p>
+      <p className="mt-2 text-label text-muted">{options.find(o => o.id === value)?.note}</p>
     </div>
   );
 }

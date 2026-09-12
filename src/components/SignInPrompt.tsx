@@ -41,7 +41,7 @@ export default function SignInPrompt() {
           role="dialog" aria-label="Sign in to sync"
         >
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent/15 text-accent"><CloudUpload size={18} /></div>
-          <p className="flex-1 text-sm text-muted">
+          <p className="flex-1 text-body text-muted">
             <b className="text-foreground">Sign in to sync your progress across devices.</b>{" "}
             Right now your sounds and sequences live in this browser only. Clear it and they are gone.
           </p>
