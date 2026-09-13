@@ -1,6 +1,6 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { Button, Card, CardBody, Dial, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
+import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Square, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal, PanelsTopLeft } from "lucide-react";
 import { useDeviceCapabilities, useIsPhone } from "../lib/layout";
@@ -2254,16 +2254,15 @@ function CueTransport({ element, label, onToggle, onStop, master, setMaster, com
 
 function ArmedEffectControls({ effects, update, commit }: { effects: Effects; update: (fx: Effects) => void; commit: () => void }) {
   return (
-    // Dials rather than faders, because this is the one rack that is touched while a show is
-    // running. A fader is the right control when you are comparing a value against the ones beside
-    // it; these five are reached for on their own, in the dark, usually with one hand, and a dial is
-    // a whole round target that reads at a glance instead of a thin track you have to find.
+    // Long vertical faders, the same control the editor rack uses. One kind of control for levels
+    // across the whole app: a fader's position is readable against the ones beside it without
+    // reading any numbers, which is the thing you want from a strip you glance at mid-show.
     <div data-armed-effects className="flex min-w-0 flex-wrap items-start justify-center gap-x-5 gap-y-4 rounded-xl border border-border/70 bg-surface/35 p-4">
       {ARMED_CONTROL_KEYS.map(key => {
         const control = controls.find(candidate => candidate.key === key)!;
-        return <Dial key={control.key} size={124} aria-label={`Armed ${control.label}`} label={control.label}
+        return <Slider key={control.key} orientation="vertical" className="h-56" aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
           minValue={control.min} maxValue={control.max} step={control.step} value={Number(effects[control.key])}
-          onChange={value => update({ ...effects, [control.key]: value })}
+          onChange={value => update({ ...effects, [control.key]: Array.isArray(value) ? value[0] : value })}
           onChangeEnd={commit}
           getValue={value => `${Number(value).toFixed(control.step < .1 ? 2 : 1)}${control.unit ?? ""}`} />;
       })}
