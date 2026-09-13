@@ -31,12 +31,19 @@ export default function SyncPill() {
   return (
     // aria-live, because this changes without anybody pressing anything: the moment it flips to
     // `down` is the moment a screen-reader user needs to know their edits have stopped travelling.
-    <div role="status" aria-live="polite" className="ml-auto">
+    // The colour rides on this wrapper, not on the Button.
+    //
+    // Putting `text-muted` on the button made it the first thing in `main` matching "muted body
+    // copy", and a button correctly uses the control font rather than the reading font -- so
+    // check-sidebar-typography started reporting that body copy and buttons no longer use separate
+    // fonts. The typography had not changed; the pill had moved what the check was looking at.
+    // Colour belongs to the whole pill anyway, and the icon and the label both inherit it here.
+    <div role="status" aria-live="polite" className={`ml-auto ${className}`}>
       <Tooltip content={detail} placement="bottom">
         <Button
           size="sm"
           variant="light"
-          className={`min-h-11 gap-1.5 font-medium sm:min-h-9 ${className}`}
+          className="min-h-11 gap-1.5 font-medium text-inherit sm:min-h-9"
           startContent={<Icon size={15} aria-hidden />}
           onPress={() => toast(label, detail, state === "down" ? "warn" : "info")}
         >

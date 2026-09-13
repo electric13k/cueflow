@@ -46,6 +46,21 @@ import { cloneEffects, cueNumbers, defaultEffects, defaultVisual, isVisual, kind
 import { loadAlertScope, type AlertScope } from "../lib/alerts";
 import { slideLabels, slidesFromPptx } from "../lib/presentation";
 
+/**
+ * Put the document back at the top, now.
+ *
+ * Called from the pane button's own press as well as from the effect that watches `pane`. The effect
+ * alone was not enough: it cannot run until React has committed the new pane, and on a phone the
+ * Library commits late enough that somebody switching to it arrived partway down a list they had
+ * never scrolled. Resetting on the press costs nothing when the effect would have covered it, and
+ * covers the case where the effect is too late to be felt as instant.
+ */
+const scrollToTop = () => {
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+};
+
 const format = (s = 0) => Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` : "0:00";
 const timerLeftFor = (id: string, timers: Record<string, number>) => Number(timers[id] ?? 0);
 type Ctl = { key: keyof Effects; label: string; min: number; max: number; step: number; unit?: string };
@@ -145,9 +160,33 @@ export default function Studio() {
   useEffect(() => {
     if (!phone) return;
     let second: number | null = null;
-    const reset = () => { document.documentElement.scrollTop = 0; document.body.scrollTop = 0; window.scrollTo({ top: 0, left: 0, behavior: "auto" }); };
+    const reset = scrollToTop;
     const frame = requestAnimationFrame(() => { reset(); second = requestAnimationFrame(reset); });
-    return () => { cancelAnimationFrame(frame); if (second !== null) cancelAnimationFrame(second); };
+    /**
+     * A third reset, later, because two frames is not long enough for the Library.
+     *
+     * Deck landed at the top and Library did not. The difference is what each pane mounts: a library
+     * is cards carrying canvases, images and iframes, and those arrive after the two frames above
+     * have already run. As they lay out, scroll anchoring keeps the previous reading position in
+     * view by scrolling back down -- which is the browser being helpful about a document, and wrong
+     * about a pane that is supposed to be a destination.
+     *
+     * `overflow-anchor: none` on the document turns that off for the moment it would fight us, and
+     * the timeout catches anything that lands after it is restored.
+     */
+    const root = document.documentElement;
+    const anchorWas = root.style.overflowAnchor;
+    root.style.overflowAnchor = "none";
+    const settle = [120, 260, 420].map(after => window.setTimeout(() => {
+      reset();
+      if (after === 420) root.style.overflowAnchor = anchorWas;
+    }, after));
+    return () => {
+      cancelAnimationFrame(frame);
+      if (second !== null) cancelAnimationFrame(second);
+      for (const timer of settle) clearTimeout(timer);
+      root.style.overflowAnchor = anchorWas;
+    };
   }, [pane, phone]);
   /**
    * The tutorial writes a demo library straight to localStorage and then asks the page to re-read
@@ -1559,7 +1598,7 @@ export default function Studio() {
           {PANES.map(p => {
             const on = pane === p.id;
             return (
-              <button key={p.id} type="button" data-tour={`pane-${p.id}`} aria-current={on} onPointerDown={(event) => event.preventDefault()} onClick={() => setPane(p.id)}
+              <button key={p.id} type="button" data-tour={`pane-${p.id}`} aria-current={on} onPointerDown={(event) => event.preventDefault()} onClick={() => { scrollToTop(); setPane(p.id); }}
                 className={`flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 pt-2 text-micro font-semibold transition-colors ${on ? "text-accent" : "text-muted"}`}>
                 <p.icon size={19} aria-hidden />
                 {p.label}
