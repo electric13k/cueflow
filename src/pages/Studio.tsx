@@ -2260,7 +2260,7 @@ function ArmedEffectControls({ effects, update, commit }: { effects: Effects; up
     <div data-armed-effects className="flex min-w-0 flex-wrap items-start justify-center gap-x-5 gap-y-4 rounded-xl border border-border/70 bg-surface/35 p-4">
       {ARMED_CONTROL_KEYS.map(key => {
         const control = controls.find(candidate => candidate.key === key)!;
-        return <Slider key={control.key} orientation="vertical" className="h-56" aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
+        return <Slider key={control.key} orientation="vertical" className="h-56 w-16" aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
           minValue={control.min} maxValue={control.max} step={control.step} value={Number(effects[control.key])}
           onChange={value => update({ ...effects, [control.key]: Array.isArray(value) ? value[0] : value })}
           onChangeEnd={commit}
