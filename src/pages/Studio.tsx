@@ -1,8 +1,9 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Square, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal, PanelsTopLeft } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Square, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal, PanelsTopLeft, X } from "lucide-react";
 import { useDeviceCapabilities, useIsPhone } from "../lib/layout";
 import LogoMark from "../components/LogoMark";
 import MediaEditor from "../components/MediaEditor";
@@ -1301,7 +1302,24 @@ export default function Studio() {
   };
   const deleteTrack = (id: string) => { const gone = tracks.find(t => t.id === id); void deleteTrackEverywhere(id, gone?.url ?? ""); setTracks(o => o.filter(t => t.id !== id)); applySequences(o => o.map(s => ({ ...s, items: s.items.filter(i => i.trackId !== id) })), "Remove library item from sequences"); updateFeatures(state => removeFromCollections(state, id)); if (selectedId === id) setSelectedId(tracks.find(t => t.id !== id)?.id ?? ""); };
 
-  const addSequence = () => { const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() }; applySequences(o => [...o, seq], "Create sequence"); setSequenceId(seq.id); setCueIndex(0); };
+  /**
+   * A new sequence takes whatever is selected with it.
+   *
+   * Building a first show was a round trip per cue: select a sound in the Library, change tab to
+   * Sequences, press Add cue, change back, select the next one. The tracks were already chosen
+   * before the sequence existed, and making an empty one and then going to fetch them is a step that
+   * only exists because the two things live on different tabs.
+   *
+   * An empty sequence is still what you get when nothing is selected, which is how you start one
+   * deliberately from nothing.
+   */
+  const addSequence = () => {
+    const chosen = selectedIds.length ? selectedIds : selected ? [selected.id] : [];
+    const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() };
+    applySequences(o => [...o, seq], "Create sequence");
+    setSequenceId(seq.id); setCueIndex(0);
+    if (chosen.length) addTracksTo(seq.id, chosen);
+  };
   const deleteSequence = (id: string) => { void deleteSequenceEverywhere(id); applySequences(o => o.filter(s => s.id !== id), "Delete sequence"); if (sequenceId === id) setSequenceId(sequences.find(s => s.id !== id)?.id ?? ""); };
   /** One way in for all three: the toolbar's picker, the Add button, and a card dropped on a chip. */
   const addTracksTo = (seqId: string, ids: string[]) => {
@@ -1318,6 +1336,20 @@ export default function Studio() {
     });
     applySequences(o => o.map(s => s.id !== seqId ? s : { ...s, items: [...s.items, ...items] }), "Add cue to sequence");
     toast("Added to the sequence", `${chosen.length} item${chosen.length === 1 ? "" : "s"} into ${sequences.find(s => s.id === seqId)?.name ?? "it"}.`, "success");
+  };
+  /**
+   * One card onto the deck, from the Library, without going anywhere.
+   *
+   * If no sequence is open yet it makes one first. Somebody adding their first sound has not
+   * decided to "create a sequence" -- they have decided this sound is in the show -- and asking
+   * them to say so in the right order first is the setup step worth deleting.
+   */
+  const addTrackToDeck = (trackId: string) => {
+    if (sequenceId) { addTracksTo(sequenceId, [trackId]); return; }
+    const seq: Sequence = { id: crypto.randomUUID(), name: `Sequence ${sequences.length + 1}`, items: [], createdAt: new Date().toISOString() };
+    applySequences(o => [...o, seq], "Create sequence");
+    setSequenceId(seq.id); setCueIndex(0);
+    addTracksTo(seq.id, [trackId]);
   };
   const addItem = () => addTracksTo(sequenceId, selectedIds.length ? selectedIds : selected ? [selected.id] : []);
   const linkAudioToSlide = (deckId: string, slideIndex: number) => {
@@ -1600,7 +1632,7 @@ export default function Studio() {
             }}
             classNames={{ tabList: armed || phone ? "hidden" : "glass-soft" }}>
             <Tab key="library" id="library" title={<span className="flex items-center gap-2"><Layers size={16} />Library</span>}>
-              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingIds={soundingIds} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
+              <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingIds={soundingIds} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} onAddToDeck={addTrackToDeck} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
               <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} armed={armed} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} onStartShow={startShowNow} starting={starting} stage={stage} clearStage={() => setStage(null)} effectsDrag={armedDragFrom} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
@@ -1680,7 +1712,19 @@ export default function Studio() {
         </div>
       )}
 
-      <AnimatePresence>{selected && !isVisual(selected) && !editingId && !armed && <Player key={`player-${selected.id}`} track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} audio={audio.current} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>
+      {/*
+        The player is portalled to the body, not left in the page.
+
+        It is `position: fixed`, which anchors to the viewport only while no ancestor is
+        transformed -- and `motion.main` keeps a residual `matrix(1, 0, 0, 1, 0, 8)` from its
+        entrance animation, which makes it the containing block instead. The floating player was
+        therefore being placed against the page rather than the screen, and on any view taller than
+        the window it sat below the fold: found in the DOM, impossible to see or press.
+      */}
+      {createPortal(
+        <AnimatePresence>{selected && !isVisual(selected) && !editingId && !armed && <Player key={`player-${selected.id}`} track={selected} unsaved={!!editUrl} playing={playing} toggle={toggle} audio={audio.current} seek={seek} jump={jump} loop={loop} setLoop={setLoop} effects={selected.effects} update={updateEffects} />}</AnimatePresence>,
+        document.body,
+      )}
 
       <Modal isOpen={renameModal.isOpen} onOpenChange={renameModal.onOpenChange} placement="center" backdrop="blur">
         <ModalContent>{onClose => (<>
@@ -1731,7 +1775,7 @@ export default function Studio() {
   );
 }
 
-function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onLinkSlide, onRename, onDeleteTrack, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection }: any) {
+function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, drag, onPlay, onToggleSelect, onAdd, onAddSlide, onOpenEditor, onLinkSlide, onRename, onDeleteTrack, importAsset, query, setQuery, sort, setSort, kind, setKind, favorites = [], collections = {}, scope = "", setScope, onNewCollection, onToggleFavorite, onAddToCollection, onAddToDeck }: any) {
   const shown: Track[] = tracks;
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const device = useDeviceCapabilities();
@@ -1800,6 +1844,9 @@ function Library({ tracks, total, selectedId, playingIds, selectedIds, busy, dra
                         {menuFor === t.id && <div className="absolute right-0 top-full z-40 mt-1 flex w-44 flex-col gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-glass">
                           <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onToggleFavorite?.(t.id); }}><Star size={14} />{favorites.includes(t.id) ? "Remove favorite" : "Favorite"}</Button>
                           <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onAddToCollection?.(t.id); }}><FolderPlus size={14} />Add to collection</Button>
+                          {/* Straight onto the deck from the card, because changing tab to add a cue you have already
+                              picked is the round trip that made building a first show tedious. */}
+                          <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onAddToDeck?.(t.id); }}><ListMusic size={14} />Add to the deck</Button>
                           <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onOpenEditor(t.id); }}><SlidersHorizontal size={14} />Open editor</Button>
                           <Button size="sm" variant="light" className="justify-start" onPress={() => { setMenuFor(null); onRename(t.id); }}><Pencil size={14} />Rename</Button>
                           <Button size="sm" variant="light" color="danger" className="justify-start" onPress={() => { setMenuFor(null); if (confirm(`Delete ${t.title}?`)) onDeleteTrack?.(t.id); }}><Trash2 size={14} />Delete</Button>
@@ -2277,6 +2324,23 @@ function ArmedEffectControls({ effects, update, commit }: { effects: Effects; up
  */
 function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setLoop, effects, update }: any) {
   const [open, setOpen] = useState(false);
+  /**
+   * Where the effects panel sits, measured rather than guessed.
+   *
+   * It was a fixed offset that assumed the bar was 107px tall. That holds on a desktop and does not
+   * on a phone, where the title wraps above the transport and the bar grows -- so the panel sat on
+   * top of the controls it belongs to. Reading the bar means it is right at any size, and it is
+   * re-read on resize because rotating a phone changes it.
+   */
+  const barRef = useRef<HTMLElement | null>(null);
+  const [panelBottom, setPanelBottom] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    const place = () => { const r = barRef.current?.getBoundingClientRect(); if (r) setPanelBottom(Math.round(window.innerHeight - r.top + 8)); };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
   const [time, setTime] = useState(() => (audio as HTMLAudioElement | null)?.currentTime ?? 0);
   const [duration, setDuration] = useState(() => {
     const d = (audio as HTMLAudioElement | null)?.duration;
@@ -2299,8 +2363,44 @@ function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setL
   return (
     // Docked flush to the bottom edge on a phone -- a floating card wastes the one strip of screen a
     // thumb reaches without moving the hand. It floats again once there is room.
-    <motion.section initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 30 }}
-      className="glass mobile-player fixed inset-x-3 bottom-[calc(var(--nav-h)+var(--safe-b)+.75rem)] z-30 mx-auto max-w-[1080px] rounded-2xl p-3 shadow-glass sm:inset-x-4 sm:bottom-4 sm:rounded-lg sm:p-4">
+    //
+    // Fades in rather than sliding up: this is a fixed overlay, and a transform on a fixed element is
+    // exactly what put it in the wrong place to begin with -- a transformed ancestor becomes the
+    // containing block, so anything positioned against the viewport stops being. Opacity moves
+    // nothing and cannot reintroduce that.
+    <>
+      {/*
+        The faders float above the bar rather than growing it.
+        Expanding in place pushed a 176px rack into the player, so opening the effects moved the
+        transport -- the play button walked out from under a thumb that was already reaching for it,
+        mid-cue. A panel over the top leaves every control where it was, and it is anchored to the
+        button that opened it so the connection is obvious.
+      */}
+      {open && (
+        <div
+          role="dialog" aria-label="Live effects"
+          // Escape closes it, because a panel that covers the page and can only be dismissed by
+          // finding its own button again is a trap with a show running.
+          onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } }}
+          style={{ bottom: panelBottom }}
+          className="glass player-effects fixed right-3 z-50 rounded-2xl border border-border p-3 shadow-glass sm:right-4"
+        >
+          <div className="mb-2 flex items-center justify-between gap-6">
+            <p className="label-cap text-muted">Live effects</p>
+            <Button isIconOnly size="sm" variant="light" aria-label="Close live effects" onPress={() => setOpen(false)}><X size={15} /></Button>
+          </div>
+          <div className="grid grid-cols-4 gap-x-3">
+            {controls.slice(0, 4).map(c => (
+              <Slider key={c.key} orientation="vertical" className="h-44 w-16" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
+                value={Number(effects[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
+                getValue={v => `${Number(v).toFixed(c.step < .1 ? 2 : 1)}${c.unit ?? ""}`} />
+            ))}
+          </div>
+        </div>
+      )}
+    <section
+      ref={barRef}
+      className="glass mobile-player fixed inset-x-3 bottom-[calc(var(--nav-h)+var(--safe-b)+.75rem)] z-50 mx-auto max-w-[1080px] rounded-2xl p-3 shadow-glass sm:inset-x-4 sm:bottom-4 sm:rounded-lg sm:p-4">
       {/* Phones get the title above the transport; there is no room for both on one line. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <div className="min-w-0 flex-1">
@@ -2328,18 +2428,8 @@ function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setL
         </div>
       </div>
       <Slider aria-label="Progress" size="sm" color="primary" className="mt-2" minValue={0} maxValue={duration || 0.0001} step={0.1} value={Math.min(time, duration || 0)} onChange={v => { const next = Array.isArray(v) ? v[0] : v; setTime(next); seek(next); }} />
-      <AnimatePresence>{open && (
-        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-          <div className="mt-3 grid grid-cols-4 gap-x-3 gap-y-3 border-t border-border pt-3">
-            {controls.slice(0, 4).map(c => (
-              <Slider key={c.key} orientation="vertical" className="h-44" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
-                value={Number(effects[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
-                getValue={v => `${Number(v).toFixed(c.step < .1 ? 2 : 1)}${c.unit ?? ""}`} />
-            ))}
-          </div>
-        </motion.div>
-      )}</AnimatePresence>
-    </motion.section>
+    </section>
+    </>
   );
 }
 
