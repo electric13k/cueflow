@@ -815,7 +815,23 @@
     gap: var(--grid-gap, 1rem);
     grid-template-columns: repeat(auto-fill, minmax(min(var(--grid-min, 16rem), 100%), 1fr));
   }
-  .media-card { border-color: color-mix(in srgb, var(--cue-forest) 25%, var(--border)); transition: transform .32s cubic-bezier(.16,1,.3,1), border-color .25s ease, box-shadow .3s ease; }
+  /**
+   * `content-visibility` rather than a virtualised list.
+   *
+   * A library is unbounded and every card carries a preview: a waveform on a canvas, a video
+   * element, or for a deck a set of Office Online iframes. Laying out and painting all of them at
+   * once is the part that makes a big library feel slow, and it is the part the browser will skip on
+   * its own if told which elements are independent.
+   *
+   * `contain-intrinsic-size` is the height to assume for a card that has not been rendered yet, so
+   * the scrollbar does not lurch as cards come into view. It is an estimate of the common case: a
+   * 16/8 preview with two lines of label under it.
+   *
+   * Chosen over windowing because a virtualised list would have to own scrolling, selection and the
+   * drag-to-sequence gesture, all of which already work; this changes no behaviour and nothing can
+   * fall out of sync with it.
+   */
+  .media-card { content-visibility: auto; contain-intrinsic-size: auto 260px; border-color: color-mix(in srgb, var(--cue-forest) 25%, var(--border)); transition: transform .32s cubic-bezier(.16,1,.3,1), border-color .25s ease, box-shadow .3s ease; }
   .media-card--audio, .media-card--image, .media-card--video, .media-card--embed { grid-column: span 2; }
   .media-preview { aspect-ratio: 16 / 8; border-bottom: 1px solid color-mix(in srgb, var(--cue-forest) 22%, var(--border)); }
   .media-card--audio .media-preview { aspect-ratio: 16 / 3.5; }
