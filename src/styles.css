@@ -791,6 +791,101 @@
   .label-cap { font-size: var(--text-micro); line-height: 1.35; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; }
 
   /**
+   * The deck: cues as pads on a control surface.
+   *
+   * A cue row used to carry eleven things -- a grip, a number, an icon, a label, three badges, the
+   * track's title, an auto-advance field, a note field and a transition picker -- all of it on the
+   * surface an operator fires from. Nine of those are things you set once while building the show
+   * and none of them helps you hit the right cue in the dark. They live behind Edit cues now, and
+   * what is left is a pad: a number, a name, and a lamp.
+   *
+   * The lamp is the signature and the only place colour is spent. It is the same vocabulary the rest
+   * of the app already uses, so nothing new has to be learned: forest is standing by, brass is next
+   * and about to be called, crimson is live. A sound desk and a DJ controller both say this with a
+   * strip of light along the bottom edge of a key, which is where it can be read at a glance from
+   * across a wing without reading any text at all.
+   *
+   * The pad physically travels on press. On a phone in a dark wing, a control that visibly moves is
+   * the difference between knowing a cue fired and pressing it twice.
+   */
+  .deck-pads {
+    display: grid; gap: .6rem;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  }
+  .pad {
+    position: relative; display: flex; flex-direction: column; gap: .35rem;
+    min-height: 6.5rem; padding: .7rem .8rem 1.1rem; text-align: left;
+    border-radius: .75rem;
+    border: 1px solid color-mix(in srgb, var(--cue-forest) 24%, var(--border));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--cue-foolscap) 7%, var(--surface-secondary)), var(--surface-secondary));
+    box-shadow: 0 1px 0 rgba(255,255,255,.07) inset, 0 2px 0 color-mix(in srgb, var(--cue-forest) 18%, transparent), 0 6px 14px -10px rgba(0,0,0,.55);
+    transition: transform .07s ease, box-shadow .07s ease, border-color .18s ease;
+  }
+  .pad:hover { border-color: color-mix(in srgb, var(--cue-armed) 46%, var(--border)); }
+  .pad:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 7px rgba(0,0,0,.34) inset, 0 0 0 color-mix(in srgb, var(--cue-forest) 18%, transparent);
+  }
+  /* The number is stamped into the plate, not printed on it. */
+  .pad__num {
+    font-family: var(--font-mono); font-weight: 700; line-height: 1;
+    font-size: 1.35rem; letter-spacing: -.02em;
+    color: color-mix(in srgb, var(--foreground) 78%, var(--cue-armed));
+    text-shadow: 0 1px 0 rgba(255,255,255,.1);
+  }
+  .pad__label {
+    font-family: var(--font-control); font-weight: 600; line-height: 1.2;
+    overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  }
+  .pad__led {
+    position: absolute; inset: auto .8rem .55rem .8rem; height: 4px; border-radius: 999px;
+    background: color-mix(in srgb, var(--cue-forest) 34%, transparent);
+    transition: background .18s ease, box-shadow .18s ease;
+  }
+  .pad[data-state="next"] { border-color: color-mix(in srgb, var(--cue-armed) 62%, var(--border)); }
+  .pad[data-state="next"] .pad__led {
+    background: var(--cue-armed);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--cue-armed) 66%, transparent);
+  }
+  .pad[data-state="live"] {
+    border-color: color-mix(in srgb, var(--cue-live) 70%, var(--border));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--cue-live) 13%, var(--surface-secondary)), var(--surface-secondary));
+  }
+  .pad[data-state="live"] .pad__led {
+    background: var(--cue-live);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--cue-live) 76%, transparent);
+  }
+  /* Which instrument the cue is, said in the colours the rest of the app already uses for it. */
+  .pad__kind { font-family: var(--font-mono); font-size: var(--text-micro); letter-spacing: .12em; text-transform: uppercase; }
+  .pad[data-kind="audio"] .pad__kind { color: var(--cue-audio); }
+  .pad[data-kind="image"] .pad__kind, .pad[data-kind="video"] .pad__kind, .pad[data-kind="embed"] .pad__kind { color: var(--cue-visual); }
+
+  /**
+   * Transport keys. Chunky, legible at arm's length, and the same shape as the pads so the deck
+   * reads as one panel: GO is the only one that carries the brass, because it is the only one you
+   * press without deciding first.
+   */
+  .transport-key {
+    min-height: 3.25rem; min-width: 3.25rem; padding-inline: 1rem;
+    font-family: var(--font-control); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    border-radius: .7rem; border: 1px solid color-mix(in srgb, var(--cue-forest) 26%, var(--border));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--cue-foolscap) 8%, var(--surface-secondary)), var(--surface-secondary));
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--cue-forest) 20%, transparent), 0 6px 14px -10px rgba(0,0,0,.5);
+    transition: transform .07s ease, box-shadow .07s ease;
+  }
+  .transport-key:active { transform: translateY(2px); box-shadow: 0 2px 7px rgba(0,0,0,.32) inset; }
+  .transport-key[data-key="go"] {
+    border-color: color-mix(in srgb, var(--cue-armed) 68%, var(--border));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--cue-armed) 24%, var(--surface-secondary)), var(--surface-secondary));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pad, .transport-key { transition: none; }
+    .pad:active, .transport-key:active { transform: none; }
+  }
+
+  /**
    * The dial. Drawn from the same forest-to-armed ramp the faders use, so a desk of both reads as
    * one instrument rather than two control sets that happened to land on the same screen.
    */

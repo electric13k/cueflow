@@ -1603,7 +1603,7 @@ export default function Studio() {
               <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingIds={soundingIds} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
-              <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} onStartShow={startShowNow} starting={starting} stage={stage} clearStage={() => setStage(null)} effectsDrag={armedDragFrom} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
+              <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} armed={armed} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} onStartShow={startShowNow} starting={starting} stage={stage} clearStage={() => setStage(null)} effectsDrag={armedDragFrom} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
             </Tab>
           </Tabs>
           )}
@@ -1658,11 +1658,19 @@ export default function Studio() {
         <div data-coach="transport" className="fixed inset-x-0 bottom-0 z-50 max-h-[58dvh] overflow-y-auto border-t border-white/10 bg-background/95 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:inset-x-4 lg:bottom-4 lg:mx-auto lg:max-w-[1080px] lg:rounded-2xl lg:border lg:p-4 lg:pb-4 lg:shadow-glass">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
             <div className="flex min-w-0 items-center gap-3 lg:shrink-0">
-              <Button className="h-16 w-24 shrink-0 text-base" variant="flat" onPress={() => advance(-1)}>← Back</Button>
+              {/*
+                Three keys, in the order a hand expects them, and each one says what it does rather
+                than showing a symbol you have to decode at speed. GO carries the brass because it is
+                the only one pressed without deciding first; STOP kills every voice and was
+                previously only reachable from the player, which is not where you are looking when
+                something has to stop now.
+              */}
+              <Button className="transport-key h-16 w-24 shrink-0" variant="flat" onPress={() => advance(-1)}>← Back</Button>
               {/* The one thing this screen exists to do, so it is the biggest thing on it. */}
-              <Button data-coach="fire" className="h-16 min-w-0 flex-1 text-lg font-bold lg:w-40 lg:flex-none" color="primary" onPress={() => advance(1)}>
-                {cueIndex < 0 ? "Fire cue 1" : "Next cue →"}
+              <Button data-coach="fire" data-key="go" className="transport-key h-16 min-w-0 flex-1 text-lg lg:w-40 lg:flex-none" color="primary" onPress={() => advance(1)}>
+                {cueIndex < 0 ? "Go · cue 1" : "Go →"}
               </Button>
+              <Button className="transport-key h-16 w-24 shrink-0" variant="flat" color="danger" aria-label="Stop all sound" onPress={stopAllSound}>Stop</Button>
               {countdownSeconds > 0 && <CueCountdown seconds={countdownSeconds} cueKey={`${selectedSequence?.id ?? ""}:${cueIndex}`} onElapsed={() => advance(1)} />}
               {features.rehearsal.active && <span className="shrink-0 rounded-xl border border-live/40 bg-live/10 px-2 py-1 text-label text-live">Rehearsal</span>}
               <CoachHelp id="transport" />
@@ -1928,7 +1936,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
   );
 }
 
-function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, onStartShow, starting, stage, clearStage, effectsDrag, cueTimers = {}, setCueTimer, rehearsal = { active: false, completed: [], notes: {} }, onToggleRehearsal, onSaveRehearsalNote }: any) {
+function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, armed, loopSeq, setLoopSeq, startSequence, onStartShow, starting, stage, clearStage, effectsDrag, cueTimers = {}, setCueTimer, rehearsal = { active: false, completed: [], notes: {} }, onToggleRehearsal, onSaveRehearsalNote }: any) {
   // Which cue is waiting to be paired. Linking is two clicks, so the second one has to know.
   const [linking, setLinking] = useState("");
   const [cueMenuFor, setCueMenuFor] = useState<string | null>(null);
@@ -1978,7 +1986,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
             <Switch size="sm" isSelected={rehearsal.active} onValueChange={onToggleRehearsal}><NotebookPen size={14} /> Rehearsal</Switch>
             {/* Off, a grip needs a long press so a thumb can still scroll the deck. On, grips drag
                 the moment you touch them and the list stops scrolling under your finger. */}
-            <Switch size="sm" isSelected={cueDrag.reorder} onValueChange={cueDrag.setReorder}>Reorder mode</Switch>
+            <Switch size="sm" isSelected={cueDrag.reorder} onValueChange={cueDrag.setReorder}>Edit cues</Switch>
             <span className="ml-auto text-label text-muted">{cueDrag.reorder ? "Drag any grip to move a cue. Scrolling is off while this is on." : cueIndex < 0 ? "Armed. Press → to fire cue 1" : "← → audio cues, A / D visual cues, W / S zoom"}</span>
           </div>
 
@@ -1991,8 +1999,57 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                 <span>{selectedCount > 1 ? <>Adds <b className="text-foreground">{selectedCount} selected items</b>.</> : <>Adds the selected item{selectedTrack ? <> (<b className="text-foreground">{selectedTrack.title}</b>)</> : ""}.</>}</span>
                 <Button data-tour="add-cue" size="sm" variant="flat" color="primary" startContent={<Plus size={14} />} isDisabled={!selectedTrack && !selectedCount} onPress={addItem}>Add {selectedCount > 1 ? `${selectedCount} cues` : "cue"}</Button>
               </div>
-              {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-border py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (
-                <ol className="space-y-2" ref={cueDrag.list}>
+              {seq.items.length === 0 ? <p className="rounded-2xl border border-dashed border-border py-10 text-center text-muted">Empty sequence. Add the selected item above.</p> : (<>
+                {/*
+                  Two ways to look at the same cues, and only one of them is the one you use while a
+                  show is running.
+
+                  Firing is a grid of pads: number, name, lamp. Everything else a cue carries -- the
+                  auto-advance seconds, the rehearsal note, the transition, the drag handle -- is
+                  something you set once while building and never while calling, so it lives under
+                  Edit cues with the list. That is the friction this removes: eleven controls per cue
+                  on the surface you are trying to hit one thing on.
+                */}
+                {!cueDrag.reorder && (
+                  <div className="deck-pads" role="group" aria-label="Cue pads">
+                    {order.map((item: SequenceItem, i: number) => {
+                      const track = byId.get(item.trackId);
+                      const kind: Kind = track ? kindOf(track) : "audio";
+                      // Only a running deck has a live cue. `cueIndex` is 0 on a fresh load, so
+                      // without this the first pad sat lit crimson before anything had been called,
+                      // which is the one thing a lamp must never do.
+                      const lit = armed ? (i === cueIndex ? "live" : i === cueIndex + 1 ? "next" : undefined) : undefined;
+                      const state = lit ?? "standing by";
+                      const timer = timerLeftFor(item.id, cueTimers);
+                      // The lamp is colour, and colour is not a label: the state is said out loud in
+                      // the accessible name so the pad reads the same to a screen reader as it does
+                      // to somebody glancing at it from across a wing.
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          data-coach={i === 0 ? "fire" : undefined}
+                          data-state={lit}
+                          data-kind={kind}
+                          className="pad cue-pressable"
+                          onClick={() => playCue(i)}
+                          onContextMenu={(event: ReactMouseEvent) => { event.preventDefault(); setCueMenuFor(item.id); }}
+                          aria-label={`Cue ${numbers[i]}, ${item.label}, ${state}. Press to fire.`}
+                        >
+                          <span className="flex items-baseline gap-2">
+                            <span className="pad__num">{numbers[i]}</span>
+                            <span className="pad__kind">{kind}</span>
+                            {timer > 0 && <span className="ml-auto font-mono text-micro text-armed">{formatTimer(timer)}</span>}
+                            {item.link && <span className="font-mono text-micro font-bold text-visual" title="Fires together with this cue">+{numbers[order.findIndex((x: SequenceItem) => x.id === item.link)] ?? "?"}</span>}
+                          </span>
+                          <span className="pad__label capitalize">{item.label}</span>
+                          <span className="pad__led" aria-hidden />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <ol className={`space-y-2 ${cueDrag.reorder ? "" : "hidden"}`} ref={cueDrag.list}>
                   <AnimatePresence>{order.map((item: SequenceItem, i: number) => {
                     const track = byId.get(item.trackId);
                     const kind: Kind = track ? kindOf(track) : "audio";
@@ -2076,7 +2133,7 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
                     </motion.li>
                   );})}</AnimatePresence>
                 </ol>
-              )}
+              </>)}
             </div>
             <div className="order-1 space-y-2 lg:order-2">
               <div className="flex items-center justify-between">
