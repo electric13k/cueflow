@@ -22,11 +22,11 @@ Playwright checks that encode regressions this project has actually had, worth r
 
 ## Deploy
 
-**The live site is whatever was last pushed to `dist/`, not necessarily what is on a branch.** Deploys have been run by hand with `npx wrangler pages deploy` from the working tree, which is how `master` ended up 23 commits behind production for two weeks. `wrangler.toml` sets `pages_build_output_dir = "dist"`.
+**Pushing to `master` is the deploy.** The Pages project is connected to `electric13k/cueflow` on GitHub: production branch `master`, build command `npm run build`, output directory `dist`. Cloudflare runs the build itself, and `dist/` is gitignored, so there is nothing to upload by hand. Pushing any other branch produces a preview deployment, not production.
 
-Rule: **build, deploy, and push in the same sitting.** A hand deploy that is not followed by a push leaves the default branch lying about what users are running, and any dashboard-triggered rebuild silently reverts the site.
+So `npm run build` passing locally is the gate: if `tsc --noEmit` fails, the Cloudflare build fails too and the site silently stays on the previous version.
 
-To check what is actually live, compare the asset hashes in the deployed `index.html` against local `dist/index.html`.
+`master` once sat 23 commits behind what was live, which is worth knowing because it means the default branch has been wrong before. To check what is actually live, compare the asset hashes in the deployed `index.html` against local `dist/index.html`.
 
 ## Supabase
 

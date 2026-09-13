@@ -11,7 +11,7 @@ import { themeClass, useStudioTheme } from "../lib/theme";
 import { defaultEffects, defaultVisual, type Effects, type Kind, type Stage as StageState } from "../types";
 import { VoicePool } from "../lib/audio";
 import {
-  forgetTicket, joinShow, listShows, refreshTicket, savedTicket,
+  atTheDoor, forgetTicket, joinShow, listShows, refreshTicket, savedTicket,
   type DeckCue, type Perm, type ShowMsg, type Ticket,
 } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
@@ -112,8 +112,17 @@ export default function Show() {
    * What the host has said about this device. `null` until it says anything, which is the same as
    * being in -- a show with no admission never sends a `door` at all, and a key has always been
    * enough on its own.
+   *
+   * Seeded from the ticket rather than starting empty, because the host saying it was the only thing
+   * holding the door shut. Someone left waiting could reload, get a fresh page whose `door` was
+   * `null`, and walk in while the host was still looking at the request. The database is the
+   * authority now (`join_show` and `show_state` withhold permissions until admitted); this is the
+   * screen agreeing with it, so a refresh puts you back in the queue you were already in.
    */
-  const [door, setDoor] = useState<{ state: "waiting" | "in" | "out"; note?: string } | null>(null);
+  const [door, setDoor] = useState<{ state: "waiting" | "in" | "out"; note?: string } | null>(() => {
+    const held = atTheDoor(savedTicket());
+    return held ? { state: held === "denied" ? "out" : "waiting" } : null;
+  });
   /**
    * Cue sound, on this device.
    *
@@ -203,6 +212,11 @@ export default function Show() {
     void refreshTicket(ticket.member).then(fresh => {
       if (!fresh) { forgetTicket(); setTicket(null); return; }
       setTicket(fresh); setStarted(fresh.started);
+      // The same answer decides the door. Asking again is how somebody admitted on the host's phone
+      // stops waiting here, and how somebody removed mid-show finds out on their next load rather
+      // than keeping a deck they are no longer entitled to.
+      const held = atTheDoor(fresh);
+      setDoor(held ? { state: held === "denied" ? "out" : "waiting" } : current => (current?.state === "out" ? current : null));
     });
   }, [ticket?.member]);
 

@@ -12,6 +12,7 @@ import { loadScript, type ScriptDoc } from "../lib/script";
 import { teach } from "../lib/coach";
 import { CoachHelp } from "../components/Coach";
 import { loadBinds, type Action } from "../lib/keys";
+import { listenToControllers } from "../lib/controllers";
 import Shell from "../components/Shell";
 import SearchBar from "../components/SearchBar";
 import ShowsBoard from "../components/ShowsBoard";
@@ -629,6 +630,17 @@ export default function Studio() {
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
   }, []);
+  /**
+   * A MIDI pad, a USB pedal or a gamepad calls cues too.
+   *
+   * An operator has one hand on a fader and their eyes on the stage, and hunting for a key on a
+   * laptop in the dark is the part that goes wrong. Hardware goes through the binding the keyboard
+   * already uses rather than a second scheme: whatever `nextCue` is bound to is what the pad
+   * presses, so rebinding in Settings moves both at once and they cannot drift apart.
+   */
+  const runAction = useRef<(a: Action) => void>(() => {});
+  runAction.current = action => { const key = binds[action]; if (key) runKey(key); };
+  useEffect(() => listenToControllers(a => runAction.current(a)), []);
   // The audience window is a separate document, so keys pressed while it has focus never reach this
   // one; it forwards them over the same-origin channel instead, and a window that reloads asks for
   // the current cue again with "hello". The channel is opened once: re-opening it per render drops

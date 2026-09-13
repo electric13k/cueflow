@@ -18,7 +18,18 @@ export type Perm = typeof PERMS[number]["key"];
 /** `password` is the collaborator key. Each job's own join key lives on its role, not here. */
 export type Show = { id: string; name: string; password: string | null; sequenceId: string | null; startedAt: string | null; owner?: string | null };
 export type Role = { id: string; name: string; perms: Perm[]; code: string | null };
-export type Ticket = { member: string; show: string; name: string; sequence: string | null; started: string | null; role: string | null; perms: Perm[]; host: boolean };
+/**
+ * `status` is what the database says about this member, which is a different question from what the
+ * host's tab last broadcast. Optional because a deployment whose database has not had 0003 applied
+ * answers without it, and the honest reading of a missing answer is the one that was true before the
+ * column gated anything: admitted.
+ */
+export type MemberStatus = "waiting" | "admitted" | "denied";
+export type Ticket = { member: string; show: string; name: string; sequence: string | null; started: string | null; role: string | null; perms: Perm[]; host: boolean; status?: MemberStatus };
+
+/** A ticket with no status came from a database that does not gate, so it is not held at the door. */
+export const atTheDoor = (ticket: Ticket | null): MemberStatus | null =>
+  !ticket ? null : ticket.status && ticket.status !== "admitted" ? ticket.status : null;
 
 const need = () => { if (!supabase) throw new Error("Cloud is not configured for this build."); return supabase; };
 const me = async () => (await need().auth.getUser()).data.user;
