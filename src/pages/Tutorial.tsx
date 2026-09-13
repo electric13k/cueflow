@@ -36,7 +36,7 @@ const screens: Screen[] = [
     shot: `${import.meta.env.BASE_URL}shots/sequences.png`, title: "The deck",
     alt: "The CueFlow sequences tab showing a cue deck",
     body: "A list you step through, one key at a time.",
-    points: ["Sound and screens in one order", "Link a slide to the sound under it", "Arm it and the frame turns amber"],
+    points: ["Sound and screens in one order", "Link a slide to the sound under it", "Start it and the frame turns amber"],
   },
   {
     shot: `${import.meta.env.BASE_URL}shots/phone.png`, title: "On a phone", fit: "contain", mobileOnly: true,
@@ -65,7 +65,7 @@ export default function Tutorial() {
         Library, deck, <span className="italic text-accent">go.</span>
       </motion.h1>
       <motion.p {...rise(.1)} className="mt-5 max-w-xl text-lg text-muted">
-        Put everything in the library. Drag it into the order you will call it. Arm it, and drive.
+        Put everything in the library. Drag it into the order you will call it. Start the show, and drive.
         The Studio explains each part as you open it, so there is nothing to memorise here except the keys.
       </motion.p>
 

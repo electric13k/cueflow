@@ -1,6 +1,6 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
+import { Button, Card, CardBody, Dial, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, Slider, Spinner, Switch, Tab, Tabs, Tooltip, useDisclosure } from "../ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, ChevronDown, ChevronUp, FileText, Link2, Unlink, Download, ExternalLink, FastForward, Film, GripVertical, Image as ImageIcon, Layers, ListMusic, Monitor, Pause, Pencil, Play, Plus, Presentation, Radio, Repeat, Rewind, RotateCcw, Search, SlidersHorizontal, Square, Trash2, TriangleAlert, Upload, Volume2, Undo2, Redo2, Star, FolderPlus, Clock3, History, NotebookPen, Command, FileJson, Copy, MoreHorizontal, PanelsTopLeft } from "lucide-react";
 import { useDeviceCapabilities, useIsPhone } from "../lib/layout";
@@ -1192,6 +1192,46 @@ export default function Studio() {
     if (audience) openAudience();
     armSequence(seq);
   };
+  /**
+   * One press, the whole show.
+   *
+   * Running a show used to be five decisions in a row, each in a different place and in different
+   * words: press Arm, or Arm in audience mode; go to Shows; type a name; press Create; press Go
+   * live; press Audience window; press Resend the deck. Two of those words meant the same thing and
+   * none of them is what somebody about to run a show is thinking, which is "start".
+   *
+   * So the order is fixed here instead of being asked about. The deck arms and the room's window
+   * opens first, because that half needs no account and no network and must not be held up by the
+   * half that does. Then, if there is an account, the show record is found or made and marked live,
+   * so the crew's phones have something to join.
+   *
+   * A failure in the cloud half is reported and does not undo the local half: an operator whose
+   * venue wifi has just died still has an armed deck and a lit audience screen, which is the thing
+   * that matters in the next ten seconds.
+   */
+  const [starting, setStarting] = useState(false);
+  const startShowNow = async (seq = selectedSequence) => {
+    if (!seq?.items.length || starting) return;
+    setStarting(true);
+    try {
+      startSequence(true, seq);
+      if (!signedIn) {
+        toast("Standing by", "The deck is armed and the audience window is open. Sign in to bring a crew in on their phones.", "info");
+        return;
+      }
+      // Reuse the show already built around this sequence rather than leaving a trail of new ones.
+      const existing = shows.find(s => s.sequenceId === seq.id);
+      const show = existing ?? await createShow(seq.name, project, seq.id);
+      if (!existing) setShows(o => [show, ...o]);
+      await updateShow(show.id, { started_at: new Date().toISOString(), sequence_id: seq.id });
+      const live = { ...show, startedAt: new Date().toISOString(), sequenceId: seq.id };
+      setShows(o => o.map(s => (s.id === live.id ? live : s)));
+      setLiveShow(live);
+      toast("You are live", `"${seq.name}" is running. The crew can join with the show's key.`, "success");
+    } catch (e) {
+      toast("The deck is armed, but the show is not live", (e as Error).message, "warn");
+    } finally { setStarting(false); }
+  };
   /** From the manager: leave the show's screen, arm that sequence, put it up in presenter mode. */
   const runSequence = (seqId: string) => { setManaging(false); startSequence(true, sequences.find(s => s.id === seqId)); };
   const armShowSequence = (seqId: string) => { const seq = sequences.find(s => s.id === seqId); if (seq) { teach(phone ? "transport" : "armed"); armSequence(seq); } };
@@ -1563,7 +1603,7 @@ export default function Studio() {
               <Library tracks={shownTracks} total={scopedTracks.length} selectedId={selected?.id ?? ""} playingIds={soundingIds} selectedIds={selectedIds} busy={busy} drag={libDrag} onPlay={playTrack} onToggleSelect={toggleSelect} onAdd={addFiles} onAddSlide={() => setSlideOpen(true)} onOpenEditor={openEditor} onLinkSlide={linkAudioToSlide} onRename={(id: string) => { const t = tracks.find(x => x.id === id); if (t) openRename("track", id, t.title); }} onDeleteTrack={deleteTrack} importAsset={importAsset} query={libQuery} setQuery={setLibQuery} sort={libSort} setSort={setLibSort} kind={libKind} setKind={setLibKind} favorites={features.favorites} collections={features.collections} scope={libScope} setScope={setLibScope} onNewCollection={newCollection} onToggleFavorite={(id: string) => updateFeatures(state => toggleFavorite(state, id))} onAddToCollection={addToNamedCollection} />
             </Tab>
             <Tab key="sequence" id="sequence" title={<span data-tour="deck-tab" className="flex items-center gap-2"><ListMusic size={16} />Sequences</span>}>
-              <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} stage={stage} clearStage={() => setStage(null)} effectsDrag={armedDragFrom} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
+              <Sequences sequences={sequences} sequenceId={sequenceId} tracks={tracks} selectedTrack={selected} selectedCount={picked.length} addItem={addItem} deleteItem={deleteItem} moveItem={moveItem} reorder={reorder} setItemTransition={setItemTransition} linkCues={linkCues} unlinkCue={unlinkCue} playCue={playCue} cueIndex={cueIndex} loopSeq={loopSeq} setLoopSeq={setLoopSeq} startSequence={startSequence} onStartShow={startShowNow} starting={starting} stage={stage} clearStage={() => setStage(null)} effectsDrag={armedDragFrom} cueTimers={features.cueTimers} setCueTimer={setCueTimer} rehearsal={features.rehearsal} onToggleRehearsal={toggleRehearsal} onSaveRehearsalNote={saveRehearsalNote} />
             </Tab>
           </Tabs>
           )}
@@ -1888,7 +1928,7 @@ function Editor({ track, cues, busy, update, updateVisual, bakeReverse, onSave, 
   );
 }
 
-function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, stage, clearStage, effectsDrag, cueTimers = {}, setCueTimer, rehearsal = { active: false, completed: [], notes: {} }, onToggleRehearsal, onSaveRehearsalNote }: any) {
+function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount, addItem, deleteItem, moveItem, reorder, setItemTransition, linkCues, unlinkCue, playCue, cueIndex, loopSeq, setLoopSeq, startSequence, onStartShow, starting, stage, clearStage, effectsDrag, cueTimers = {}, setCueTimer, rehearsal = { active: false, completed: [], notes: {} }, onToggleRehearsal, onSaveRehearsalNote }: any) {
   // Which cue is waiting to be paired. Linking is two clicks, so the second one has to know.
   const [linking, setLinking] = useState("");
   const [cueMenuFor, setCueMenuFor] = useState<string | null>(null);
@@ -1919,8 +1959,21 @@ function Sequences({ sequences, sequenceId, tracks, selectedTrack, selectedCount
       ) : (
         <div className="space-y-3">
           <div className="glass-soft flex flex-wrap items-center gap-3 p-3">
-            <Tooltip content="Arms the deck. Nothing plays until you press →"><Button size="sm" color="primary" startContent={<Play size={14} fill="currentColor" />} isDisabled={!seq.items.length} data-coach="arm" onPress={() => startSequence(false)}>Arm</Button></Tooltip>
-            <Tooltip content="Opens the presenter window and arms the deck"><Button size="sm" color="secondary" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(true)}>Arm in audience mode</Button></Tooltip>
+            {/*
+              One primary control, named for what the operator is about to do.
+              "Arm" and "Arm in audience mode" sat side by side meaning almost the same thing, and
+              neither is the word somebody reaches for thirty seconds before a house goes dark.
+              Start does the lot: arms the deck, opens the room's window, and puts the show live for
+              the crew. Rehearse is the same thing without the room or the crew, which is the only
+              distinction that was ever worth a second button.
+            */}
+            <Tooltip content="Arms the deck, opens the audience window, and puts the show live. Nothing plays until you press →">
+              <Button size="sm" color="primary" className="cue-leather" isLoading={starting} startContent={<Play size={14} fill="currentColor" />}
+                isDisabled={!seq.items.length} data-coach="arm" onPress={() => void onStartShow(seq)}>Start the show</Button>
+            </Tooltip>
+            <Tooltip content="Arms the deck on this screen only. No audience window, no crew.">
+              <Button size="sm" variant="flat" startContent={<Monitor size={14} />} isDisabled={!seq.items.length} onPress={() => startSequence(false)}>Rehearse</Button>
+            </Tooltip>
             <Switch size="sm" isSelected={loopSeq} onValueChange={setLoopSeq}>Loop sequence</Switch>
             <Switch size="sm" isSelected={rehearsal.active} onValueChange={onToggleRehearsal}><NotebookPen size={14} /> Rehearsal</Switch>
             {/* Off, a grip needs a long press so a thumb can still scroll the deck. On, grips drag
@@ -2051,7 +2104,7 @@ function EffectGrid({ effects, update }: { effects: Effects; update: (fx: Effect
     // position of two faders is legible at a glance instead of requiring both labels to be read.
     <div className="grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-5 xl:grid-cols-10">
       {controls.map(c => (
-        <Slider key={c.key} orientation="vertical" className="h-36" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
+        <Slider key={c.key} orientation="vertical" className="h-56" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
           value={Number(effects[c.key] ?? base[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
           getValue={v => `${Number(v).toFixed(c.step < .1 ? 2 : 1)}${c.unit ?? ""}`} />
       ))}
@@ -2144,12 +2197,16 @@ function CueTransport({ element, label, onToggle, onStop, master, setMaster, com
 
 function ArmedEffectControls({ effects, update, commit }: { effects: Effects; update: (fx: Effects) => void; commit: () => void }) {
   return (
-    <div data-armed-effects className="grid min-w-0 grid-cols-3 gap-x-3 gap-y-4 rounded-xl border border-border/70 bg-surface/35 p-3 sm:grid-cols-5">
+    // Dials rather than faders, because this is the one rack that is touched while a show is
+    // running. A fader is the right control when you are comparing a value against the ones beside
+    // it; these five are reached for on their own, in the dark, usually with one hand, and a dial is
+    // a whole round target that reads at a glance instead of a thin track you have to find.
+    <div data-armed-effects className="flex min-w-0 flex-wrap items-start justify-center gap-x-5 gap-y-4 rounded-xl border border-border/70 bg-surface/35 p-4">
       {ARMED_CONTROL_KEYS.map(key => {
         const control = controls.find(candidate => candidate.key === key)!;
-        return <Slider key={control.key} orientation="vertical" className="h-28" aria-label={`Armed ${control.label}`} size="sm" color="primary" label={control.label}
+        return <Dial key={control.key} size={124} aria-label={`Armed ${control.label}`} label={control.label}
           minValue={control.min} maxValue={control.max} step={control.step} value={Number(effects[control.key])}
-          onChange={value => update({ ...effects, [control.key]: Array.isArray(value) ? value[0] : value })}
+          onChange={value => update({ ...effects, [control.key]: value })}
           onChangeEnd={commit}
           getValue={value => `${Number(value).toFixed(control.step < .1 ? 2 : 1)}${control.unit ?? ""}`} />;
       })}
@@ -2219,7 +2276,7 @@ function Player({ track, unsaved, playing, toggle, audio, seek, jump, loop, setL
         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
           <div className="mt-3 grid grid-cols-4 gap-x-3 gap-y-3 border-t border-border pt-3">
             {controls.slice(0, 4).map(c => (
-              <Slider key={c.key} orientation="vertical" className="h-28" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
+              <Slider key={c.key} orientation="vertical" className="h-44" size="sm" color="primary" label={c.label} minValue={c.min} maxValue={c.max} step={c.step}
                 value={Number(effects[c.key])} onChange={v => update({ ...effects, [c.key]: Array.isArray(v) ? v[0] : v })}
                 getValue={v => `${Number(v).toFixed(c.step < .1 ? 2 : 1)}${c.unit ?? ""}`} />
             ))}

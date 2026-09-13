@@ -523,7 +523,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
                 <Button isIconOnly size="sm" variant={c.mute ? "solid" : "light"} color={c.mute ? "danger" : "default"} aria-label={`${c.mute ? "Unmute" : "Mute"} ${labels[i]}`} onPress={() => { setC(i, { mute: !c.mute }); rerender(); }}>{c.mute ? <VolumeX size={14} /> : <Volume2 size={14} />}</Button>
               </Tooltip>
             </div>
-            <Slider orientation="vertical" className="h-32" size="sm" color="primary" aria-label={`${labels[i]} gain`} minValue={0} maxValue={2} step={0.05} isDisabled={c.mute} value={c.gain} onChange={v => setC(i, { gain: Array.isArray(v) ? v[0] : v })} onChangeEnd={rerender} getValue={v => `${Number(v).toFixed(2)}x`} />
+            <Slider orientation="vertical" className="h-48" size="sm" color="primary" aria-label={`${labels[i]} gain`} minValue={0} maxValue={2} step={0.05} isDisabled={c.mute} value={c.gain} onChange={v => setC(i, { gain: Array.isArray(v) ? v[0] : v })} onChangeEnd={rerender} getValue={v => `${Number(v).toFixed(2)}x`} />
           </div>
         ))}
         <Switch size="sm" isSelected={mono} onValueChange={setMono}>Mix to mono</Switch>

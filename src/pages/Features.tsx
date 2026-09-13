@@ -19,7 +19,7 @@ const mainFeatures = [
     icon: ListMusic,
     eyebrow: "Cue deck",
     title: "Run the show from one clear order.",
-    body: "Build a sequence that keeps every sound, slide, and visual in the order the room will experience it. Arm the next cue, see what is standing by, and keep your place.",
+    body: "Build a sequence that keeps every sound, slide, and visual in the order the room will experience it. Start the show, see what is standing by, and keep your place.",
     tags: ["Ordered sequences", "Drag to arrange", "Undo and redo"],
   },
   {

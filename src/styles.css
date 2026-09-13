@@ -790,6 +790,27 @@
   .eyebrow { font-size: var(--text-micro); line-height: 1.25; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; }
   .label-cap { font-size: var(--text-micro); line-height: 1.35; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; }
 
+  /**
+   * The dial. Drawn from the same forest-to-armed ramp the faders use, so a desk of both reads as
+   * one instrument rather than two control sets that happened to land on the same screen.
+   */
+  .dial__track { stroke: color-mix(in srgb, var(--cue-forest) 30%, var(--surface-secondary)); }
+  .dial__fill { stroke: color-mix(in srgb, var(--cue-armed) 82%, var(--cue-forest)); transition: stroke-dasharray .06s linear; }
+  .dial__face {
+    background: radial-gradient(circle at 34% 26%, color-mix(in srgb, var(--cue-foolscap) 14%, var(--surface-secondary)), var(--surface-secondary) 62%);
+    border: 1px solid color-mix(in srgb, var(--cue-armed) 26%, var(--border));
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.34), 0 1px 0 rgba(255,255,255,.06);
+  }
+  .dial__pointer {
+    width: 2px; border-radius: 2px;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--cue-armed) 92%, white), transparent 42%);
+  }
+  /* The face is the target: a focus ring on a transparent input would be drawn nowhere visible. */
+  .dial__input:focus-visible + * , .dial:has(.dial__input:focus-visible) .dial__face {
+    outline: 2px solid var(--cue-armed); outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) { .dial__fill { transition: none; } }
+
   .control-slider .slider__track, .slider__track { background: linear-gradient(90deg, color-mix(in srgb, var(--cue-forest) 32%, var(--surface-secondary)), color-mix(in srgb, var(--cue-armed) 28%, var(--surface-secondary))); border: 1px solid color-mix(in srgb, var(--cue-armed) 28%, transparent); box-shadow: inset 0 1px 2px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.08); }
   .control-slider .slider__thumb, .slider__thumb {
     background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--cue-foolscap) 92%, white), color-mix(in srgb, var(--cue-armed) 38%, var(--cue-foolscap)) 54%, color-mix(in srgb, var(--cue-armed) 76%, #1c1713));

@@ -16,7 +16,7 @@ import type { Sequence } from "../types";
  *
  * **A step whose anchor is missing is not shown.** That is enforced in `Spotlight.useAnchor`, and it
  * is why the order below matters: each step creates the state the next step's control needs to
- * exist. You cannot point at Arm before there is a sequence to arm.
+ * exist. You cannot point at Start the show before there is a sequence to start.
  */
 
 export type Step = {
@@ -103,7 +103,7 @@ export const steps: Step[] = [
     id: "arm",
     anchor: "[data-coach='arm']",
     route: "/studio",
-    say: "Arm it. Nothing goes out until you call it.",
+    say: "Start the show. The deck arms and the room's window opens; nothing goes out until you call it.",
     // The armed frame is drawn around the whole window, and only while armed.
     done: () => onScreen(".armed-frame"),
   },
