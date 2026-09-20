@@ -28,9 +28,9 @@ jobs:
     name: test
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -82,9 +82,9 @@ jobs:
           - windows-latest
           - ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -122,7 +122,7 @@ jobs:
       # peripheral role from CARGO_CFG_TARGET_OS, so the desktop and Android builds cannot be
       # configured inconsistently by hand.
       - name: Build the desktop bundles
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -130,7 +130,7 @@ jobs:
       # readable and works unchanged on both runners; the globs that do not apply to a given
       # OS simply match nothing.
       - name: Upload the installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cueflow-desktop-${{ matrix.os }}
           if-no-files-found: error
@@ -145,9 +145,9 @@ jobs:
     needs: test
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -155,12 +155,12 @@ jobs:
       - run: npm ci
 
       # 17 is the JDK the current Android Gradle Plugin expects; 21 is not universally safe here.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
 
       # setup-android brings the SDK but not an NDK, and Tauri will not cross compile the
       # Rust side without one. NDK_HOME is the variable the Tauri Android build reads.
@@ -247,7 +247,7 @@ jobs:
           fi
 
       - name: Upload the APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cueflow-android-apk
           if-no-files-found: error
@@ -260,28 +260,47 @@ jobs:
       - android
     # Only a tag produces a Release; a manual run still leaves every installer downloadable
     # from the run's artifacts.
-    if: startsWith(github.ref, 'refs/tags/v')
+    #
+    # `always()` is doing real work here. `needs` alone means every listed job must succeed, so
+    # the first tag cut published nothing at all: the desktop installers had both built and
+    # uploaded, and the release was skipped because the Android SDK failed to install. A mobile
+    # toolchain that breaks must not take the Windows and Linux downloads with it. The desktop
+    # job is still required, because a release with no desktop installer is not a release.
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.desktop.result == 'success'
     runs-on: ubuntu-22.04
     # The one job allowed to write to the repository.
     permissions:
       contents: write
     steps:
       - name: Collect every installer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
           merge-multiple: true
 
       - name: Attach the installers to the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          # If an expected installer went missing, fail loudly rather than publishing a
-          # release that is quietly short of a platform.
-          fail_on_unmatched_files: true
+          # Not `fail_on_unmatched_files`, and that is a change of mind rather than an oversight.
+          # It was set so a release could not quietly ship short of a platform, but paired with
+          # the `always()` above it would do the opposite: an Android job that failed would make
+          # the release step fail too, and the desktop installers that did build would again
+          # reach nobody. The summary below says which platforms are actually in the release.
+          fail_on_unmatched_files: false
           files: |
             artifacts/**/*.exe
             artifacts/**/*.msi
             artifacts/**/*.deb
             artifacts/**/*.AppImage
             artifacts/**/*.apk
+
+      - name: Say which platforms made it into the release
+        run: |
+          {
+            echo "### In this release"
+            for pattern in '*.exe' '*.msi' '*.deb' '*.AppImage' '*.apk'; do
+              found=$(find artifacts -name "$pattern" -type f 2>/dev/null | wc -l)
+              if [ "$found" -gt 0 ]; then echo "- $pattern: $found"; else echo "- $pattern: missing"; fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
