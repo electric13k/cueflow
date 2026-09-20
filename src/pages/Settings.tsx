@@ -12,6 +12,7 @@ import { loadAlertScope, saveAlertScope, type AlertScope } from "../lib/alerts";
 import { getConsent, saveConsent, type ConsentState } from "../lib/cookies";
 import { loadDemo } from "../lib/demo";
 import { nativeStore, storeUsage, tidyAssets } from "../lib/nativeStore";
+import { canWebStore, tidyWebAssets, webStoreUsage } from "../lib/webStore";
 
 export default function Settings() {
   const [binds, setBinds] = useState<Record<Action, string>>(loadBinds);
@@ -160,29 +161,38 @@ function Choice<T extends string>({ label, value, options, onChange }: {
 }
 
 /**
- * What the offline app is holding on this machine, and a way to hand some of it back.
+ * What is being held on this machine, and a way to hand some of it back.
  *
- * Only on the native build, because only there is there a store to report on: the website keeps
- * its media in Supabase and its settings in this browser, and neither is a number anybody can act
- * on. The sweep is a press rather than something that happens at startup on purpose. It deletes
- * files, the list of what to keep is worked out by reading everything on the device, and a delete
- * that runs on its own before the operator has opened the show they came for is a delete nobody
- * asked for. See `assetsInUse` for why the keep list errs towards keeping.
+ * On the native build that is the disk store: shows, sequences and media, and nothing else. On the
+ * website it is the browser's own asset store, which exists for the same reason and holds the same
+ * kind of thing. Both are shown, because "how much of my disk is this using" is the same question
+ * in both places and it used to be answerable in only one of them.
+ *
+ * The sweep is a press rather than something that happens at startup, on purpose. It deletes files,
+ * the list of what to keep is worked out by reading everything on the device, and a delete that
+ * runs on its own before the operator has opened the show they came for is a delete nobody asked
+ * for. See `assetsInUse` and `assetsInUseWeb` for why the keep list errs heavily towards keeping.
  */
 function OnThisDevice() {
-  const [usage, setUsage] = useState<{ shows: number; assets: number; bytes: number } | null>(null);
+  const native = nativeStore();
+  const [usage, setUsage] = useState<{ shows: number | null; assets: number; bytes: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
 
-  const read = () => { void storeUsage().then(setUsage).catch(() => setUsage(null)); };
-  useEffect(() => { if (nativeStore()) read(); }, []);
-  if (!nativeStore()) return null;
+  const read = () => {
+    const job = native
+      ? storeUsage().then(u => ({ shows: u.shows as number | null, assets: u.assets, bytes: u.bytes }))
+      : webStoreUsage().then(u => ({ shows: null, assets: u.assets, bytes: u.bytes }));
+    void job.then(setUsage).catch(() => setUsage(null));
+  };
+  useEffect(() => { if (native || canWebStore()) read(); }, []);
+  if (!native && !canWebStore()) return null;
 
   const megabytes = (n: number) => `${(n / 1_048_576).toFixed(n < 10_485_760 ? 1 : 0)} MB`;
   const tidy = async () => {
     setBusy(true); setNote("");
     try {
-      const { removed, freed } = await tidyAssets();
+      const { removed, freed } = native ? await tidyAssets() : await tidyWebAssets();
       setNote(removed ? `${removed} file${removed === 1 ? "" : "s"} removed, ${megabytes(freed)} back.` : "Nothing to remove. Every file here belongs to a show.");
       read();
     } catch (error) {
@@ -194,13 +204,13 @@ function OnThisDevice() {
     <section className="glass mt-6 p-6 sm:p-8">
       <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><HardDrive size={18} className="text-accent" />On this device</h2>
       <p className="mt-2 text-body text-muted">
-        The app keeps the show, its sequences and its sounds and pictures on this machine, so a
-        venue with no internet still has all of them. Nothing else is kept here: no account, no
-        sign-in, no history.
+        {native
+          ? "The app keeps the show, its sequences and its sounds and pictures on this machine, so a venue with no internet still has all of them. Nothing else is kept here: no account, no sign-in, no history."
+          : "Files you import without an account are kept in this browser under the name of their own contents, so a show you built offline still makes a noise the next time you open it. They never leave this device."}
       </p>
       <p className="mt-4 text-body">
         {usage
-          ? <>{usage.shows} show{usage.shows === 1 ? "" : "s"}, {usage.assets} file{usage.assets === 1 ? "" : "s"}, {megabytes(usage.bytes)}.</>
+          ? <>{usage.shows !== null && <>{usage.shows} show{usage.shows === 1 ? "" : "s"}, </>}{usage.assets} file{usage.assets === 1 ? "" : "s"}, {megabytes(usage.bytes)}.</>
           : "Reading what is stored…"}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">

@@ -292,6 +292,45 @@ pub async fn store_usage(app: AppHandle) -> Result<Usage, String> {
     Ok(Usage { shows: shows.len(), assets: assets.len(), bytes: assets.iter().map(|a| a.bytes).sum() })
 }
 
+/// The name a baked installer carries its show under, inside the bundle's resource directory.
+///
+/// Two spellings are tried at runtime rather than one. Tauri's resource globs keep the relative
+/// path they were listed under, so `resources/*` lands the file at `resources/show.cueflow`, while
+/// a build that lists the file on its own puts it at the root. Trying both costs one `exists` call
+/// at startup and removes a whole class of "the installer built and the show is not in it".
+const BAKED: [&str; 2] = ["resources/show.cueflow", "show.cueflow"];
+
+/// The show this installer was built around, if it was built around one.
+///
+/// A generic download is an empty app somebody then has to get a show into, which in a venue with
+/// no internet means a USB stick and a file picker in a dark room. A baked installer is the show:
+/// the crew member installs one file and the app opens already knowing the production and already
+/// holding the job that person does. See `scripts/bake-show.mjs`, which is what puts the file here.
+///
+/// `None` rather than an error when there is nothing baked, because that is the normal case: every
+/// installer on the releases page is a generic one, and an error there would be noise at every
+/// single startup. A zero-length file counts as nothing, since that is what a placeholder is.
+#[tauri::command]
+pub async fn store_baked_show(app: AppHandle) -> Result<Option<Vec<u8>>, String> {
+    let dir = match app.path().resource_dir() {
+        Ok(dir) => dir,
+        Err(error) => {
+            warn!("this build has no resource directory: {error}");
+            return Ok(None);
+        }
+    };
+    for name in BAKED {
+        let path = dir.join(name);
+        match fs::read(&path) {
+            Ok(bytes) if !bytes.is_empty() => return Ok(Some(bytes)),
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => warn!("a baked show at {} could not be read: {error}", path.display()),
+        }
+    }
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

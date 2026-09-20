@@ -230,3 +230,27 @@ export async function storeUsage(): Promise<{ shows: number; assets: number; byt
     return empty;
   }
 }
+
+/**
+ * The show this installer was built around, if it was built around one.
+ *
+ * A generic installer is an empty app, and getting a show into an empty app in a venue means a USB
+ * stick and a file picker in the dark. A baked installer IS the show: install it and the app opens
+ * already holding the production and already in the job that copy was cut for. See
+ * `scripts/bake-show.mjs` for what puts the file there, and `lib/bakedShow.ts` for what opens it.
+ *
+ * Null on anything that is not a native build with something baked in, which is nearly every run.
+ */
+export async function bakedShow(): Promise<Blob | null> {
+  if (!nativeStore()) return null;
+  try {
+    const { invoke } = await core();
+    const bytes = await invoke<number[] | null>("store_baked_show");
+    return bytes?.length ? new Blob([new Uint8Array(bytes)], { type: "application/zip" }) : null;
+  } catch (error) {
+    // An older shell has no such command. That is not a fault worth reporting to an operator; it
+    // simply means this build carries no show, which is what an empty answer already says.
+    console.warn("[store] this build could not be asked whether it carries a show", error);
+    return null;
+  }
+}

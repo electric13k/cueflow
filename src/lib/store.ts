@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { toast } from "./toast";
 import { contentPath, MAX_UPLOAD, packForUpload, size, typeFor } from "./compress";
 import { keepAsset, nativeStore } from "./nativeStore";
+import { keepAssetWeb } from "./webStore";
 import type { Sequence, SequenceItem, Track } from "../types";
 // Supabase publishable credentials are safe to ship in a browser build. The fallback keeps the
 // static Pages deployment functional when its build environment is not injected by Cloudflare.
@@ -165,15 +166,41 @@ export async function uploadTrack(file: File) {
     const kept = await keepAsset(file, ext || "bin");
     if (kept) return kept.url;
   }
-  if (!supabase) return URL.createObjectURL(file);
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  /*
+   * No account, or an account but no way to reach it: keep it in this browser under its own hash.
+   *
+   * What this replaces is `URL.createObjectURL`, which produced a URL belonging to one document.
+   * It played beautifully until the tab was reloaded and then every cue in the show was silent,
+   * which is the worst shape a bug can have: it works while you build the show and fails the next
+   * time you open it. See `webStore.ts`. Falling through on null is deliberate; a browser that
+   * cannot hold the file is better served by the old behaviour than by a refused import.
+   */
+  const signedIn = !!(await supabase?.auth.getSession())?.data.session;
+  if (!supabase || !signedIn) {
+    const kept = await keepAssetWeb(file, ext);
+    if (kept) return kept.url;
+    if (!supabase) return URL.createObjectURL(file);
+  }
   // Bounded before the decode, not after: repacking a file this far over the limit would be
   // minutes of work to arrive at a refusal.
   if (file.size > MAX_UPLOAD * 4) throw new Error(`${file.name} is ${size(file.size)}, well past the ${size(MAX_UPLOAD)} limit for one file.`);
   const packed = await packForUpload(file, bytes => import("./audio").then(audio => audio.decodeBytes(bytes)));
   if (packed.file.size > MAX_UPLOAD) throw new Error(`${file.name} is ${size(packed.file.size)}. One file can be ${size(MAX_UPLOAD)}.`);
   const path = (await contentPath(packed.file, packed.file.name)) ?? `public/${crypto.randomUUID()}-${packed.file.name}`;
-  const { error } = await supabase.storage.from("audio").upload(path, packed.file, { contentType: typeFor(packed.file.name, packed.file.type), upsert: false });
-  if (error && !alreadyThere(error)) throw error;
+  try {
+    const { error } = await supabase.storage.from("audio").upload(path, packed.file, { contentType: typeFor(packed.file.name, packed.file.type), upsert: false });
+    if (error && !alreadyThere(error)) throw error;
+  } catch (error) {
+    /*
+     * The venue's wifi went during an import. Keeping it in this browser is strictly better than
+     * losing the file: the show can be built and run now, and `persist()` will push the row up
+     * when the connection is back. Only a refusal to store locally as well is worth reporting.
+     */
+    const kept = await keepAssetWeb(packed.file, ext);
+    if (kept) return kept.url;
+    throw error;
+  }
   return supabase.storage.from("audio").getPublicUrl(path).data.publicUrl;
 }
 const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);

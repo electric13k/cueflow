@@ -1,4 +1,4 @@
-const CACHE_NAME = "cueflow-shell-v5";
+const CACHE_NAME = "cueflow-shell-v6";
 /**
  * Cue media the operator has asked to keep, filled by `lib/offline.ts` from the page rather than
  * here. Separate from the shell so clearing one does not throw away the other, and so a version
@@ -9,6 +9,18 @@ const CACHE_NAME = "cueflow-shell-v5";
  * and fails if the two ever differ.
  */
 const MEDIA_CACHE = "cueflow-media-v1";
+
+/**
+ * The website's own asset store, filled by `lib/webStore.ts`. Frequently the ONLY copy of a sound:
+ * a show built in a browser with no account has no cloud row to re-download from, so unlike
+ * MEDIA_CACHE above nothing clears this except a sweep that was told what to keep, and a miss here
+ * is answered with a 404 rather than a network request, because there is no network copy to get.
+ *
+ * Kept in step with `webStore.ts` by `webStore.test.ts`, which reads this line: a static file
+ * cannot import the page's copy of the name, and a bucket nobody fills is a silent show.
+ */
+const ASSET_CACHE = "cueflow-assets-v1";
+const ASSET_PATH = "cf-asset/";
 const SHELL = ["./", "./index.html"];
 
 /**
@@ -70,6 +82,28 @@ async function slice(held, header) {
   return new Response(body.slice(start, end + 1), { status: 206, statusText: "Partial Content", headers });
 }
 
+/**
+ * A locally imported file, out of the store and nowhere else.
+ *
+ * Range handling matters as much here as it does for cached cloud media: `<audio>` seeks with a
+ * Range header, Safari and iOS reject any answer to one that is not a 206, and this is the only
+ * place those bytes exist. The 404 body is written for a person because this is reachable by
+ * pasting a URL, and "not found" with no explanation reads like a bug in the app.
+ */
+async function serveAsset(request) {
+  try {
+    const cache = await caches.open(ASSET_CACHE);
+    const held = await cache.match(request.url.split("?")[0]);
+    if (held) {
+      const range = request.headers.get("range");
+      return range ? await slice(held, range) : held;
+    }
+  } catch {
+    // An unreadable bucket and an empty one are the same answer to the page: the file is not here.
+  }
+  return new Response("This file is not stored on this device.", { status: 404, headers: { "Content-Type": "text/plain" } });
+}
+
 async function serveMedia(request) {
   try {
     const cache = await caches.open(MEDIA_CACHE);
@@ -96,6 +130,13 @@ self.addEventListener("fetch", event => {
   if (url.origin !== self.location.origin) {
     if (!isKeptMedia(url)) return;
     event.respondWith(serveMedia(request));
+    return;
+  }
+
+  // Before the navigation branch: these are never navigations, and they must never fall through to
+  // the shell's network-first path, which would answer a missing sound with index.html.
+  if (url.pathname.includes(ASSET_PATH)) {
+    event.respondWith(serveAsset(request));
     return;
   }
 

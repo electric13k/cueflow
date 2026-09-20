@@ -1,10 +1,23 @@
 import { performanceAllowed } from "./cookies";
 import { offlineWanted } from "./offline";
 
-const CACHE_VERSION = "cueflow-cache-v5";
+const CACHE_VERSION = "cueflow-cache-v6";
 
+/**
+ * A secure context, which is what a service worker needs and what localhost counts as.
+ *
+ * The https check alone excluded `http://localhost`, so the worker never registered against a
+ * local production build. That made the browser's own asset store untestable outside a deploy:
+ * `keepAssetWeb` refuses to mint a URL nothing will serve, so every local import silently fell
+ * back to the old behaviour and the thing under test never ran.
+ */
+const secureEnough = () => location.protocol === "https:"
+  || ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+
+// Still not in `vite dev`: a worker that caches the shell fights hot module replacement, and the
+// dev server has no built `sw.js` to register anyway.
 const supported = () => typeof window !== "undefined" && "serviceWorker" in navigator
-  && location.protocol === "https:" && !import.meta.env.DEV;
+  && secureEnough() && !import.meta.env.DEV;
 
 function register() {
   const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;

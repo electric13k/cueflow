@@ -136,6 +136,7 @@ pub fn run() {
             store::store_delete_show,
             store::store_sweep,
             store::store_usage,
+            store::store_baked_show,
         ])
         .run(tauri::generate_context!())
         .expect("CueFlow could not start a window.");

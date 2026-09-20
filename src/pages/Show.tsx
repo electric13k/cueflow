@@ -19,6 +19,8 @@ import { useShowLink } from "../lib/showLink";
 import { currentProject } from "../lib/projects";
 import { getProfile } from "../lib/account";
 import { supabase } from "../lib/store";
+import { ShowImport } from "../components/ShowPack";
+import { onOpenedShow, peekOpenedShow } from "../lib/openedShow";
 
 const can = (t: Ticket | null, p: Perm) => !!t && (t.perms ?? []).includes(p);
 
@@ -72,6 +74,15 @@ function Door({ onIn, onClose, initialKey = "" }: { onIn: (t: Ticket) => void; o
             Lost it, or it stopped working? Ask whoever is running the show, they can hand out a new one,
             and the old one dies the moment they do.
           </p>
+          {/* The other way in, and on a phone in a venue with no signal it is the only way in: a
+              file somebody handed over carries the show and the job, so there is no key to type
+              and nothing to reach. The reload is deliberate. This screen reads the saved ticket
+              once at mount, and starting again is cheaper and more certain than teaching every
+              piece of state below it that a show can appear underneath it. */}
+          <div className="border-t border-white/10 pt-4">
+            <p className="label-cap text-muted">Or open a show file</p>
+            <div className="mt-2"><ShowImport compact onDone={() => window.location.reload()} /></div>
+          </div>
         </div>
       </div>
     </div>
@@ -104,6 +115,11 @@ export default function Show() {
    * says something, which is the reader left alone with its own teleprompter, as before.
    */
   const [follow, setFollow] = useState<number | null>(null);
+  /** Set while a show file is waiting to be reviewed, which forces the door open over any ticket. */
+  const [opened, setOpened] = useState<File | null>(() => peekOpenedShow());
+  // An installed app is reused rather than relaunched for a second file, so a show opened from the
+  // desktop can arrive while this screen is already up and already in a show.
+  useEffect(() => onOpenedShow(setOpened), []);
   const [outgoing, setOutgoing] = useState("");
   const [note, setNote] = useState("");
   /** The sequence the deck came from, sent back with every `fire` so the host cannot misindex it. */
@@ -349,7 +365,17 @@ export default function Show() {
   }, [started]);
 
   const marked = useMemo(() => doc, [doc]);
-  if (!ticket) return <Door initialKey={requestedKey} onClose={closeDoor} onIn={t => { setTicket(t); setStarted(t.started); }} />;
+  /*
+   * A file the operating system handed over opens the door even when this device already holds a
+   * ticket. Without this, double-clicking a show on a machine that is already in one did nothing
+   * visible: the screen that reviews an import is inside the door, and the door was shut.
+   */
+  if (!ticket || opened) {
+    // Closing a door that was forced open by a file returns to the show this device was already in,
+    // rather than leaving it, which is what `closeDoor` does and would be wrong here.
+    const close = () => { if (opened && ticket) setOpened(null); else closeDoor(); };
+    return <Door initialKey={requestedKey} onClose={close} onIn={t => { setTicket(t); setStarted(t.started); }} />;
+  }
 
   if (door && door.state !== "in") {
     const refused = door.state === "out";

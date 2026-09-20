@@ -190,3 +190,49 @@ describe("zip with deflated entries", () => {
     expect(deflated).toBeLessThan(stored);
   });
 });
+
+describe("unzip", () => {
+  const entries = (): ZipEntry[] => [
+    { name: "data/cues.json", body: compressible },
+    { name: "media/horn.flac", body: incompressible },
+  ];
+
+  it("reads back exactly what zip wrote, stored and deflated alike", async () => {
+    const { unzip } = await import("./zip");
+    const read = await unzip(zip(await deflateEntries(entries())));
+    expect(read.map(e => e.name)).toEqual(["data/cues.json", "media/horn.flac"]);
+    expect(read[0].body).toEqual(compressible);
+    expect(read[1].body).toEqual(incompressible);
+  });
+
+  it("reads an archive whose entries were all stored", async () => {
+    const { unzip } = await import("./zip");
+    const read = await unzip(zip(entries()));
+    expect(read[0].body).toEqual(compressible);
+    expect(read[1].body).toEqual(incompressible);
+  });
+
+  it("hands back a map, because every caller wants one", async () => {
+    const { unzipMap } = await import("./zip");
+    const map = await unzipMap(zip(await deflateEntries(entries())));
+    expect([...map.keys()].sort()).toEqual(["data/cues.json", "media/horn.flac"]);
+    expect(map.get("media/horn.flac")).toEqual(incompressible);
+  });
+
+  it("says so rather than guessing when the file is not a zip at all", async () => {
+    const { unzip } = await import("./zip");
+    await expect(unzip(new Blob(["not a zip, just some text"]))).rejects.toThrow(/not a zip/i);
+  });
+
+  it("refuses an archive whose tail has been cut off", async () => {
+    const { unzip } = await import("./zip");
+    // The end record survives and the payload does not, which is what an interrupted download
+    // leaves behind. Reading it as an empty archive would silently import a show with no cues.
+    const whole = new Uint8Array(await zip(entries()).arrayBuffer());
+    const end = whole.length - 22;
+    const broken = new Uint8Array(whole.length - 40);
+    broken.set(whole.subarray(0, broken.length - 22));
+    broken.set(whole.subarray(end), broken.length - 22);
+    await expect(unzip(broken as Uint8Array<ArrayBuffer>)).rejects.toThrow();
+  });
+});

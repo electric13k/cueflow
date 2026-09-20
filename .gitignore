@@ -19,3 +19,7 @@ vite.config.d.ts
 .env*
 
 .wrangler/
+
+# A baked show is a local build product, not a change to the app.
+src-tauri/resources/show.cueflow
+src-tauri/resources/.before-bake.tauri.conf.json

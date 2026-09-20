@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Select, Switch } from "../ui";
 import ShareButton from "./ShareButton";
+import { ShowExport, ShowImport } from "./ShowPack";
 import { Plus, RefreshCw, Send, Square, Trash2, Radio } from "lucide-react";
 import { toast } from "../lib/toast";
 import {
@@ -99,6 +100,9 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
           Create
         </Button>
       </div>
+      {/* A show that arrived as a file is a show, and the screen that lists shows is where somebody
+          looks for it. Above "reopen one", because opening the file IS how it gets into that list. */}
+      <ShowImport compact onDone={reload} />
       {shows.length > 0 && (
         <div className="space-y-2">
           <p className="label-cap text-muted">Or reopen one</p>
@@ -234,6 +238,8 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
         </div>
         <p className="text-label text-muted">It flashes on every device in the show. No sound, ever, that is the point.</p>
       </section>
+
+      <ShowExport show={show} roles={roles} sequenceId={sequenceId} />
 
       <section className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
         {show.startedAt

@@ -1,0 +1,269 @@
+name: custom-app
+
+# One production, one installer.
+#
+# `native-release.yml` builds the generic app: an empty show runner somebody then has to get a show
+# into, which in a venue with no internet means a USB stick and a file picker in the dark. This
+# builds the other kind. Give it an exported `.cueflow` file and it produces an installer that IS
+# that show, in that job: install it and the app opens already holding the production with nothing
+# to type and nothing to download.
+#
+# A link rather than an upload, because a workflow input caps out at 64 KB and a show with audio in
+# it is megabytes. Anything a runner can reach over https works: a release asset, a public bucket,
+# a file-sharing link that serves the bytes directly.
+#
+# Nothing here is signed. Read "Before you run it" on the download page: the same SmartScreen box
+# and the same Android "install from this app" prompt apply to these builds as to the generic ones.
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_url:
+        description: "Direct https link to the exported .cueflow file"
+        required: true
+        type: string
+      app_name:
+        description: "Installer name. Blank takes the show and job from the file."
+        required: false
+        type: string
+      identifier:
+        description: "App id, e.g. app.cueflow.macbeth.display. Blank derives one from the file."
+        required: false
+        type: string
+      platforms:
+        description: "Which installers to build"
+        required: true
+        default: both
+        type: choice
+        options: [both, desktop, android]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  ANDROID_NDK_VERSION: "27.2.12479018"
+
+jobs:
+  # Fetch and check the pack once, here, rather than in each build job. A bad link should cost
+  # fifteen seconds and not two parallel twenty-minute toolchain installs.
+  pack:
+    name: pack
+    runs-on: ubuntu-22.04
+    outputs:
+      show: ${{ steps.read.outputs.show }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Fetch the show
+        env:
+          BUNDLE_URL: ${{ inputs.bundle_url }}
+        run: |
+          set -euo pipefail
+          case "$BUNDLE_URL" in
+            https://*) ;;
+            *) echo "The link must be https. Refusing to fetch over anything else."; exit 1 ;;
+          esac
+          curl --fail --location --silent --show-error --max-time 300 --max-filesize 2000000000 \
+            --output show.cueflow "$BUNDLE_URL"
+          ls -lh show.cueflow
+
+      # bake-show refuses anything without a CueFlow manifest, so this doubles as validation: a
+      # link that served an HTML error page fails here instead of producing an installer that
+      # opens to nothing.
+      - name: Check it is a CueFlow show
+        id: read
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          APP_ID: ${{ inputs.identifier }}
+        run: |
+          set -euo pipefail
+          node scripts/bake-show.mjs show.cueflow ${APP_NAME:+--name "$APP_NAME"} ${APP_ID:+--identifier "$APP_ID"} | tee bake.log
+          echo "show=$(head -1 bake.log)" >> "$GITHUB_OUTPUT"
+          cat bake.log >> "$GITHUB_STEP_SUMMARY"
+
+      # Passed to the build jobs as an artifact so each one fetches it from GitHub rather than
+      # from the original link, which may be a one-shot download or behind a rate limit.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cueflow-show-pack
+          if-no-files-found: error
+          retention-days: 1
+          path: show.cueflow
+
+  desktop:
+    name: desktop (${{ matrix.os }})
+    needs: pack
+    if: inputs.platforms != 'android'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: cueflow-show-pack
+
+      # Before the build, because tauri.conf.json is read by beforeBuildCommand and the bundler
+      # both. Baking after would produce a generic installer with a show sitting next to it.
+      # Values go through the environment, never through the expression that builds the command
+      # line: a workflow input is typed by a person and `${{ }}` splices it into the shell before
+      # the shell ever sees a quote.
+      - name: Bake the show into the app
+        shell: bash
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          APP_ID: ${{ inputs.identifier }}
+        run: node scripts/bake-show.mjs show.cueflow ${APP_NAME:+--name "$APP_NAME"} ${APP_ID:+--identifier "$APP_ID"}
+
+      - name: Build the desktop bundles
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload the installers
+        uses: actions/upload-artifact@v7
+        with:
+          name: cueflow-custom-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+
+  android:
+    name: android
+    needs: pack
+    if: inputs.platforms != 'desktop'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install the Android NDK
+        run: |
+          sdkmanager "ndk;${ANDROID_NDK_VERSION}"
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: cueflow-show-pack
+
+      # Before `android init`, because init reads productName and identifier out of the config to
+      # write the Gradle project and the package name. Baking after it would build a show into an
+      # app still calling itself CueFlow, which is the collision this exists to avoid.
+      - name: Bake the show into the app
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          APP_ID: ${{ inputs.identifier }}
+        run: node scripts/bake-show.mjs show.cueflow ${APP_NAME:+--name "$APP_NAME"} ${APP_ID:+--identifier "$APP_ID"}
+
+      - name: Generate the Android project
+        run: npm run tauri android init
+
+      - name: Apply the CueFlow Android manifest permissions
+        run: node scripts/patch-android-manifest.mjs
+
+      - name: Prepare the release signing keystore
+        id: signing
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEY_BASE64}" ] || [ -z "${ANDROID_KEY_PASSWORD}" ] || [ -z "${ANDROID_KEY_ALIAS}" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets are not all set; this run will produce a debug APK."
+            exit 0
+          fi
+          echo "${ANDROID_KEY_BASE64}" | base64 --decode > src-tauri/gen/android/keystore.jks
+          printf 'storeFile=keystore.jks\npassword=%s\nkeyAlias=%s\n' \
+            "${ANDROID_KEY_PASSWORD}" "${ANDROID_KEY_ALIAS}" \
+            > src-tauri/gen/android/keystore.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build the APK
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            npm run tauri android build -- --apk
+          else
+            npm run tauri android build -- --apk --debug
+          fi
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: cueflow-custom-android
+          if-no-files-found: error
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+  said:
+    name: what was built
+    needs: [pack, desktop, android]
+    if: always() && needs.pack.result == 'success'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Say what came out
+        run: |
+          {
+            echo "### ${{ needs.pack.outputs.show }}"
+            echo ""
+            echo "| platform | result |"
+            echo "| --- | --- |"
+            echo "| desktop | ${{ needs.desktop.result }} |"
+            echo "| android | ${{ needs.android.result }} |"
+            echo ""
+            echo "Installers are on this run's artifacts. Nothing is code-signed:"
+            echo "Windows SmartScreen and Android's install prompt both apply."
+          } >> "$GITHUB_STEP_SUMMARY"

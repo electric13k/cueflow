@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { Bluetooth, Download as DownloadIcon, ShieldAlert, Wifi } from "lucide-react";
+import { Bluetooth, Download as DownloadIcon, Package, ShieldAlert, Wifi, WifiOff } from "lucide-react";
 import Page, { Section } from "../components/Page";
 import { Button } from "../ui";
 import { useReveal } from "../lib/motion";
@@ -114,8 +114,9 @@ export default function Download() {
       <p className="eyebrow text-accent">Native app</p>
       <h1 className="mt-2 text-title font-semibold tracking-tight sm:text-banner">Download CueFlow</h1>
       <p className="mt-2 text-lead text-muted">
-        The desktop and Android app runs a show over a mesh between the devices in the room, with no
-        router, no account and no internet. Everything else happens on the website.
+        CueFlow is the website. Build the show there, run it there, and it keeps working with the
+        connection gone. This page is for the two things a browser tab cannot do: talk to the other
+        devices in the room, and be handed over as one installer that already is your show.
       </p>
 
       <div data-reveal className="glass mt-10 p-6 sm:p-8">
@@ -163,6 +164,62 @@ export default function Download() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div data-reveal className="glass mt-6 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-heading font-semibold tracking-tight">
+          <Package size={20} className="text-accent" />A show can be its own app
+        </h2>
+
+        <Section title="One file that is the whole production">
+          <p>
+            From the show panel in the Studio, <b>Take this show somewhere</b> exports a{" "}
+            <span className="font-mono">.cueflow</span> file: the cues, the sequences, the script and
+            every sound and picture, in one archive. Open it on any other device, website or app,
+            and that device has the show. No account, no code to type, no connection at any point.
+          </p>
+          <p>
+            Each copy is cut for a job. The file you send to the screen in the foyer arrives as a
+            display and can only be a display; the one you keep runs everything. That is decided when
+            you export, so there is nothing to set up at the other end and nothing to get wrong in a
+            dark room.
+          </p>
+        </Section>
+
+        <Section title="Or an installer that opens straight into it">
+          <p>
+            The same file can be built into the app rather than opened by it. The result is an
+            ordinary installer, named after the production and the job, which starts already holding
+            the show with nothing to type: hand a crew member one download and they are on book.
+          </p>
+          <p>
+            Run the <b>custom-app</b> workflow in the repository, give it a link to the exported
+            file, and it produces the Windows installer and the Android APK. Locally it is{" "}
+            <span className="font-mono">node scripts/bake-show.mjs your-show.cueflow</span> followed
+            by a normal build. Two copies with different jobs get different app ids, so they sit on
+            one laptop without replacing each other.
+          </p>
+        </Section>
+      </div>
+
+      <div data-reveal className="glass mt-6 p-6 sm:p-8">
+        <h2 className="flex items-center gap-2 text-heading font-semibold tracking-tight">
+          <WifiOff size={20} className="text-accent" />The website works offline too
+        </h2>
+
+        <Section title="It is not a download, it is the same site">
+          <p>
+            Files you import without an account are held in this browser under the name of their own
+            contents, so a show built with the connection down still makes a noise the next time the
+            tab is opened. Install it from the address bar and it gets a window, an icon, and opens{" "}
+            <span className="font-mono">.cueflow</span> files by double click, like any other app.
+          </p>
+          <p>
+            What stays online is everything an account buys: the library following you between
+            devices, the crew joining over the internet rather than over the room. Settings says how
+            much this browser is holding and gives it back on request.
+          </p>
+        </Section>
       </div>
 
       <div data-reveal className="glass mt-6 p-6 sm:p-8">

@@ -1,7 +1,11 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "cueflow", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5173 },
-    { "name": "cueflow-checks", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "preview", "--port", "4175", "--strictPort"], "port": 4175 }
+    {
+      "name": "cueflow-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview"],
+      "port": 4173
+    }
   ]
 }

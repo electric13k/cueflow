@@ -24,6 +24,7 @@ import RequireAuth from "./components/RequireAuth";
 import UsernamePrompt from "./components/UsernamePrompt";
 import Coach from "./components/Coach";
 import Tour from "./components/Tour";
+import BakedShow from "./components/BakedShow";
 import CookieConsent from "./components/CookieConsent";
 import SignInPrompt from "./components/SignInPrompt";
 import Toaster from "./components/Toaster";
@@ -32,7 +33,8 @@ import { applyLayout } from "./lib/layout";
 import { trackGlassPointer } from "./lib/glass";
 import { touchLastSeen } from "./lib/retention";
 import { registerCueflowCache } from "./lib/cache";
-import { restoreShowsFromDisk } from "./lib/localShow";
+import { bootDevice } from "./lib/boot";
+import { watchForOpenedShows } from "./lib/openedShow";
 
 /** /legal was one page with two anchors; keep old links working now that it is two pages. */
 function RouteLoading() {
@@ -55,13 +57,19 @@ trackGlassPointer();
 void touchLastSeen();
 registerCueflowCache();
 /**
- * On the native build, put back any show the WebView's storage has lost before anything reads it.
+ * On the native build, put the device's shows back before anything reads them: whatever its
+ * storage has lost, and the show this installer was built around if it was built around one.
  *
- * Not awaited, and that is on purpose: a disk that is slow or busy must not hold up the first
- * paint of a show runner. It only ever acts when local storage has no shows at all, so the worst a
- * late answer can do is leave the list empty for a moment on a device that had nothing in it.
+ * Started here and not awaited, on purpose: a disk that is slow or busy must not hold up the first
+ * paint of a show runner. `bootDevice` hands the same promise to `<BakedShow />`, which is what
+ * acts on the answer once there is a router to navigate with.
  */
-void restoreShowsFromDisk().catch(error => console.warn("[show] nothing was restored from disk", error));
+void bootDevice();
+/**
+ * Before React, because the OS delivers a launched file once and early, and a handle nobody takes
+ * is a handle that is gone. `openedShow.ts` parks it; the show screen collects it and reviews it.
+ */
+watchForOpenedShows();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">
@@ -100,6 +108,8 @@ createRoot(document.getElementById("root")!).render(
       {/* Inside the boundary: the tour anchors onto controls that live in lazily loaded route
           chunks, so mounted outside it, it started polling for them before they could exist. */}
       <Tour />
+      {/* Inside the router: it navigates, and it cannot do that from module scope. */}
+      <BakedShow />
       </Suspense>
       <Toaster />
       <CookieConsent />

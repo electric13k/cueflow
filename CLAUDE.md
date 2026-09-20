@@ -44,6 +44,41 @@ select tablename, attnames from pg_publication_tables where pubname='supabase_re
 
 An empty `supabase_realtime` publication means `postgres_changes` delivers nothing, no matter how healthy the socket looks. `shows` and `show_roles` are published with explicit column lists that exclude `shows.password` and `show_roles.code`; those are join keys, and publishing them whole hands every subscriber another role's entry code.
 
+## Taking a show off this machine
+
+A show leaves the app as a `.cueflow` file: an ordinary zip holding `manifest.json`, `show.json` and
+`assets/<sha256>.<ext>`. `src/lib/showPack.ts` writes and reads it; `src/lib/zip.ts` is the zip
+writer and reader, no dependency. The manifest carries the **role** the copy was cut for, so the
+device that opens it lands in that job with nothing typed.
+
+```bash
+node scripts/bake-show.mjs my-show.cueflow   # copy it into src-tauri/resources/, rename the app
+npm run tauri build                          # an installer that IS that show
+node scripts/bake-show.mjs --reset           # put tauri.conf.json back, byte for byte
+```
+
+`scripts/bake-show.mjs` has its **own** zip reader, in Node, sharing no code with the app's. That
+pair is what `scripts/bake-show.test.ts` exists to stop drifting. The `custom-app` workflow does the
+same thing in CI from a link to the file.
+
+Three content-addressed stores, all naming a file by the SHA-256 of its bytes, so the same sound is
+one file across all of them: Supabase Storage (`contentPath` in `compress.ts`), the native disk
+(`src-tauri/src/store.rs`), and the browser (`src/lib/webStore.ts`).
+
+## The browser's asset store
+
+`webStore.ts` holds locally imported media in Cache Storage under `cueflow-assets-v1`, served back
+by `public/sw.js` at `/cf-asset/<hash>.<ext>` so `track.url` stays a plain string every `<audio>`
+already understands, Range requests included. Two things to know:
+
+- It is **not** `cueflow-media-v1`. That one mirrors files that also exist in the cloud and
+  `forgetOffline()` empties it. `cueflow-assets-v1` is often the only copy there is.
+- The bucket name and the path prefix are duplicated in `public/sw.js`, which is static and cannot
+  import anything. `webStore.test.ts` reads that file and fails if they drift.
+- No controlling service worker means no stable URL to serve, so `keepAssetWeb` returns null and
+  the caller falls back rather than minting a URL that 404s tomorrow. Service workers are off in
+  `vite dev`, so test this against `npm run preview` on localhost.
+
 ## Conventions
 
 - **Type scale lives in `@theme` in `src/styles.css`.** Use the named steps (`text-micro` / `label` / `body` / `lead` / `heading` / `title` / `banner` / `display` / `marquee`), never an arbitrary `text-[13px]`. 12px is the floor: operators read this in a dark room.
@@ -58,6 +93,11 @@ An empty `supabase_realtime` publication means `postgres_changes` delivers nothi
 - `hydrateCloud` returns three things, not two: a copy, `null` for "no account", `false` for "the read failed". Collapsing the last two is what told signed-in operators to sign in.
 - `src/pages/Studio.tsx` is ~2270 lines with 12 components in it. Extract before adding.
 - There is a service worker (`public/sw.js`). A bad cache entry survives redeploys, because the browser stops asking.
+- HeroUI's `onPress` does not fire for the browser pane's synthetic clicks. To drive a button from
+  `javascript_tool`, dispatch the whole pointer sequence (`pointerdown`, `mousedown`, `pointerup`,
+  `mouseup`, `click`) with `pointerId` and `pointerType` set.
+- `npm test` includes `scripts/bake-show.test.ts`, which writes to `src-tauri/tauri.conf.json` and
+  restores it. Nothing else may touch that file during a test run.
 
 
 

@@ -164,3 +164,92 @@ export function zip(entries: (ZipEntry | PackedEntry)[], now = new Date()): Blob
   end.setUint32(16, offset, true);
   return new Blob([...locals, ...central, new Uint8Array(end.buffer)], { type: "application/zip" });
 }
+
+/* ── reading ─────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The reader half, added because an export is only half a feature.
+ *
+ * A show now leaves this app as a zip and has to come back in on another device, so the format
+ * needs a parser as well as a writer. Written here rather than pulled in as a dependency for the
+ * same reason the writer was: this is a hundred lines of DataView reads, and the archives it opens
+ * are ones this file wrote.
+ *
+ * Central directory first, never the local headers alone. A local header is allowed to carry zeroes
+ * for both sizes and defer them to a data descriptor after the payload, which is what a streaming
+ * writer emits; the central directory always has the real numbers. Reading the local header only
+ * for its name and extra lengths, and taking the sizes from the directory, opens both kinds.
+ */
+export type ReadEntry = { name: string; body: Bytes };
+
+const canInflate = () => typeof globalThis.DecompressionStream === "function";
+
+/** Where the end-of-central-directory record starts, or -1. The comment can be 64 KB, so scan back. */
+function endRecord(view: DataView): number {
+  const from = Math.max(0, view.byteLength - 22 - 0xffff);
+  for (let at = view.byteLength - 22; at >= from; at--) {
+    if (view.getUint32(at, true) === 0x06054b50) return at;
+  }
+  return -1;
+}
+
+/**
+ * Every entry in the archive, names and bytes.
+ *
+ * Throws with something a person can act on rather than returning null: every caller of this is
+ * somebody opening a file they chose, and "that file is not a CueFlow show" belongs on screen.
+ * Directory entries (a name ending in "/") are dropped; they carry no payload and every consumer
+ * here works from full paths anyway.
+ */
+export async function unzip(source: Blob | Bytes): Promise<ReadEntry[]> {
+  const bytes = source instanceof Blob ? (new Uint8Array(await source.arrayBuffer()) as Bytes) : source;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const end = endRecord(view);
+  if (end < 0) throw new Error("That file is not a zip archive, so there is nothing in it to open.");
+
+  const count = view.getUint16(end + 10, true);
+  const dirAt = view.getUint32(end + 16, true);
+  if (dirAt + 4 > bytes.length) throw new Error("This archive's directory points past the end of the file, so it is truncated.");
+
+  const dec = new TextDecoder();
+  const out: ReadEntry[] = [];
+  let at = dirAt;
+  for (let i = 0; i < count; i++) {
+    // Thrown, never broken out of. Stopping early would return the entries read so far, and a
+    // truncated download of a show would then import as a show with fewer cues in it than it has,
+    // silently, which is found out on the night. A directory that does not parse is a damaged file.
+    if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) {
+      throw new Error("This archive's directory is damaged, so what is in it cannot be listed.");
+    }
+    const method = view.getUint16(at + 10, true);
+    const packedSize = view.getUint32(at + 20, true);
+    const plainSize = view.getUint32(at + 24, true);
+    const nameLen = view.getUint16(at + 28, true);
+    const extraLen = view.getUint16(at + 30, true);
+    const commentLen = view.getUint16(at + 32, true);
+    const localAt = view.getUint32(at + 42, true);
+    const name = dec.decode(bytes.subarray(at + 46, at + 46 + nameLen));
+    at += 46 + nameLen + extraLen + commentLen;
+
+    if (name.endsWith("/")) continue;
+    if (localAt + 30 > bytes.length || view.getUint32(localAt, true) !== 0x04034b50) {
+      throw new Error(`"${name}" is not where this archive says it is, so the file is damaged.`);
+    }
+    const dataAt = localAt + 30 + view.getUint16(localAt + 26, true) + view.getUint16(localAt + 28, true);
+    const packed = bytes.subarray(dataAt, dataAt + packedSize) as Bytes;
+    if (packed.length < packedSize) throw new Error(`"${name}" runs past the end of this archive, so the file is truncated.`);
+
+    if (method === 0) { out.push({ name, body: packed }); continue; }
+    if (method !== 8) throw new Error(`"${name}" uses a compression method CueFlow cannot read.`);
+    if (!canInflate()) throw new Error("This browser cannot decompress zip archives, so this file cannot be opened here.");
+    const body = await pipeBytes(new Uint8Array(packed) as Bytes, new DecompressionStream("deflate-raw"));
+    if (plainSize && body.length !== plainSize) throw new Error(`"${name}" did not decompress to the size this archive claims.`);
+    out.push({ name, body });
+  }
+  return out;
+}
+
+/** The archive as a name-to-bytes map, which is how every caller here actually wants it. */
+export async function unzipMap(source: Blob | Bytes): Promise<Map<string, Bytes>> {
+  return new Map((await unzip(source)).map(e => [e.name, e.body]));
+}
