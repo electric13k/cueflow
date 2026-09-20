@@ -1,5 +1,5 @@
 import { supabase } from "./store";
-import { zip, type Bytes, type ZipEntry } from "./zip";
+import { deflateEntries, pipeBytes, zip, type Bytes, type ZipEntry } from "./zip";
 
 /**
  * Everything one account owns, as a zip you can open without CueFlow: the rows as JSON, the media
@@ -66,16 +66,64 @@ export async function buildBackup(onProgress?: (done: number, total: number) => 
     entries.push({ name: `media/${safe(t.title)}.${ext}`, body });
   }
 
-  return { blob: zip(entries), files: entries.length, missing };
+  // The media is already compressed and the JSON is not, so deflateEntries() decides per entry.
+  return { blob: zip(await deflateEntries(entries)), files: entries.length, missing };
 }
 
 /** Hands the archive to the browser's downloader under a dated name. */
 export function saveBackup(blob: Blob, now = new Date()) {
+  download(blob, `cueflow-export-${now.toISOString().slice(0, 10)}.zip`);
+}
+
+function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `cueflow-export-${now.toISOString().slice(0, 10)}.zip`;
+  a.download = name;
   a.click();
   // Revoking immediately can cancel the download in some browsers, so let the click settle first.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/**
+ * The snapshot half: rows as one JSON file rather than an archive, which is what a restore reads
+ * back. JSON is the most compressible thing the app produces, and gzip commonly takes structured
+ * rows to a tenth or a fifth of their size, so it is written through CompressionStream.
+ */
+export type JsonBackup = { blob: Blob; name: string };
+
+const stamp = (now: Date) => now.toISOString().slice(0, 10);
+
+export async function writeJsonBackup(data: unknown, now = new Date()): Promise<JsonBackup> {
+  const json = new TextEncoder().encode(JSON.stringify(data));
+  // No CompressionStream (older Safari, some test environments) means plain JSON under the old
+  // name. Naming uncompressed bytes .json.gz would hand somebody a backup that no gzip reader and
+  // no other browser could open, which is worse than a large one.
+  if (typeof globalThis.CompressionStream !== "function")
+    return { blob: new Blob([json], { type: "application/json" }), name: `cueflow-backup-${stamp(now)}.json` };
+  const packed = await pipeBytes(json, new CompressionStream("gzip"));
+  return { blob: new Blob([packed], { type: "application/gzip" }), name: `cueflow-backup-${stamp(now)}.json.gz` };
+}
+
+/**
+ * Reads either form. Every backup written before gzip shipped is plain JSON, and a restore that
+ * refused those would destroy the only copy of somebody's show, so the gzip magic bytes 1f 8b are
+ * sniffed off the front rather than the extension being trusted: a file gets renamed, a header
+ * does not.
+ */
+export async function readJsonBackup(source: Blob | Uint8Array): Promise<unknown> {
+  const bytes: Bytes = source instanceof Uint8Array
+    ? (source as Bytes)
+    : new Uint8Array(await source.arrayBuffer());
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    if (typeof globalThis.DecompressionStream !== "function")
+      throw new Error("This backup is gzipped and this browser cannot unzip it. Open it in a current browser.");
+    return JSON.parse(new TextDecoder().decode(await pipeBytes(bytes, new DecompressionStream("gzip"))));
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+/** Hands a JSON backup to the browser's downloader under the name writeJsonBackup chose. */
+export function saveJsonBackup(file: JsonBackup) {
+  download(file.blob, file.name);
 }

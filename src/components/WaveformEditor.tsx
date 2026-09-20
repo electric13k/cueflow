@@ -9,7 +9,7 @@ import {
   Flag, SignalHigh, Spline, Split, TrendingDown, TrendingUp, Undo2, Redo2, Trash2, Volume1, Volume2, VolumeX, Wand2, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import {
-  bufferToWavFile, decodeAudioUrl, fadeRange, gainRange, insertBuffer, mixBuffer, normalizeRange,
+  bufferToLosslessFile, decodeAudioUrl, fadeRange, gainRange, insertBuffer, mixBuffer, normalizeRange,
   pickChannels, processBuffer, removeRange, reverseRange, silenceRange, sliceBuffer, toStereo,
 } from "../lib/audio";
 import {
@@ -174,7 +174,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
   useEffect(() => {
     if (!ws || !buffer) return;
     const t = setTimeout(() => {
-      const file = bufferToWavFile(buildOutput(), track.title);
+      const file = bufferToLosslessFile(buildOutput(), track.title);
       const url = URL.createObjectURL(file);
       if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
       previewUrl.current = url;
@@ -312,7 +312,7 @@ export default function WaveformEditor({ track, onSave, onPreview }: {
       const edited = canUndo || !!pending;
       const suffix = edited ? " (edit)" : mono ? " (mono)" : " (copy)";
       const title = `${track.title}${suffix}`;
-      await onSave(bufferToWavFile(buildOutput(), title), title);
+      await onSave(bufferToLosslessFile(buildOutput(), title), title);
     } catch (e) { setErr((e as Error).message); } finally { setSaving(false); }
   };
 

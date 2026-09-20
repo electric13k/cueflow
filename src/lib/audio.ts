@@ -1,4 +1,5 @@
 import type { Effects } from "../types";
+import { encodeFlac, toInt16 } from "./flac";
 
 /**
  * Three-band tone control, the shelf/peak split every mixer and Audacity's own equaliser use: a low
@@ -178,7 +179,7 @@ export function liveVoiceOf(pool: VoicePool, held: HeldVoice | null): Voice | nu
   return pool.playing()[0] ?? pool.all().find(v => v.trackId) ?? null;
 }
 
-export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return new File([encodeWav(reversed)], `${name}-reversed.wav`, { type: "audio/wav" }); }
+export async function makeReversedFile(url: string, name: string) { const response = await fetch(url); if (!response.ok) throw new Error("Could not read this audio for reversal"); const encoded = await response.arrayBuffer(); const context = new AudioContext(); const decoded = await context.decodeAudioData(encoded); const reversed = context.createBuffer(decoded.numberOfChannels, decoded.length, decoded.sampleRate); for (let channel = 0; channel < decoded.numberOfChannels; channel++) reversed.getChannelData(channel).set(decoded.getChannelData(channel).slice().reverse()); await context.close(); return bufferToLosslessFile(reversed, `${name}-reversed`); }
 // --- Buffer editing (waveform region trim, stereo/mono, per-channel gain) ---
 /**
  * Decoded audio, kept but not hoarded.
@@ -209,6 +210,10 @@ function remember(url: string, decoded: AudioBuffer) {
     held -= bufferBytes(buffer);
   }
 }
+
+/** Decode bytes we already hold, on the shared context. The upload path uses this to see whether a
+ *  WAV is worth repacking; it is here rather than there so there is one decode context, not two. */
+export const decodeBytes = (bytes: ArrayBuffer) => sharedDecodeContext().decodeAudioData(bytes);
 
 export async function decodeAudioUrl(url: string) {
   const hit = decodeCache.get(url);
@@ -246,6 +251,23 @@ export function processBuffer(src: AudioBuffer, opts: { gains?: number[]; mono?:
   return out;
 }
 export const bufferToWavFile = (buffer: AudioBuffer, name: string) => new File([encodeWav(buffer)], `${name}.wav`, { type: "audio/wav" });
+
+/**
+ * An edit, written back in the smallest form that still holds every sample.
+ *
+ * FLAC where it helps, WAV where it does not. Both are lossless and both decode in every browser
+ * this app runs in, so the choice costs the operator nothing and saves between a fifth and a half
+ * of what used to be uploaded, synced to every other device, and held in the offline cache. The
+ * WAV path stays because `encodeFlac` returns null rather than emit a file larger than the PCM,
+ * which is what happens to a few seconds of noise or a clip too short to pay for a header.
+ */
+export function bufferToLosslessFile(buffer: AudioBuffer, name: string): File {
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, c) => toInt16(buffer.getChannelData(c)));
+  const flac = encodeFlac({ channels, sampleRate: buffer.sampleRate, bitsPerSample: 16 });
+  return flac
+    ? new File([flac], `${name}.flac`, { type: "audio/flac" })
+    : bufferToWavFile(buffer, name);
+}
 
 // --- Clip surgery (cut / paste / merge / silence) ---
 const frames = (buf: AudioBuffer, seconds: number) => Math.max(0, Math.min(buf.length, Math.round(seconds * buf.sampleRate)));

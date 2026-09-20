@@ -36,6 +36,9 @@ export function Button({
   className?: string; size?: "sm" | "md" | "lg"; isIconOnly?: boolean; isDisabled?: boolean;
   // The press event carries the modifier keys, which the library uses for shift-click range select.
   title?: string; as?: string; id?: string; "aria-label"?: string; "aria-expanded"?: boolean; "aria-controls"?: string; "data-tour"?: string; "data-coach"?: string; onPress?: (e: { shiftKey?: boolean }) => void; type?: "button" | "submit";
+  // Forwarded so a pair of buttons can be a real radiogroup. Without these the group announced as
+  // two plain buttons and a screen reader had no way to say which mode was the one in force.
+  role?: string; "aria-checked"?: boolean;
 }) {
   const navigate = useNavigate();
   const inner = <>{isLoading ? <Sp size="sm" /> : startContent}{children}{endContent}</>;

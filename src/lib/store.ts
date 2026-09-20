@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "./toast";
+import { contentPath, MAX_UPLOAD, packForUpload, size, typeFor } from "./compress";
 import type { Sequence, SequenceItem, Track } from "../types";
 // Supabase publishable credentials are safe to ship in a browser build. The fallback keeps the
 // static Pages deployment functional when its build environment is not injected by Cloudflare.
@@ -103,8 +104,33 @@ export async function unlinkIdentity(id: string) {
 export async function signOut() { await supabase?.auth.signOut(); }
 export function onAuth(cb: (email: string | null) => void) { if (!supabase) { cb(null); return () => {}; } supabase.auth.getUser().then(({ data }) => cb(data.user?.email ?? null)); const { data } = supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.email ?? null)); return () => data.subscription.unsubscribe(); }
 export const local = { get<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(`cueflow:${key}`) || "") as T; } catch { return fallback; } }, set(key: string, value: unknown) { localStorage.setItem(`cueflow:${key}`, JSON.stringify(value)); } };
-// Session-free upload: anon key writes to the public/ prefix (RLS policy allows it), bucket is public-read.
-export async function uploadTrack(file: File) { if (!supabase) return URL.createObjectURL(file); const path = `public/${crypto.randomUUID()}-${file.name}`; const { error } = await supabase.storage.from("audio").upload(path, file, { contentType: file.type || "audio/mpeg", upsert: false }); if (error) throw error; return supabase.storage.from("audio").getPublicUrl(path).data.publicUrl; }
+/**
+ * A 409 on a content-addressed name is a hit, not a failure.
+ *
+ * The path is the SHA-256 of the bytes being written, so an object already sitting there holds
+ * exactly these bytes -- somebody imported the same sound first. Treating that as an error is what
+ * would make dedup visible to the operator as a broken import.
+ */
+const alreadyThere = (error: { message?: string; statusCode?: string } | null) =>
+  !!error && ((error as { statusCode?: string }).statusCode === "409" || /already exists|duplicate/i.test(error.message ?? ""));
+
+/**
+ * Session-free upload: anon key writes to the public/ prefix (RLS policy allows it), bucket is
+ * public-read. On the way it is repacked if that is lossless and smaller, and named by its own
+ * hash so the same file is stored once however many people import it. See `lib/compress.ts`.
+ */
+export async function uploadTrack(file: File) {
+  if (!supabase) return URL.createObjectURL(file);
+  // Bounded before the decode, not after: repacking a file this far over the limit would be
+  // minutes of work to arrive at a refusal.
+  if (file.size > MAX_UPLOAD * 4) throw new Error(`${file.name} is ${size(file.size)}, well past the ${size(MAX_UPLOAD)} limit for one file.`);
+  const packed = await packForUpload(file, bytes => import("./audio").then(audio => audio.decodeBytes(bytes)));
+  if (packed.file.size > MAX_UPLOAD) throw new Error(`${file.name} is ${size(packed.file.size)}. One file can be ${size(MAX_UPLOAD)}.`);
+  const path = (await contentPath(packed.file, packed.file.name)) ?? `public/${crypto.randomUUID()}-${packed.file.name}`;
+  const { error } = await supabase.storage.from("audio").upload(path, packed.file, { contentType: typeFor(packed.file.name, packed.file.type), upsert: false });
+  if (error && !alreadyThere(error)) throw error;
+  return supabase.storage.from("audio").getPublicUrl(path).data.publicUrl;
+}
 const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 
 // Tombstones. Deleting locally is not enough: every re-hydrate would pull the row back from the
