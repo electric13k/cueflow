@@ -14,6 +14,7 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Cookies = lazy(() => import("./pages/Cookies"));
 const Tutorial = lazy(() => import("./pages/Tutorial"));
 const Credits = lazy(() => import("./pages/Credits"));
+const Download = lazy(() => import("./pages/Download"));
 const Script = lazy(() => import("./pages/Script"));
 const Account = lazy(() => import("./pages/Account"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -69,6 +70,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/credits" element={<Credits />} />
+        <Route path="/download" element={<Download />} />
         <Route path="/script" element={<Script />} />
         {/* An account buys a workspace, not the app. Studio, the library and sequences are open to
             anyone; these three do not render without a session. See plan.md §8. */}

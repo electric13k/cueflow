@@ -15,6 +15,7 @@ const links = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
   { to: "/tutorial", label: "Tutorial" },
+  { to: "/download", label: "Download" },
   { to: "/contact", label: "Contact" },
   { to: "/projects", label: "Projects", mine: true },
   { to: "/show", label: "Join a show", mine: true },

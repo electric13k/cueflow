@@ -5,6 +5,7 @@ import { Button } from "../ui";
 import Spotlight, { findAnchor, useAnchor, useSpotlightSlot } from "./Spotlight";
 import { clearDemo, demoPresent, loadDemo } from "../lib/demo";
 import { getTour, setTour, steps } from "../lib/tour";
+import { CONSENT_COOKIE, getCookie } from "../lib/cookies";
 import { onAuth } from "../lib/store";
 import { toast } from "../lib/toast";
 import { useSignedIn } from "./RequireAuth";
@@ -24,6 +25,21 @@ export default function Tour() {
   const navigate = useNavigate();
   const signedIn = useSignedIn();
   const [authEmail, setAuthEmail] = useState<string | null>(null);
+  /**
+   * The tour waits its turn behind the cookie banner, the way `SignInPrompt` already does.
+   *
+   * It did not, and a first visit opened three things at once: the consent banner along the bottom,
+   * the sign-in nudge underneath it, and a nine step tour spotlighting a page behind both of them.
+   * The person's first press has to be the consent answer, so anything that arrives before they
+   * have given it is something they have to dismiss before they can answer the question the law
+   * says we have to ask.
+   */
+  const [consented, setConsented] = useState(!!getCookie(CONSENT_COOKIE));
+  useEffect(() => {
+    const again = () => setConsented(!!getCookie(CONSENT_COOKIE));
+    window.addEventListener("cueflow:consent", again);
+    return () => window.removeEventListener("cueflow:consent", again);
+  }, []);
   const active = step >= 0 && step < steps.length;
   const current = active ? steps[step] : undefined;
   const { spot, state } = useAnchor(current?.anchor, active);
@@ -103,12 +119,14 @@ export default function Tour() {
     if (!pathname.endsWith("/workspace") && !pathname.endsWith("/studio")) return;
     const saved = getTour();
     if (saved.done) return;
-    if (localStorage.getItem("cueflow:tour") === null) begin(0);
+    // Only the first, unprompted start waits on consent. Resuming a tour somebody already began is
+    // them coming back to something they asked for, so it picks up where it was.
+    if (localStorage.getItem("cueflow:tour") === null) { if (consented) begin(0); }
     else if (step < 0) {
       loadDemo();
       setStep(Math.min(Math.max(saved.step, 0), steps.length - 1));
     }
-  }, [pathname, signedIn]);
+  }, [pathname, signedIn, consented]);
 
   const finish = (keep: boolean) => {
     clearAdvanceTimer();
