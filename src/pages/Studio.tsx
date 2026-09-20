@@ -22,7 +22,7 @@ import ShowManager from "../components/ShowManager";
 import DarkToggle, { WorkSurface } from "../components/DarkToggle";
 import { useSignedIn } from "../components/RequireAuth";
 import { currentProject, setCurrentProject } from "../lib/projects";
-import { createShow, deleteShow, forgetMemberPerms, listRoles, listShows, memberPerms, PERMS, playableUrl, SCRIPT_LIMIT, updateShow, type Perm, type Role, type Show, type ShowMsg } from "../lib/shows";
+import { cloudDoor, createShow, deleteShow, forgetMemberPerms, listRoles, listShows, memberPerms, noteDoor, PERMS, playableUrl, SCRIPT_LIMIT, updateShow, type Perm, type Role, type Show, type ShowMsg } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
 import { linksOf, loadLinks, saveLinks, withScript, withSequence, withoutShow, type LinkMap } from "../lib/showLinks";
 import Stage from "../components/Stage";
@@ -919,7 +919,8 @@ export default function Studio() {
 
   /**
    * What the room is allowed to know: the sequence as labels, and the script. No source URLs
-   * for sounds, because a device that only reads cues has no business being able to download them.
+   * for sounds, because a device that only reads cues has no business being able to download them;
+   * the exceptions are the two devices a sound has to come out of, the operator's and the display's.
    */
   const cueLabels = useMemo(
     () => selectedSequence ? cueNumbers(selectedSequence.items.map(it => kindOf(trackById.get(it.trackId) ?? { kind: "audio" }))) : [],
@@ -945,9 +946,11 @@ export default function Studio() {
       cues: may("cues") ? (selectedSequence?.items ?? []).map((it, i) => {
         const track = trackById.get(it.trackId);
         const kind = kindOf(track ?? { kind: "audio" });
-        // Sound travels only to a device that is allowed to fire, and only when the file is
-        // somewhere that device can actually reach.
-        const sendable = may("fire") && kind === "audio" ? playableUrl(track?.url) : undefined;
+        // Sound travels only to a device that has a reason to make it, and only when the file is
+        // somewhere that device can actually reach. `fire` is one reason and `play` is the other:
+        // the screen pointed at the audience never touches a control, so on `fire` alone it was
+        // sent a cue label and no audio, which is an output that cannot output anything.
+        const sendable = (may("fire") || may("play")) && kind === "audio" ? playableUrl(track?.url) : undefined;
         return {
           id: it.id, label: it.label, number: cueLabels[i] ?? String(i + 1), kind,
           url: sendable,
@@ -971,8 +974,14 @@ export default function Studio() {
   /** Let somebody in, or turn them away. The refusal is a message, not a silence. */
   const answerDoor = (member: string, allow: boolean) => {
     const who = roster.current.get(member);
-    if (!who) return;
+    if (!who || !liveShow) return;
     if (allow) {
+      // Offline nobody has looked this device's job up for us, so admitting it before the host has
+      // picked one would put it in the room as nobody: no cue list, no script, no way to ask.
+      if (!cloudDoor(liveShow.id) && !who.perms.length) {
+        toast("Give them a job first", `Pick what ${who.name || "that device"} is doing, then let them in.`, "warn");
+        return;
+      }
       admitted.current.add(member);
       roster.current.set(member, { ...who, state: "in" });
       sendShow({ type: "door", member, state: "in", role: who.role, perms: who.perms });
@@ -982,6 +991,9 @@ export default function Studio() {
       roster.current.set(member, { ...who, state: "out" });
       sendShow({ type: "door", member, state: "out", note: "Whoever is running the show did not let you in." });
     }
+    // The host's own copy of the answer. Offline the roster lives in this tab and nowhere else, so
+    // `memberPerms` would have nothing to check the next `fire` against once it is admitted.
+    noteDoor(member, liveShow.id, allow ? "in" : "out", who.role, who.perms, who.name);
     showRoster();
   };
   /**
@@ -993,11 +1005,12 @@ export default function Studio() {
    */
   const setMemberJob = (member: string, roleId: string) => {
     const who = roster.current.get(member);
-    if (!who) return;
+    if (!who || !liveShow) return;
     const role = showRoles.find(r => r.id === roleId);
     const next = { ...who, role: role?.name ?? null, perms: role?.perms ?? [] };
     roster.current.set(member, next);
     forgetMemberPerms(member);
+    noteDoor(member, liveShow.id, next.state === "waiting" ? "waiting" : "in", next.role, next.perms, next.name);
     sendShow({ type: "door", member, state: next.state === "waiting" ? "waiting" : "in", role: next.role, perms: next.perms });
     if (next.state !== "waiting") sendShow(deck(member, next.perms));
     showRoster();
@@ -1038,7 +1051,11 @@ export default function Studio() {
    */
   const onCrewMsg = async (msg: Extract<ShowMsg, { member: string }>, show: Show) => {
     const perms = await memberPerms(msg.member, show.id);
-    if (!perms.length) return;
+    // Offline there is no database that has heard of this device before it knocks, so a stranger
+    // holds nothing until this host gives it something, and dropping its `here` for holding
+    // nothing was a deadlock: the person at the door never appeared in the roster, so there was
+    // nobody to admit and no way in. Every other message still has to be backed by a job.
+    if (!perms.length && !(msg.type === "here" && !cloudDoor(show.id))) return;
     // Being held at the door has to restrict something. A device showing "Waiting to be let in"
     // could still send a `fire` and the host played the cue.
     if (msg.type !== "here" && roster.current.get(msg.member)?.state !== "in") return;
@@ -1051,7 +1068,11 @@ export default function Studio() {
         sendShow({ type: "door", member: msg.member, state: "out", note: "Removed from this show." });
         return;
       }
-      const waiting = admissionRef.current && !admitted.current.has(msg.member);
+      // Offline a device that holds no job waits whatever the admission toggle says. Letting it
+      // straight in would let it in as nobody: it would sit on a blank screen with no cue list, no
+      // script and no way to ask, because there is no database this host can look the job up in.
+      // Somebody has to choose, and the roster is where they choose it.
+      const waiting = (admissionRef.current && !admitted.current.has(msg.member)) || (!cloudDoor(show.id) && !perms.length);
       roster.current.set(msg.member, { name: msg.who, role: msg.role, perms, at: Date.now(), state: waiting ? "waiting" : "in" });
       showRoster();
       if (waiting) {
@@ -1076,6 +1097,11 @@ export default function Studio() {
       playCue(msg.index);
       return;
     }
+    // Dragging every script in the building is the same order of authority as calling a cue, so it
+    // takes the same perm. Relayed verbatim and nowhere else: `member` stays on it so the device
+    // that sent it can ignore its own echo, and nothing is stored, because a scroll position ten
+    // seconds old is worth exactly what a cue ten seconds old is worth.
+    if (msg.type === "scroll") { if (perms.includes("fire")) sendShow(msg); return; }
     if (msg.type === "flash") { if (perms.includes("message")) showAlert("warn", msg.text); return; }
     if (msg.type === "relabel") {
       if (!perms.includes("edit")) return;
@@ -1646,9 +1672,12 @@ export default function Studio() {
             <Select data-coach="script" aria-label="Where the reader sits" value={scriptMode} className="mb-2 w-full"
               onChange={value => openScript(value as typeof scriptMode)}
               options={[{ value: "split", label: "Reader: split screen" }, { value: "popup", label: "Reader: popup window" }, { value: "tab", label: "Reader: new tab" }, { value: "off", label: "Close the reader" }]} />
-            {/* BroadcastChannel never echoes to the window that posted, so this one raises its own. */}
+            {/* BroadcastChannel never echoes to the window that posted, so this one raises its own.
+                `onMove` is there because the operator is a controller with a bigger screen: scroll
+                here and every reader in the building comes along. */}
             <ScriptReader doc={scriptDoc} setDoc={setScriptDoc} alertScope={alertScope}
-              onAlert={(level, message, cue) => { showAlert(level, message); send({ type: "alert", level, message, cue }); }} />
+              onAlert={(level, message, cue) => { showAlert(level, message); send({ type: "alert", level, message, cue }); }}
+              onMove={at => sendShow({ type: "scroll", at, member: "host" })} />
           </div>
         )}
         </div>

@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input } from "../ui";
-import { Bluetooth, Lock, Maximize, MessageSquare, Send, Unlock, Volume2, VolumeX, X } from "lucide-react";
+import { Lock, Maximize, MessageSquare, Send, Unlock, Volume2, VolumeX, X } from "lucide-react";
 import ScriptReader, { AlertFlash } from "../components/ScriptReader";
 import DarkToggle from "../components/DarkToggle";
 import CurtainTransition from "../components/CurtainTransition";
 import Stage from "../components/Stage";
+import DisplaySurface from "../components/DisplaySurface";
 import { clean, emptyDoc, type ScriptDoc } from "../lib/script";
 import { themeClass, useStudioTheme } from "../lib/theme";
 import { defaultEffects, defaultVisual, type Effects, type Kind, type Stage as StageState } from "../types";
 import { VoicePool } from "../lib/audio";
 import {
-  atTheDoor, forgetTicket, joinShow, listShows, refreshTicket, savedTicket,
+  atTheDoor, forgetTicket, isDisplayRole, joinShow, listShows, noteDoor, refreshTicket, savedTicket,
   type DeckCue, type Perm, type ShowMsg, type Ticket,
 } from "../lib/shows";
 import { useShowLink } from "../lib/showLink";
-import { bluetoothPossible, bluetoothWanted, enableBluetooth } from "../lib/transports/ble";
 import { currentProject } from "../lib/projects";
 import { getProfile } from "../lib/account";
 import { supabase } from "../lib/store";
@@ -97,6 +97,13 @@ export default function Show() {
   const [stage, setStage] = useState<StageState>(null);
   const [doc, setDoc] = useState<ScriptDoc>(emptyDoc);
   const [flash, setFlash] = useState("");
+  /**
+   * Where the controller has got to in the script, for a device that is reading along rather than
+   * driving. Backstage used to run its own scroll, so the person calling the show and the person
+   * following it were on different pages of the same script all night. `null` until a controller
+   * says something, which is the reader left alone with its own teleprompter, as before.
+   */
+  const [follow, setFollow] = useState<number | null>(null);
   const [outgoing, setOutgoing] = useState("");
   const [note, setNote] = useState("");
   /** The sequence the deck came from, sent back with every `fire` so the host cannot misindex it. */
@@ -136,8 +143,6 @@ export default function Show() {
    */
   const voices = useRef(new VoicePool(4));
   const [soundOn, setSoundOn] = useState(false);
-  /** Whether this device has been told it may use Bluetooth. Survives a remount within the session. */
-  const [btOn, setBtOn] = useState(() => bluetoothWanted());
   const [soundNote, setSoundNote] = useState("");
   const cuesRef = useRef<DeckCue[]>([]);
   const soundOnRef = useRef(false); soundOnRef.current = soundOn;
@@ -253,6 +258,11 @@ export default function Show() {
       if (msg.perms) {
         setTicket(held => (held ? { ...held, role: msg.role ?? held.role, perms: msg.perms ?? held.perms } : held));
       }
+      // Offline this message is the only place the job ever existed. `refreshTicket` re-reads a
+      // seat in this browser's storage rather than asking a database, so without writing the
+      // answer down a reload put an admitted crew member back in the waiting room with nothing.
+      const mine = ticketRef.current;
+      if (mine) noteDoor(mine.member, mine.show, msg.state, msg.role ?? mine.role, msg.perms ?? mine.perms, myNameRef.current || mine.name);
       return;
     }
 
@@ -280,6 +290,12 @@ export default function Show() {
       // running. An index only means something against the list it was counted in.
       if (msg.sequence && msg.sequence !== deckSequenceRef.current) return;
       setIndex(msg.index); setNote(`Cue ${msg.label}`); playCueHere(cuesRef.current[msg.index]);
+    }
+    if (msg.type === "scroll") {
+      // The host relays our own scrolling back to us. Applying it would fight the thumb that caused
+      // it: the reader would jump to where we were a moment ago, every moment.
+      if (msg.member === ticketRef.current?.member) return;
+      setFollow(msg.at);
     }
     if (msg.type === "start") { setStarted(msg.at); startCurtain(); show("Standby, show is live"); }
     if (msg.type === "end") { setStarted(null); setNote("Show ended"); voices.current.stopAll(); }
@@ -356,6 +372,20 @@ export default function Show() {
     );
   }
 
+  /**
+   * A screen pointed at the audience gets none of the crew layout.
+   *
+   * It comes through the same door as everybody else and waits in the same queue, which is why this
+   * sits below the door: a display is a member of the show, not a special case of joining one. What
+   * it is not is a device anyone should be able to touch, so from here it is the stage and black.
+   */
+  if (isDisplayRole(ticket.perms)) {
+    return (
+      <DisplaySurface stage={stage} started={started} armed={soundOn} onArm={enableSound}
+        onLeave={() => { forgetTicket(); setTicket(null); }} />
+    );
+  }
+
   const sendFlash = () => {
     if (!outgoing.trim()) return;
     bus.send({ type: "flash", text: outgoing.trim(), from: ticket.role ?? "crew", member: ticket.member });
@@ -389,26 +419,24 @@ export default function Show() {
           <DarkToggle />
           <Button isIconOnly size="sm" variant="light" aria-label="Full screen"
             onPress={() => void document.documentElement.requestFullscreen?.().catch(() => {})}><Maximize size={15} /></Button>
-          {can(ticket, "fire") && (soundOn
+          {/* `play` needs the press as much as `fire` does: a job that is both a crew screen and an
+              output still has to give the browser its gesture before a cue can make a sound. */}
+          {(can(ticket, "fire") || can(ticket, "play")) && (soundOn
             ? <span className="flex items-center gap-1 text-label text-ready"><Volume2 size={13} aria-hidden />Sound on</span>
             : <Button size="sm" variant="flat" startContent={<VolumeX size={14} aria-hidden />} onPress={enableSound}>
                 Turn sound on
               </Button>)}
           {/*
-            * The only way the Bluetooth transport is ever reachable.
-            *
-            * `bleTransport.available()` answers false until this is pressed, because `requestDevice`
-            * puts the browser's own chooser on screen and refuses to run from a background probe. So
-            * without a control the transport sat first in the list and was never once considered,
-            * and a venue with no internet got no link at all rather than a fallback. The press has
-            * to be the same gesture that opens the chooser, which is why `reopen` exists.
+            * There is no control for choosing a wire any more, on purpose. Bluetooth used to need
+            * one because the browser would not scan without the operator picking a device from its
+            * own chooser; the native app starts its mesh itself, so the wire is chosen without
+            * asking. What is left is the case the press was really for: nothing is carrying the
+            * show yet, and the answer can change the moment the app's mesh comes up or the venue's
+            * wifi does, so the operator gets to ask again instead of waiting out the backoff.
             */}
-          {bluetoothPossible() && (btOn
-            ? <span className="flex items-center gap-1 text-label text-ready"><Bluetooth size={13} aria-hidden />Bluetooth on</span>
-            : <Button size="sm" variant="flat" startContent={<Bluetooth size={14} aria-hidden />}
-                onPress={() => { enableBluetooth(); setBtOn(true); link.reopen(); }}>
-                Use Bluetooth
-              </Button>)}
+          {!link.ready && (
+            <Button size="sm" variant="flat" onPress={() => link.reopen()}>Reconnect</Button>
+          )}
           {!started && <Button size="sm" variant="light" onPress={() => { forgetTicket(); setTicket(null); }}>Leave</Button>}
         </div>
       </header>
@@ -450,7 +478,12 @@ export default function Show() {
           <section className="glass flex min-h-0 flex-col p-3">
             <h2 className="mb-2 label-cap text-muted">Script</h2>
             <div className="min-h-0 flex-1">
-              <ScriptReader doc={marked} setDoc={setDoc} />
+              {/* Whoever fires the cues is the one scrolling the script for everybody: they send
+                  where they are, everybody else is moved there. A device that cannot fire has no
+                  business dragging the reader on somebody else's phone, so it only listens. */}
+              <ScriptReader doc={marked} setDoc={setDoc}
+                follow={can(ticket, "fire") ? null : follow}
+                onMove={can(ticket, "fire") ? at => bus.send({ type: "scroll", at, member: ticket.member }) : undefined} />
             </div>
           </section>
         )}
@@ -473,9 +506,14 @@ export default function Show() {
           </section>
         )}
 
+        {/* A display never gets here: it returned above, with no panels and no header at all. What
+            reaches this is a job with nothing to look at, and since `play` can now be one of the
+            things it holds, the empty screen has to say whether sound comes out of this device. */}
         {!can(ticket, "cues") && !can(ticket, "script") && !can(ticket, "stage") && (
           <section className="glass flex items-center justify-center p-8 text-center text-body text-muted lg:col-span-2">
-            You are in. Your job does not need the cue list or the script, messages will still reach you.
+            {can(ticket, "play")
+              ? "You are in. Nothing to look at on this one, but cues play out loud here, so turn its sound on."
+              : "You are in. Your job does not need the cue list or the script, messages will still reach you."}
           </section>
         )}
       </div>

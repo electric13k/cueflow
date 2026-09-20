@@ -5,7 +5,7 @@ import { Plus, RefreshCw, Send, Square, Trash2, Radio } from "lucide-react";
 import { toast } from "../lib/toast";
 import {
   addRole, createShow, deleteRole, deleteShow, joinShow, listRoles, listShows, PERMS, regeneratePassword,
-  regenerateRoleCode, updateRole, updateShow, type Perm, type Role, type Show,
+  regenerateRoleCode, ROLE_PRESETS, updateRole, updateShow, type Perm, type Role, type Show,
 } from "../lib/shows";
 
 /**
@@ -57,6 +57,14 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
     await joinShow(s.password, localStorage.getItem("cueflow:showName")?.trim() || "Operator");
   };
 
+  /**
+   * The preset a job is currently shaped like, if any. Matched on the switches rather than the
+   * name, because the name is the host's: "Foyer TV" with a display's perms is still a display,
+   * and flipping one switch on it should stop claiming it is one.
+   */
+  const presetFor = (perms: Perm[]) =>
+    ROLE_PRESETS.find(p => p.perms.length === perms.length && p.perms.every(x => perms.includes(x)));
+
   const togglePerm = (role: Role, perm: Perm) => {
     const next = role.perms.includes(perm) ? role.perms.filter(p => p !== perm) : [...role.perms, perm];
     setRoles(rs => rs.map(r => (r.id === role.id ? { ...r, perms: next } : r)));
@@ -72,7 +80,22 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
       <div className="flex flex-wrap gap-2">
         <Input className="min-w-48 flex-1" label="Name this show" value={name} onValueChange={setName} placeholder="Friday night" />
         <Button className="self-end" color="primary" isLoading={busy} startContent={<Plus size={15} />}
-          onPress={() => void run(async () => { const created = await createShow(name, projectId, sequenceId || null); await enterAsOwner(created); setShow(created); }, "Show created. You are already in as the operator.")}>
+          onPress={() => void run(async () => {
+            const created = await createShow(name, projectId, sequenceId || null);
+            // A new show used to arrive with nothing in it, so the first thing anyone did with one
+            // was build the same three jobs by hand, twenty minutes before a house opened. They are
+            // ordinary roles once they exist: rename them, re-key them, delete the ones you do not
+            // need. Sequentially, because every key in the system shares one namespace and each
+            // insert may have to retry for a free one.
+            // Unless the show arrived with them. A local show is minted on this device and comes
+            // with its jobs already on it, because there is no second screen to add them from;
+            // adding them again here would hand the room two Controllers and two Displays.
+            if (!(await listRoles(created.id)).length) {
+              for (const preset of ROLE_PRESETS) await addRole(created.id, preset.name, preset.perms);
+            }
+            await enterAsOwner(created);
+            setShow(created);
+          }, "Show created, with its three standard jobs and their keys. You are already in as the operator.")}>
           Create
         </Button>
       </div>
@@ -144,6 +167,18 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
                 onPress={() => void run(async () => { await updateRole(role.id, { name: role.name, code: role.code ?? undefined }); setRoles(await listRoles(show.id)); }, "Saved.")}>
                 Save
               </Button>
+              {/**
+                * The job's own door, not the show's. The door reads `?key=` on its own, so this link
+                * lands whoever opens it in this job with nothing typed. The show-wide share button
+                * above hands out the collaborator password, which is the wrong thing to send the
+                * person on followspot, and the alternative was reading six characters aloud across
+                * a dark theatre.
+                */}
+              {role.code && (
+                <ShareButton iconOnly size="sm" label={`Share the ${role.name} link`}
+                  url={`/show?key=${encodeURIComponent(role.code)}`} title={`${role.name} · ${show.name}`}
+                  text={`You are on ${role.name} for ${show.name}. This link takes you straight in.`} />
+              )}
               <Button isIconOnly size="sm" variant="light" aria-label="New key for this job" isLoading={busy}
                 onPress={() => void run(async () => { await regenerateRoleCode(role.id); setRoles(await listRoles(show.id)); }, "New key. The old one no longer works.")}>
                 <RefreshCw size={14} />
@@ -153,6 +188,9 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
                 <Trash2 size={14} />
               </Button>
             </div>
+            {/* Seven switches say what a job can do; the hint says what it is for, which is the
+                question a host scanning this list at the half is actually asking. */}
+            {presetFor(role.perms) && <p className="mt-2 text-label text-muted">{presetFor(role.perms)!.hint}</p>}
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {PERMS.map(p => (
                 <label key={p.key} className="flex items-start gap-2 text-body">
@@ -163,6 +201,20 @@ export default function ShowHost({ projectId, sequenceId, show, setShow, onFlash
             </div>
           </div>
         ))}
+        {/**
+          * Adding a job used to mean typing a name and then flipping six switches from off, which
+          * is how you get a device that joins and shows nothing. These three are the shapes worth
+          * having a name for; the box below still describes a followspot.
+          */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-label text-muted">Add one of the usual jobs</span>
+          {ROLE_PRESETS.map(preset => (
+            <Button key={preset.key} size="sm" variant="flat" isDisabled={busy} startContent={<Plus size={14} />}
+              onPress={() => void run(async () => { setRoles([...roles, await addRole(show.id, preset.name, preset.perms)]); }, "")}>
+              {preset.name}
+            </Button>
+          ))}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Input className="min-w-40 flex-1" size="sm" label="New job" value={roleName} onValueChange={setRoleName} placeholder="Followspot" />
           <Button className="self-end" size="sm" isLoading={busy}
