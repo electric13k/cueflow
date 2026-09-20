@@ -13,6 +13,7 @@ mod android;
 mod ble;
 mod hub;
 mod lan;
+mod store;
 
 use std::sync::{Arc, Mutex};
 
@@ -121,7 +122,21 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(Mesh::default())
-        .invoke_handler(tauri::generate_handler![mesh_start, mesh_stop, mesh_send, mesh_status])
+        .invoke_handler(tauri::generate_handler![
+            mesh_start,
+            mesh_stop,
+            mesh_send,
+            mesh_status,
+            store::store_put_asset,
+            store::store_asset_url,
+            store::store_list_assets,
+            store::store_save_show,
+            store::store_load_show,
+            store::store_list_shows,
+            store::store_delete_show,
+            store::store_sweep,
+            store::store_usage,
+        ])
         .run(tauri::generate_context!())
         .expect("CueFlow could not start a window.");
 }

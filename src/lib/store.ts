@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "./toast";
 import { contentPath, MAX_UPLOAD, packForUpload, size, typeFor } from "./compress";
+import { keepAsset, nativeStore } from "./nativeStore";
 import type { Sequence, SequenceItem, Track } from "../types";
 // Supabase publishable credentials are safe to ship in a browser build. The fallback keeps the
 // static Pages deployment functional when its build environment is not injected by Cloudflare.
@@ -103,7 +104,35 @@ export async function unlinkIdentity(id: string) {
 
 export async function signOut() { await supabase?.auth.signOut(); }
 export function onAuth(cb: (email: string | null) => void) { if (!supabase) { cb(null); return () => {}; } supabase.auth.getUser().then(({ data }) => cb(data.user?.email ?? null)); const { data } = supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.email ?? null)); return () => data.subscription.unsubscribe(); }
-export const local = { get<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(`cueflow:${key}`) || "") as T; } catch { return fallback; } }, set(key: string, value: unknown) { localStorage.setItem(`cueflow:${key}`, JSON.stringify(value)); } };
+/**
+ * What the offline app is not allowed to keep.
+ *
+ * The native build is a show runner on a machine that is usually not the operator's: a laptop at
+ * the production desk, a tablet in the wings, a front of house PC three people have the password
+ * to. It has one job, and an account, a session token and a record of which tutorial tips somebody
+ * dismissed are all things the next person can read that are nothing to do with calling cues.
+ *
+ * A denylist and not an allowlist, deliberately. A key somebody adds next month that nobody thinks
+ * to list here should still be written: a silently dropped write is data loss that only shows up
+ * weeks later, in a venue, as a show that did not save.
+ */
+const NOT_ON_A_SHOW_MACHINE = new Set([
+  "session", "signin", "signin-prompt", "first-auth", "usernameAsked", "consent",
+  "demo-loaded", "demo-cleared", "tour", "tour-pane", "teach", "taught",
+  "tutorial-active", "tutorial-finished", "deleted",
+]);
+const onShowMachine = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const refusedHere = (key: string) => onShowMachine() && NOT_ON_A_SHOW_MACHINE.has(key);
+
+export const local = {
+  get<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(`cueflow:${key}`) || "") as T; } catch { return fallback; } },
+  set(key: string, value: unknown) {
+    // Cleared rather than merely skipped: a build that used to write this key has already left one
+    // behind, and refusing new writes while the old value sits there is the worst of both.
+    if (refusedHere(key)) { localStorage.removeItem(`cueflow:${key}`); return; }
+    localStorage.setItem(`cueflow:${key}`, JSON.stringify(value));
+  },
+};
 /**
  * A 409 on a content-addressed name is a hit, not a failure.
  *
@@ -120,6 +149,22 @@ const alreadyThere = (error: { message?: string; statusCode?: string } | null) =
  * hash so the same file is stored once however many people import it. See `lib/compress.ts`.
  */
 export async function uploadTrack(file: File) {
+  /*
+   * On the show machine the file goes to this device's own disk and never near a network.
+   *
+   * It is not repacked on the way, which the cloud path does and this deliberately does not. The
+   * repack exists to buy bandwidth, there is no bandwidth here, and the machine paying for it is a
+   * tablet in the wings being asked to decode and re-encode an audio file while somebody waits.
+   * Disk is the cheap thing in this room; time before a house opens is not.
+   *
+   * A store that will not answer falls through to the browser behaviour below rather than throwing,
+   * so an import still works even on a native build whose store is unavailable.
+   */
+  if (nativeStore()) {
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const kept = await keepAsset(file, ext || "bin");
+    if (kept) return kept.url;
+  }
   if (!supabase) return URL.createObjectURL(file);
   // Bounded before the decode, not after: repacking a file this far over the limit would be
   // minutes of work to arrive at a refusal.

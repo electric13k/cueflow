@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "CueFlow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "app.cueflow.show",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -22,7 +22,11 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; frame-src 'self' https://*.supabase.co"
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/assets/*", "$APPDATA/shows/*"]
+      },
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http://asset.localhost https://*.supabase.co; media-src 'self' data: blob: asset: http://asset.localhost https://*.supabase.co; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; frame-src 'self' https://*.supabase.co"
     }
   },
   "bundle": {
