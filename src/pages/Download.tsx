@@ -81,8 +81,12 @@ const BUILDS: Build[] = [
     what: "Mark the AppImage executable and run it, no install needed. Built on Ubuntu 22.04, so an older distribution may be short of the glibc and WebKitGTK it wants.",
   },
   {
-    id: "android", name: "Android", file: "the .apk",
-    what: "Android blocks installs from outside the Play Store until you allow them for whichever app hands over the file, in Settings, Apps, Special app access. A phone joins the mesh; it cannot host the Bluetooth half of it.",
+    id: "android", name: "Android", file: "app-universal-debug.apk",
+    // Named debug because it is one. No signing key is configured, and an unsigned release APK
+    // cannot be installed at all, so the build produces a debug one instead. Said here rather than
+    // left as a surprise: somebody who downloads a file with "debug" in the name and was not told
+    // why reasonably assumes they picked up the wrong thing.
+    what: "A debug build, which is what the name says: there is no signing key for this project yet, and an unsigned release APK will not install on any phone. It runs the same. Android also blocks installs from outside the Play Store until you allow them for whichever app hands over the file, in Settings, Apps, Special app access. A phone joins the mesh; it cannot host the Bluetooth half of it.",
   },
   {
     id: "macos", name: "macOS", file: "",

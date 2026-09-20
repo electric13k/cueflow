@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Switch } from "../ui";
-import { Bell, Cookie, GraduationCap, Keyboard, LayoutGrid, Palette, RotateCcw } from "lucide-react";
+import { Bell, Cookie, GraduationCap, HardDrive, Keyboard, LayoutGrid, Palette, RotateCcw, Trash2 } from "lucide-react";
 import Shell from "../components/Shell";
 import { startTour } from "../components/Tour";
 import KeybindRow from "../components/KeybindRow";
@@ -11,6 +11,7 @@ import { emptyDoc, loadScript, saveScript, type ScriptDoc } from "../lib/script"
 import { loadAlertScope, saveAlertScope, type AlertScope } from "../lib/alerts";
 import { getConsent, saveConsent, type ConsentState } from "../lib/cookies";
 import { loadDemo } from "../lib/demo";
+import { nativeStore, storeUsage, tidyAssets } from "../lib/nativeStore";
 
 export default function Settings() {
   const [binds, setBinds] = useState<Record<Action, string>>(loadBinds);
@@ -114,6 +115,8 @@ export default function Settings() {
         </div>
       </section>
 
+      <OnThisDevice />
+
       <section className="glass mt-6 p-6 sm:p-8">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><GraduationCap size={18} className="text-accent" />Tutorial</h2>
         <p className="mt-2 text-body text-muted">
@@ -153,5 +156,60 @@ function Choice<T extends string>({ label, value, options, onChange }: {
       </div>
       <p className="mt-2 text-label text-muted">{options.find(o => o.id === value)?.note}</p>
     </div>
+  );
+}
+
+/**
+ * What the offline app is holding on this machine, and a way to hand some of it back.
+ *
+ * Only on the native build, because only there is there a store to report on: the website keeps
+ * its media in Supabase and its settings in this browser, and neither is a number anybody can act
+ * on. The sweep is a press rather than something that happens at startup on purpose. It deletes
+ * files, the list of what to keep is worked out by reading everything on the device, and a delete
+ * that runs on its own before the operator has opened the show they came for is a delete nobody
+ * asked for. See `assetsInUse` for why the keep list errs towards keeping.
+ */
+function OnThisDevice() {
+  const [usage, setUsage] = useState<{ shows: number; assets: number; bytes: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  const read = () => { void storeUsage().then(setUsage).catch(() => setUsage(null)); };
+  useEffect(() => { if (nativeStore()) read(); }, []);
+  if (!nativeStore()) return null;
+
+  const megabytes = (n: number) => `${(n / 1_048_576).toFixed(n < 10_485_760 ? 1 : 0)} MB`;
+  const tidy = async () => {
+    setBusy(true); setNote("");
+    try {
+      const { removed, freed } = await tidyAssets();
+      setNote(removed ? `${removed} file${removed === 1 ? "" : "s"} removed, ${megabytes(freed)} back.` : "Nothing to remove. Every file here belongs to a show.");
+      read();
+    } catch (error) {
+      setNote((error as Error).message);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <section className="glass mt-6 p-6 sm:p-8">
+      <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight"><HardDrive size={18} className="text-accent" />On this device</h2>
+      <p className="mt-2 text-body text-muted">
+        The app keeps the show, its sequences and its sounds and pictures on this machine, so a
+        venue with no internet still has all of them. Nothing else is kept here: no account, no
+        sign-in, no history.
+      </p>
+      <p className="mt-4 text-body">
+        {usage
+          ? <>{usage.shows} show{usage.shows === 1 ? "" : "s"}, {usage.assets} file{usage.assets === 1 ? "" : "s"}, {megabytes(usage.bytes)}.</>
+          : "Reading what is stored…"}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button className="min-h-11" size="sm" variant="flat" isLoading={busy} startContent={<Trash2 size={14} />} onPress={() => void tidy()}>
+          Free up space
+        </Button>
+        <span className="text-label text-muted">Removes files no show still points at. Nothing a show uses is touched.</span>
+      </div>
+      {note && <p className="mt-3 text-label text-ready" role="status">{note}</p>}
+    </section>
   );
 }

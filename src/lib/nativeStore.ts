@@ -190,6 +190,35 @@ export async function sweepAssets(keep: string[]): Promise<{ removed: number; fr
   return await invoke<{ removed: number; freed: number }>("store_sweep", { keep });
 }
 
+/**
+ * Every asset hash anything on this device still refers to.
+ *
+ * Deliberately blunt: every value in local storage and every saved show is scanned for anything
+ * shaped like a content hash, rather than walking the library and the sequences and the stage and
+ * the script and hoping that is all of them. The two mistakes here are not symmetrical. Keeping a
+ * file nothing points at wastes a few megabytes on a disk; missing one that something does point at
+ * deletes a cue's sound, and it is found out in front of an audience. So anything that even looks
+ * like a reference counts as one.
+ */
+export async function assetsInUse(): Promise<string[]> {
+  const found = new Set<string>();
+  const hashes = (text: string) => { for (const m of text.matchAll(/[0-9a-f]{64}/g)) found.add(m[0]); };
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) hashes(localStorage.getItem(key) ?? "");
+  }
+  // Shows on disk too. One restored from a backup is a show whose sounds must not be swept away
+  // before anybody has opened it.
+  for (const id of await listShowBundles()) {
+    const bundle = await loadShowBundle<unknown>(id);
+    if (bundle) hashes(JSON.stringify(bundle));
+  }
+  return [...found];
+}
+
+/** Sweep everything nothing refers to. The only caller that should ever build the list itself. */
+export const tidyAssets = async () => sweepAssets(await assetsInUse());
+
 /** What the store costs this machine, for a screen that offers to give some of it back. */
 export async function storeUsage(): Promise<{ shows: number; assets: number; bytes: number }> {
   const empty = { shows: 0, assets: 0, bytes: 0 };

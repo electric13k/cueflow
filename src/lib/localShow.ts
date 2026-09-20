@@ -1,4 +1,5 @@
 import { newCode } from "./projects";
+import { deleteShowBundle, listShowBundles, loadShowBundle, nativeStore, saveShowBundle } from "./nativeStore";
 import { local } from "./store";
 import { PERMS, ROLE_PRESETS, type MemberStatus, type Perm, type Role, type Show, type Ticket } from "./shows";
 
@@ -52,10 +53,60 @@ export function saveLocalShow(show: Show) {
   const at = all.findIndex(s => s.id === show.id);
   // Newest first, which is the order the cloud list comes back in, and an edit stays where it was.
   local.set(SHOWS, at < 0 ? [show, ...all] : all.map((s, i) => (i === at ? show : s)));
+  toDisk(show.id);
+}
+
+/**
+ * A copy of the show on the app's own disk, on top of the one in local storage.
+ *
+ * Local storage is a WebView's, and a WebView's can be cleared: by the operating system reclaiming
+ * space, by a "clear data" press in Android's app settings, by a reinstall the week before a run.
+ * That is an acceptable way to lose a browser tab and not an acceptable way to lose the show a
+ * company has been rehearsing, so on the native build it is written twice and read back from disk
+ * when local storage comes up empty.
+ *
+ * Fire and forget. A disk that will not take the copy must not stop the show being saved in the
+ * place the app actually reads it from.
+ */
+function toDisk(id: string) {
+  if (!nativeStore()) return;
+  const show = listLocalShows().find(s => s.id === id);
+  if (!show) return;
+  void saveShowBundle(id, { v: 1, show, roles: localRoles(id) })
+    .catch(error => console.warn("[show] the copy on this device was not written", error));
+}
+
+type Bundle = { v: 1; show: Show; roles: Role[] };
+
+/**
+ * Put back what the disk still has, when local storage has nothing.
+ *
+ * Guarded on empty rather than merged, and that guard is the whole safety of this. A merge would
+ * have to decide which copy of a show is the real one, and getting that wrong the morning after a
+ * rehearsal silently reverts the changes somebody made in it. Nothing to lose is the only case
+ * where restoring cannot lose anything.
+ */
+export async function restoreShowsFromDisk(): Promise<number> {
+  if (!nativeStore() || listLocalShows().length) return 0;
+  let restored = 0;
+  for (const id of await listShowBundles()) {
+    const bundle = await loadShowBundle<Bundle>(id);
+    if (!bundle?.show) continue;
+    const all = listLocalShows();
+    local.set(SHOWS, [...all, bundle.show]);
+    setLocalRoles(id, bundle.roles ?? []);
+    restored++;
+  }
+  return restored;
 }
 
 export const localRoles = (showId: string): Role[] => local.get<Role[]>(rolesKey(showId), []);
-export const setLocalRoles = (showId: string, roles: Role[]) => local.set(rolesKey(showId), roles);
+export const setLocalRoles = (showId: string, roles: Role[]) => {
+  local.set(rolesKey(showId), roles);
+  // The jobs and their keys are half of what a show is. A disk copy carrying the show and not the
+  // keys people type to get into it would restore something nobody can join.
+  toDisk(showId);
+};
 
 /**
  * Every key on this device -- every show id and every job's code -- is one namespace, because the
@@ -105,6 +156,8 @@ export function updateLocalShow(id: string, patch: { name?: string; password?: s
 
 export function deleteLocalShow(id: string) {
   local.set(SHOWS, listLocalShows().filter(show => show.id !== id));
+  // Including the copy on disk, or the next start would restore a show somebody deleted.
+  if (nativeStore()) void deleteShowBundle(id).catch(() => undefined);
   // The jobs and the roster are part of the show. Leaving them behind would keep a deleted show's
   // codes answering the door, and leave member ids pointing at a room that is not there any more.
   setLocalRoles(id, []);

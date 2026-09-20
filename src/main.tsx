@@ -32,6 +32,7 @@ import { applyLayout } from "./lib/layout";
 import { trackGlassPointer } from "./lib/glass";
 import { touchLastSeen } from "./lib/retention";
 import { registerCueflowCache } from "./lib/cache";
+import { restoreShowsFromDisk } from "./lib/localShow";
 
 /** /legal was one page with two anchors; keep old links working now that it is two pages. */
 function RouteLoading() {
@@ -53,6 +54,14 @@ trackGlassPointer();
 // so the thing that must never happen is an active account looking idle to it.
 void touchLastSeen();
 registerCueflowCache();
+/**
+ * On the native build, put back any show the WebView's storage has lost before anything reads it.
+ *
+ * Not awaited, and that is on purpose: a disk that is slow or busy must not hold up the first
+ * paint of a show runner. It only ever acts when local storage has no shows at all, so the worst a
+ * late answer can do is leave the list empty for a moment on a device that had nothing in it.
+ */
+void restoreShowsFromDisk().catch(error => console.warn("[show] nothing was restored from disk", error));
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">

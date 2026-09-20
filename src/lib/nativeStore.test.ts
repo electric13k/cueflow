@@ -168,3 +168,33 @@ describe("what a show machine is allowed to keep", () => {
     expect(local.get<{ token: string } | null>("session", null)).toEqual({ token: "fine here" });
   });
 });
+
+describe("working out what is still in use", () => {
+  it("finds hashes anywhere on the device, because over-keeping is the safe mistake", async () => {
+    asNative();
+    const store = await import("./nativeStore");
+    const used = "c".repeat(64);
+    const inABundle = "d".repeat(64);
+    // A track url in the library, which is the obvious place.
+    localStorage.setItem("cueflow:tracks:project-1", JSON.stringify([{ id: "t1", url: `asset://localhost/assets/${used}.mp3` }]));
+    // And somewhere nobody would think to walk: the stage, a script, a draft. Scanned anyway.
+    localStorage.setItem("cueflow:something-nobody-listed", JSON.stringify({ deep: { nested: `${inABundle}.webm` } }));
+    invoke.mockImplementation(async (name: string) => (name === "store_list_shows" ? [] : null));
+
+    const found = await store.assetsInUse();
+    expect(found).toContain(used);
+    expect(found).toContain(inABundle);
+  });
+
+  it("keeps what a show saved on disk points at, even before anybody opens it", async () => {
+    asNative();
+    const store = await import("./nativeStore");
+    const onlyOnDisk = "f".repeat(64);
+    invoke.mockImplementation(async (name: string) =>
+      name === "store_list_shows" ? ["CF-K7QM2X"]
+      : name === "store_load_show" ? JSON.stringify({ show: { id: "CF-K7QM2X" }, cue: `${onlyOnDisk}.wav` })
+      : null);
+
+    expect(await store.assetsInUse()).toContain(onlyOnDisk);
+  });
+});
