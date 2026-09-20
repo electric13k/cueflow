@@ -7,7 +7,7 @@ numbered list, and one keypress sends the next thing on it to a second screen th
 
 Nothing plays on a timer. Nothing plays until you call it.
 
-**[cuefloww.netlify.app](https://cuefloww.netlify.app)** · no install, no account needed to try it
+**[cuefloww](https://cueflow.pages.dev)** · no install, no account needed to try it
 
 ---
 
