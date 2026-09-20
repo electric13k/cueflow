@@ -1,0 +1,64 @@
+[package]
+name = "cueflow"
+version = "0.1.0"
+description = "CueFlow, the offline show runner"
+authors = ["CueFlow"]
+edition = "2021"
+rust-version = "1.82"
+
+# The desktop binary is a thin `main` over this library, and the Android build links the same
+# library through `mobile_entry_point`. Keeping the whole app in a lib is what lets one set of
+# commands serve both without a second copy going stale.
+[lib]
+name = "cueflow_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "time", "io-util", "macros"] }
+futures = "0.3"
+socket2 = { version = "0.6", features = ["all"] }
+if-addrs = "0.15"
+rand = "0.9"
+uuid = { version = "1", features = ["v4"] }
+
+btleplug = "0.13"
+
+# The wire format, shared with `src/lib/mesh.ts` byte for byte. A path dependency rather than a copy
+# so that the Rust half cannot drift from the TypeScript half without a test failing on one side.
+cueflow-mesh = { path = "../native/cueflow-mesh" }
+
+# The GATT server half of Bluetooth, which is what makes this a mesh rather than a star.
+#
+# There is no Android backend for it and no Rust crate that has one, so Android runs the central
+# role only until the Kotlin advertiser in `native/README.md` exists. Selected by target rather than
+# by a cargo feature, because a feature would have to be turned off by hand in the Android build and
+# the day someone forgets is the day the Android build stops compiling.
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+ble-peripheral-rust = "0.2"
+
+[profile.release]
+# A show runner is not a place for a panic handler to unwind into a half-written state, and aborting
+# also takes a couple of megabytes off the installer.
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+# Android will not deliver multicast to a socket unless the app holds a `WifiManager.MulticastLock`,
+# and that lock is a Java object with no NDK equivalent. JNI is the only way to take it from Rust.
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk-context = "0.1"

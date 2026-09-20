@@ -1,8 +1,10 @@
 # The native half
 
-A browser can only be a BLE central. Web Bluetooth exposes the GATT client role and nothing else —
-a page can neither advertise nor host a GATT server — so every device that relays for the room has
-to be native. This directory is that half.
+A browser cannot mesh. Web Bluetooth exposes the GATT client role and nothing else, so a page can
+neither advertise nor host a GATT server and two browsers can never reach each other that way; and a
+page served over https cannot open a socket to a bare LAN address, because that is mixed content.
+Every device that carries a show without the internet therefore has to be native. This directory,
+and `../src-tauri`, are that half.
 
 ## What is here
 
@@ -14,36 +16,38 @@ hand-written fixture: `frame_layout_is_fixed` here, `describe("the wire format")
 generated from the other, so a change to either that the other does not know about fails a test on
 one side rather than in a venue with the two halves quietly disagreeing about where a message ends.
 
-```bash
+```sh
 cargo test --manifest-path native/cueflow-mesh/Cargo.toml
 ```
 
 16 tests, no radio needed.
 
-## What is not here yet, and why
+## What uses it
 
-The Bluetooth binding, and the Tauri shell around it. Both were left out rather than sketched,
-because neither can be compiled or run on the machine this was written on: there is a Rust
-toolchain but no Java and no Android SDK. Rust that has never been built is not progress.
+`../src-tauri` is the app. Its `src/ble.rs` is the Bluetooth binding this file used to say was
+missing; it takes this crate's framing and hop counting and puts a radio under them. `src/lan.rs` is
+the other half of the hybrid, and `src/hub.rs` is what makes the two one mesh rather than two
+separate ones: everything a plane hears is deduped, handed to the window, and re-flooded to the
+other plane, so a phone on Bluetooth hears a cue that was sent over Wi-Fi.
 
-What it needs, in the order the risk sits:
+Read `../src-tauri/README.md` for how to build and run it.
 
-1. **Android host.** `BluetoothLeAdvertiser` and `BluetoothGattServer`, from a Kotlin Tauri plugin.
-   There is no crate for this — `btleplug` (which `tauri-plugin-blec` wraps) is central-only and
-   says so, `ble-peripheral-rust` has bluez, corebluetooth and winrt backends and no Android one,
-   and `bluster` is BlueZ only. Needs `BLUETOOTH_ADVERTISE`, `BLUETOOTH_CONNECT` and
-   `BLUETOOTH_SCAN` with `neverForLocation`, plus a foreground service of type `connectedDevice` to
-   survive Doze.
-2. **Windows host.** WinRT has `GattServiceProvider` and `BluetoothLEAdvertisementPublisher`, and
-   `ble-peripheral-rust`'s `winrt` backend wraps them — but it is 61 stars and 13 commits, so
-   prototype it before committing. `btleplug` covers the central role so a Windows machine can also
-   connect outward.
-3. **The relay itself.** Accept writes on `SHOW_INBOX`, notify on `SHOW_OUTBOX`, and forward what
-   arrives to every other connected device with `relay_ttl` applied. The dedup lives in the router
-   above (`src/lib/transport.ts`), so the host only has to count hops and not echo to the sender.
+## The gap that is still real
 
-The service and characteristic UUIDs are fixed in `src/lib/transports/ble.ts`. Both halves have to
-agree and the host cannot be asked which it prefers before it has been found.
+**Android cannot host.** `BluetoothLeAdvertiser` and `BluetoothGattServer` are Java classes and there
+is no Rust crate that reaches them: `btleplug` is central-only and says so, `ble-peripheral-rust` has
+bluez, corebluetooth and winrt backends and no Android one, and `bluster` is BlueZ only. So an
+Android device joins a host over Bluetooth and relays over Wi-Fi, but cannot be the Bluetooth host
+itself. `ble.rs` reports that in its status line rather than failing quietly.
+
+Closing it means a Kotlin Tauri plugin holding the advertiser and the GATT server, needing
+`BLUETOOTH_ADVERTISE`, `BLUETOOTH_CONNECT` and `BLUETOOTH_SCAN` with `neverForLocation`, plus a
+foreground service of type `connectedDevice` to survive Doze. The permissions are already written by
+`scripts/patch-android-manifest.mjs`; the plugin is not.
+
+In practice a laptop is usually in the room and is the Bluetooth host, and every Android device in
+range of the same Wi-Fi is a full peer on that plane, so the gap costs a phone-only room rather than
+a normal one.
 
 Android holds roughly seven GATT connections, fewer on some hardware, which is the reason the hop
 count exists: a room larger than that needs a second device relaying.

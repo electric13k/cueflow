@@ -169,7 +169,7 @@ export const fromBytes = <T>(bytes: Uint8Array): T | null => {
  * way at all. Measured BLE throughput on phones runs from about 2.7 kB/s at the pessimistic end to
  * roughly 100 kB/s where Data Length Extension and a short connection interval both land. A cue is
  * a couple of hundred bytes and arrives instantly either way. A 180 KB script does not: at the slow
- * end that is over a minute, which is why `bleTransport` refuses it rather than appearing to hang.
+ * end that is over a minute, which is why the native plane refuses it rather than appearing to hang.
  */
 export const transferMs = (bytes: number, bytesPerSecond = 8_000, frameSize = BLE_FRAME) => {
   const frames = Math.ceil(bytes / (frameSize - FRAME_HEADER));

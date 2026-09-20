@@ -1,0 +1,236 @@
+# CueFlow native installers, GitLab edition.
+#
+# The GitHub workflow at .github/workflows/native-release.yml is the reference pipeline; this
+# file does the same work in GitLab's own syntax rather than mirroring its YAML line for line.
+# Both exist because the project is connected to both remotes, and the developer's machine has
+# no Java, no Android SDK and no NDK, so an .apk can only ever come out of CI.
+
+stages:
+  - test
+  - build
+  - release
+
+variables:
+  # Keep cargo's download cache inside the project directory; GitLab can only cache paths
+  # under $CI_PROJECT_DIR, and the default ~/.cargo is outside it.
+  CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
+  # Pinned because the Tauri Android build needs an exact path in NDK_HOME, not whichever NDK
+  # sdkmanager happened to install last. Same value as the GitHub workflow.
+  NDK_VERSION: "27.2.12479018"
+
+# Two caches, keyed on the two lockfiles, so a dependency bump on one side does not throw away
+# the other side's cache. Referenced by every job that compiles anything.
+.caches:
+  cache:
+    - key:
+        files:
+          - package-lock.json
+      paths:
+        - node_modules/
+    - key:
+        files:
+          - src-tauri/Cargo.lock
+      paths:
+        - .cargo/registry/
+        - .cargo/git/
+        - src-tauri/target/
+
+# The Tauri v2 Linux dependency set. libwebkit2gtk-4.1-dev is the v2 webview (v1's 4.0 package
+# will not do), and libdbus-1-dev plus pkg-config are what btleplug needs to reach BlueZ.
+# rust:1-bookworm carries a current stable toolchain, which matters because the path dependency
+# native/cueflow-mesh is edition 2024 and so needs Rust 1.85 or newer.
+.linux-native:
+  extends: .caches
+  image: rust:1-bookworm
+  before_script:
+    - apt-get update
+    - >-
+      apt-get install -y --no-install-recommends
+      libwebkit2gtk-4.1-dev
+      build-essential
+      curl
+      wget
+      file
+      libxdo-dev
+      libssl-dev
+      libayatana-appindicator3-dev
+      librsvg2-dev
+      libdbus-1-dev
+      pkg-config
+      ca-certificates
+      gnupg
+    # Debian bookworm ships a Node too old for this frontend, so pull Node 22 from NodeSource.
+    - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    - apt-get install -y nodejs
+    - npm ci
+
+test:web:
+  stage: test
+  extends: .caches
+  image: node:22-bookworm
+  script:
+    - npm ci
+    - npm test
+
+test:rust:
+  stage: test
+  extends: .linux-native
+  script:
+    - cargo test --manifest-path src-tauri/Cargo.toml
+
+# Produces the .AppImage and the .deb. No cargo feature flags are passed on any target:
+# src-tauri/build.rs picks the BLE peripheral role from CARGO_CFG_TARGET_OS, so desktop and
+# Android cannot be configured inconsistently by hand.
+build:linux:
+  stage: build
+  extends: .linux-native
+  needs:
+    - test:web
+    - test:rust
+  script:
+    # tauri.conf.json runs "npm run build" as beforeBuildCommand, so this one command covers
+    # the web build as well.
+    - npm run tauri build
+  artifacts:
+    name: "cueflow-linux-$CI_COMMIT_REF_SLUG"
+    expire_in: 30 days
+    paths:
+      - src-tauri/target/release/bundle/appimage/
+      - src-tauri/target/release/bundle/deb/
+
+# Windows installers need GitLab's hosted Windows runner, which is not included in every
+# account's plan, and a job whose runner tag nothing carries sits pending until it times out.
+# So this job is opt in: set CI_WINDOWS_RUNNER to "true" in Settings, CI/CD, Variables once you
+# know a saas-windows runner is available to this project. On GitHub this is not a question;
+# windows-latest is always there, so the GitHub workflow builds Windows unconditionally.
+build:windows:
+  stage: build
+  extends: .caches
+  needs:
+    - test:web
+    - test:rust
+  tags:
+    - saas-windows-medium-amd64
+  rules:
+    - if: $CI_WINDOWS_RUNNER == "true"
+  before_script:
+    - choco install -y --no-progress nodejs-lts rustup.install
+    - $env:Path = "C:\Program Files\nodejs;$env:USERPROFILE\.cargo\bin;$env:Path"
+    - rustup default stable
+    - npm ci
+  script:
+    - npm run tauri build
+  artifacts:
+    name: "cueflow-windows-$CI_COMMIT_REF_SLUG"
+    expire_in: 30 days
+    paths:
+      - src-tauri/target/release/bundle/nsis/
+      - src-tauri/target/release/bundle/msi/
+
+# Google's command line tools archive carries a build number in its filename and there is no
+# stable "latest" alias to fetch, so the URL is a project variable rather than a number hard
+# coded here that would rot without anyone noticing. Set ANDROID_CMDLINE_TOOLS_URL in
+# Settings, CI/CD, Variables to the Linux .zip listed at
+# https://developer.android.com/studio#command-line-tools-only to turn this job on.
+# GitHub Actions does not need this; android-actions/setup-android resolves it there.
+build:android:
+  stage: build
+  extends: .caches
+  image: rust:1-bookworm
+  needs:
+    - test:web
+    - test:rust
+  rules:
+    - if: $ANDROID_CMDLINE_TOOLS_URL
+  variables:
+    ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
+  before_script:
+    - apt-get update
+    # 17 is the JDK the current Android Gradle Plugin expects.
+    - >-
+      apt-get install -y --no-install-recommends
+      curl
+      unzip
+      file
+      ca-certificates
+      gnupg
+      openjdk-17-jdk-headless
+    - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    - apt-get install -y nodejs
+    - npm ci
+    - mkdir -p "$ANDROID_HOME/cmdline-tools"
+    - curl -fsSL -o /tmp/cmdline-tools.zip "$ANDROID_CMDLINE_TOOLS_URL"
+    - unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools"
+    # sdkmanager insists on living in cmdline-tools/latest/bin or it cannot find its own SDK root.
+    - mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+    - export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+    - yes | sdkmanager --licenses > /dev/null
+    # Only the pieces Gradle cannot fetch for itself. The compile SDK and build tools are
+    # resolved from the generated Gradle project, so no version numbers are guessed here.
+    - sdkmanager "platform-tools" "ndk;$NDK_VERSION"
+    - export NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+    - rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+  script:
+    # src-tauri/gen/android is generated rather than committed, so init runs on every clean
+    # checkout. It is idempotent, so it needs no guard.
+    - npm run tauri android init
+    # init writes the manifest from a template every time, so the Bluetooth and local network
+    # permissions are re-applied after it and before the build. The script is idempotent.
+    - node scripts/patch-android-manifest.mjs
+    # Signing runs after init because init rewrites src-tauri/gen/android and would discard a
+    # keystore written before it. Without a keystore a release APK comes out unsigned and will
+    # not install, so the unsigned path builds --debug, which Gradle signs with the debug key.
+    - |
+      if [ -n "$ANDROID_KEY_BASE64" ] && [ -n "$ANDROID_KEY_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ]; then
+        echo "$ANDROID_KEY_BASE64" | base64 --decode > src-tauri/gen/android/keystore.jks
+        printf 'storeFile=keystore.jks\npassword=%s\nkeyAlias=%s\n' \
+          "$ANDROID_KEY_PASSWORD" "$ANDROID_KEY_ALIAS" \
+          > src-tauri/gen/android/keystore.properties
+        npm run tauri android build -- --apk
+      else
+        echo "WARNING: ANDROID_KEY_BASE64, ANDROID_KEY_PASSWORD and ANDROID_KEY_ALIAS are not"
+        echo "all set, so this APK is a debug build with no release signature. Installing it"
+        echo "needs 'install unknown apps' enabled, and a later signed release cannot upgrade"
+        echo "it in place, because Android refuses an update signed by a different key."
+        npm run tauri android build -- --apk --debug
+      fi
+  artifacts:
+    name: "cueflow-android-$CI_COMMIT_REF_SLUG"
+    expire_in: 30 days
+    paths:
+      - src-tauri/gen/android/app/build/outputs/apk/
+
+# Tags only. GitLab releases point at job artifacts by URL rather than re-uploading them, so
+# each link below resolves to that job's artifact archive for this tag. The Windows and Android
+# links only resolve if those two jobs actually ran; see the gates on each.
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build:linux
+      artifacts: false
+    - job: build:windows
+      artifacts: false
+      optional: true
+    - job: build:android
+      artifacts: false
+      optional: true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+  script:
+    - echo "Publishing the CueFlow release for $CI_COMMIT_TAG."
+  release:
+    tag_name: "$CI_COMMIT_TAG"
+    name: "CueFlow $CI_COMMIT_TAG"
+    description: "CueFlow native installers for $CI_COMMIT_TAG."
+    assets:
+      links:
+        - name: "Linux .AppImage and .deb"
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build:linux"
+          link_type: package
+        - name: "Windows .exe and .msi"
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build:windows"
+          link_type: package
+        - name: "Android .apk"
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build:android"
+          link_type: package

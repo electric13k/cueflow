@@ -1,0 +1,287 @@
+name: native-release
+
+# Two ways in: a tag cuts a real release, and the manual button lets anyone pull an installer
+# off master without tagging, which is how the developer gets an .apk at all (there is no
+# Java, Android SDK or NDK on the dev machine, so CI is the only place an APK can be built).
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+# Read only by default; the release job raises itself to contents: write because it is the
+# only job that writes anything back to GitHub.
+permissions:
+  contents: read
+
+env:
+  # One place to bump Node, so the test, desktop and android jobs cannot drift apart.
+  NODE_VERSION: "22"
+  # Pinned because Tauri needs an exact NDK path in NDK_HOME, not "whatever sdkmanager
+  # installed last"; bumping this is a deliberate one-line change.
+  ANDROID_NDK_VERSION: "27.2.12479018"
+
+jobs:
+  # Gate for everything else: a broken test suite should not spend twenty minutes of
+  # Windows and Android runner time producing installers nobody will ship.
+  test:
+    name: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # cargo test links the same native libraries the desktop bundle does, so it needs the
+      # full Tauri v2 dependency set, not a subset. libdbus-1-dev and pkg-config are here for
+      # btleplug, which talks to BlueZ over D-Bus on Linux.
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            pkg-config
+
+      # stable, not a pinned older version: the path dependency native/cueflow-mesh is
+      # edition 2024, which needs Rust 1.85 or newer.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - run: npm ci
+
+      - name: Run the web test suite
+        run: npm test
+
+      - name: Run the Rust test suite
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  desktop:
+    name: desktop (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing should still leave the other platform's installer downloadable.
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # Same list as the test job; Ubuntu only, because Windows gets WebView2 and its
+      # Bluetooth stack from the OS.
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      # tauri-action shells out to the Tauri CLI from node_modules, and tauri.conf.json runs
+      # "npm run build" as beforeBuildCommand, so the web build needs the deps too.
+      - run: npm ci
+
+      # No feature flags are passed on any target: src-tauri/build.rs decides the BLE
+      # peripheral role from CARGO_CFG_TARGET_OS, so the desktop and Android builds cannot be
+      # configured inconsistently by hand.
+      - name: Build the desktop bundles
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Uploading by extension rather than by the action's artifactPaths output keeps this
+      # readable and works unchanged on both runners; the globs that do not apply to a given
+      # OS simply match nothing.
+      - name: Upload the installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: cueflow-desktop-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+
+  android:
+    name: android
+    needs: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      # 17 is the JDK the current Android Gradle Plugin expects; 21 is not universally safe here.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      # setup-android brings the SDK but not an NDK, and Tauri will not cross compile the
+      # Rust side without one. NDK_HOME is the variable the Tauri Android build reads.
+      - name: Install the Android NDK
+        run: |
+          sdkmanager "ndk;${ANDROID_NDK_VERSION}"
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      # src-tauri/gen/android is generated, not committed, so init has to run on every clean
+      # checkout. It is idempotent, so there is no need to guard it.
+      - name: Generate the Android project
+        run: npm run tauri android init
+
+      # init writes the manifest from a template every time, so the Bluetooth and local network
+      # permissions have to be re-applied after it and before the build, or the APK ships with a
+      # mesh that silently never starts. The script is idempotent.
+      - name: Apply the CueFlow Android manifest permissions
+        run: node scripts/patch-android-manifest.mjs
+
+      # Runs after init on purpose: init rewrites src-tauri/gen/android, so a keystore written
+      # before it would be thrown away.
+      - name: Prepare the release signing keystore
+        id: signing
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEY_BASE64}" ] || [ -z "${ANDROID_KEY_PASSWORD}" ] || [ -z "${ANDROID_KEY_ALIAS}" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets are not all set; this run will produce a debug APK."
+            exit 0
+          fi
+          echo "${ANDROID_KEY_BASE64}" | base64 --decode > src-tauri/gen/android/keystore.jks
+          # storeFile is relative to src-tauri/gen/android, which is where Gradle reads
+          # keystore.properties from.
+          printf 'storeFile=keystore.jks\npassword=%s\nkeyAlias=%s\n' \
+            "${ANDROID_KEY_PASSWORD}" "${ANDROID_KEY_ALIAS}" \
+            > src-tauri/gen/android/keystore.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      # Without a keystore a release APK would come out unsigned and refuse to install, so the
+      # unsigned path builds --debug instead, which Gradle signs with the debug key and a phone
+      # will actually accept.
+      - name: Build the APK
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            npm run tauri android build -- --apk
+          else
+            npm run tauri android build -- --apk --debug
+          fi
+
+      - name: Say in the summary whether the APK is signed
+        if: always()
+        run: |
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            {
+              echo "### Android APK: signed release build"
+              echo ""
+              echo "Signed with the keystore from the ANDROID_KEY_BASE64 secret."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### Android APK: UNSIGNED debug build"
+              echo ""
+              echo "The secrets ANDROID_KEY_BASE64, ANDROID_KEY_PASSWORD and ANDROID_KEY_ALIAS"
+              echo "were not all present, so this APK carries no release signature."
+              echo ""
+              echo "To install it you must enable \"install unknown apps\" for whichever app"
+              echo "hands the file to the installer, in Settings, Apps, Special app access."
+              echo "Do not distribute this build; it cannot be upgraded in place by a later"
+              echo "signed release, because Android refuses an update signed by a different key."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cueflow-android-apk
+          if-no-files-found: error
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+  release:
+    name: release
+    needs:
+      - desktop
+      - android
+    # Only a tag produces a Release; a manual run still leaves every installer downloadable
+    # from the run's artifacts.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    # The one job allowed to write to the repository.
+    permissions:
+      contents: write
+    steps:
+      - name: Collect every installer
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Attach the installers to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          # If an expected installer went missing, fail loudly rather than publishing a
+          # release that is quietly short of a platform.
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.msi
+            artifacts/**/*.deb
+            artifacts/**/*.AppImage
+            artifacts/**/*.apk

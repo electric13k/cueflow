@@ -2,20 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import type { ShowMsg } from "./shows";
 import { openShowLink, PayloadTooLarge, type Router, type Transport } from "./transport";
 import { cloudTransport } from "./transports/cloud";
-import { bleTransport } from "./transports/ble";
+import { nativeTransport } from "./transports/native";
 import { toast } from "./toast";
 
 /**
  * The transports a show will try, in order of preference.
  *
- * Cloud is last because it is the only one that needs the venue to have working internet, and a
- * venue is exactly where that is not true. Bluetooth is ahead of it but is not tried on its own
- * initiative: Web Bluetooth will not scan without the operator picking a device from the browser's
- * chooser, so `bleTransport.available()` reports only that the radio exists. Putting it first means
- * a room that has already been joined over Bluetooth stays on Bluetooth; a room that has not falls
- * through to the cloud in the usual way.
+ * The local mesh is first because it is the only one that works where shows happen. It needs no
+ * internet, no venue wifi password and no account: the devices in the room find each other over
+ * wifi and Bluetooth at once, and a message crosses the room instead of crossing a datacentre.
+ *
+ * Cloud is the fallback, and it is last for the reason it exists: it reaches anyone holding the
+ * show id from anywhere, which is what a rehearsal across town needs, but it needs the venue to
+ * have working internet and a venue is exactly where that is not true. On the website the mesh
+ * reports itself unavailable at once, so a browser goes straight to the cloud and pays nothing for
+ * the probe.
  */
-export const showTransports: Transport[] = [bleTransport, cloudTransport];
+export const showTransports: Transport[] = [nativeTransport, cloudTransport];
 
 /**
  * A message sent before the link is up is not dropped, it waits. This is the whole reason the crew
@@ -68,10 +71,12 @@ export type ShowLinkHandle = {
   /**
    * Probe the transports again, now, without waiting out the backoff.
    *
-   * The reason this exists is Bluetooth. `bleTransport.available()` answers false until the operator
-   * has pressed something, because `requestDevice` puts the browser's own chooser on screen and will
-   * not run from a background probe. So the press that turns Bluetooth on has to be able to say "ask
-   * again", or the transport it just enabled would not be considered until the next reconnect.
+   * A transport can become available after the link was opened: the native app finishes starting
+   * its mesh, or the venue's wifi comes back. The router only re-probes when the current link
+   * drops, and a link that is working badly over the cloud never drops, so without this the show
+   * would stay on the slower wire until something broke. Something has to be able to say "ask
+   * again" at the moment the answer changes, rather than at the end of a backoff measured in tens
+   * of seconds.
    */
   reopen: () => void;
   readonly transport: string | null;
@@ -104,9 +109,9 @@ export function createShowLink(options: ShowLinkOptions): ShowLinkHandle {
    *
    * A message no link can carry must not go back on the queue. Retrying it forever is worse than
    * dropping it: it is re-sent on every flush, and since `push` appends while the queue evicts from
-   * the front, a deck too big for a Bluetooth link quietly shifts the real cues out behind it. The
-   * caller is told instead, because "the script is too long to send over Bluetooth" is something the
-   * operator can act on and a silently missing cue is not.
+   * the front, a deck too big for the link quietly shifts the real cues out behind it. The caller is
+   * told instead, because "the script is too long to send over this link" is something the operator
+   * can act on and a silently missing cue is not.
    */
   const deliver = (open: Router, msg: ShowMsg) => {
     try { open.send(msg); }

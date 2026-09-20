@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the CueFlow window is allowed to ask the native side for. The mesh commands are not listed because `invoke_handler` commands are reachable by default; this file governs the plugins, and the only one here is the opener, which the help links use.",
+  "windows": ["main"],
+  "permissions": ["core:default", "opener:default"]
+}
